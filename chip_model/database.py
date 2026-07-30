@@ -310,9 +310,27 @@ def search_chips(
             for rid, recs in grouped.items():
                 summaries[rid] = _build_provenance_summary(recs)
 
+        # ── Benchmark & compatibility counts ──
+        bm_counts: dict[str, int] = {}
+        comp_counts: dict[str, int] = {}
+        if rows:
+            chip_models = [r["chip_model"] for r in rows if r.get("chip_model")]
+            for cm in chip_models:
+                bm_counts[cm] = db.execute(
+                    "SELECT COUNT(*) FROM chip_model_benchmarks WHERE chip_model LIKE ?",
+                    (f"%{cm}%",),
+                ).fetchone()[0]
+                comp_counts[cm] = db.execute(
+                    "SELECT COUNT(*) FROM chip_model_compatibility WHERE chip_model LIKE ?",
+                    (f"%{cm}%",),
+                ).fetchone()[0]
+
         result_chips = []
         for r in rows:
             c = chip_summary(r)
+            cm = r.get("chip_model", "")
+            c["_benchmark_count"] = bm_counts.get(cm, 0)
+            c["_compat_count"] = comp_counts.get(cm, 0)
             if include_provenance:
                 c["_provenance"] = summaries.get(str(r["id"]), {
                     "field_count": 0, "record_count": 0, "sources": [],

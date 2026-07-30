@@ -98,6 +98,8 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 .card-stat .value{font-weight:600;font-variant-numeric:tabular-nums}
 
 .card-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.card-meta{display:flex;gap:12px;font-size:0.7rem;color:var(--text3);margin-top:6px;padding-top:6px;border-top:1px solid var(--bg4)}
+.card-meta span{display:flex;align-items:center;gap:3px}
 .tag{
   font-size:0.68rem;padding:2px 8px;border-radius:4px;
   background:var(--bg3);color:var(--text2);
@@ -146,9 +148,20 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 .group.collapsed .group-header::after{content:'+'}
 .group-body{padding:10px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:5px}
 .group.collapsed .group-body{display:none}
-.group-field{display:flex;justify-content:space-between;font-size:0.78rem;gap:6px}
-.group-field .key{color:var(--text3);white-space:nowrap}
-.group-field .val{font-weight:500;text-align:right;word-break:break-all}
+.group-field{display:flex;justify-content:space-between;font-size:0.78rem;gap:6px;padding:4px 6px;border-bottom:1px solid var(--bg4);border-radius:2px}
+.group-field:nth-child(even){background:var(--bg4)}
+.group-field .key{color:var(--text3);white-space:nowrap;min-width:120px}
+.group-field .val{font-weight:500;text-align:right;word-break:break-all;position:relative;cursor:help}
+.group-field .val:hover{color:var(--accent)}
+
+/* Provenance tooltip */
+.prov-tooltip{display:none;position:absolute;bottom:calc(100% + 6px);right:0;z-index:999;
+  background:var(--bg2);border:1px solid var(--accent);border-radius:var(--radius-sm);
+  padding:8px 10px;min-width:240px;max-width:380px;box-shadow:0 8px 24px rgba(0,0,0,0.5);
+  font-size:0.68rem;text-align:left;pointer-events:none}
+.prov-tooltip .pt-src{color:var(--accent);word-break:break-all;margin-bottom:3px}
+.prov-tooltip .pt-meta{color:var(--text3)}
+.val-has-provenance:hover .prov-tooltip{display:block}
 
 /* Provenance row */
 .prov-row{
@@ -446,6 +459,10 @@ async function searchChips(){
         ${c.production_status?`<span class="tag ${isUndisclosed?'undisclosed':''}">${esc(c.production_status)}</span>`:''}
         ${c.process_node_nm?`<span class="tag">${esc(c.process_node_nm)}nm</span>`:''}
       </div>
+      ${(c._benchmark_count||c._compat_count)?`<div class="card-meta">
+        ${c._benchmark_count?`<span title="评测数据">📊 ${c._benchmark_count}条实测</span>`:''}
+        ${c._compat_count?`<span title="兼容模型">🔗 ${c._compat_count}个兼容</span>`:''}
+      </div>`:''}
     </div>
   `}).join('');
 }
@@ -471,9 +488,23 @@ async function openChipProfile(id){
   const groupsHtml = CHIP_GROUPS.map(([key,label])=>{
     const g = chip[key];
     if(!g||Object.keys(g).length===0)return'';
+    const fp = data.field_provenance || {};
     const fields = Object.entries(g)
       .filter(([k])=>k!=='id'&&!k.startsWith('_'))
-      .map(([k,v])=>`<div class="group-field"><span class="key">${esc(k)}</span><span class="val">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}</span></div>`)
+      .map(([k,v])=>{
+        const prov = fp[k];
+        const hasProv = prov && prov.history && prov.history.length > 0;
+        let tooltipHtml = '';
+        if(hasProv){
+          const latest = prov.history[0];
+          tooltipHtml = `<div class="prov-tooltip">
+            <div class="pt-src">${esc((latest.source_url||'').slice(0,120))}</div>
+            <div class="pt-meta">${esc(latest.source_type||'?')} · ${esc(latest.confidence||'?')} · ${esc((latest.updated_at||'').slice(0,16))}${latest.is_official==='1'?' · ✓官方':''}</div>
+            ${prov.update_count>1?`<div class="pt-meta" style="margin-top:2px">${prov.update_count}次变更</div>`:''}
+          </div>`;
+        }
+        return `<div class="group-field"><span class="key">${esc(k)}</span><span class="val${hasProv?' val-has-provenance':''}">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}${tooltipHtml}</span></div>`;
+      })
       .join('');
     return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${label}</div><div class="group-body">${fields}</div></div>`:'';
   }).join('');
