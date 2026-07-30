@@ -183,6 +183,7 @@ def api_chip_recommend(
         price_wan = float(chip_dict.get("price_cny_wan", 0) or 0)
 
         vram_cards = max(1, int(min_vram_total / vram) + 1)
+        vram_cards = _round_up_pow2(vram_cards)
         deadline_cards = vram_cards
         estimated_days = None
 
@@ -195,6 +196,7 @@ def api_chip_recommend(
                     vram_cards,
                     int(total_flops / (effective_per_card_day * training_days)) + 1,
                 )
+                deadline_cards = _round_up_pow2(deadline_cards)
                 estimated_days = round(
                     total_flops / (effective_per_card_day * deadline_cards), 1
                 )
@@ -267,6 +269,21 @@ def api_chip_recommend(
             "sla_satisfaction", "data_quality", "production_readiness",
         ],
     }
+
+
+def _next_pow2(n: int) -> int:
+    """Return the smallest power of 2 >= n."""
+    if n <= 1:
+        return 1
+    p = 1
+    while p < n:
+        p <<= 1
+    return p
+
+
+def _round_up_pow2(n: int) -> int:
+    """Round n up to nearest power of 2 (for GPU cluster sizing)."""
+    return _next_pow2(n)
 
 
 def _parse_fp16(perf_str: str) -> float:
