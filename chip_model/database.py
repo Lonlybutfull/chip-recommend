@@ -314,16 +314,17 @@ def search_chips(
         bm_counts: dict[str, int] = {}
         comp_counts: dict[str, int] = {}
         if rows:
-            chip_models = [r["chip_model"] for r in rows if r.get("chip_model")]
-            for cm in chip_models:
-                bm_counts[cm] = db.execute(
-                    "SELECT COUNT(*) FROM chip_model_benchmarks WHERE chip_model LIKE ?",
-                    (f"%{cm}%",),
-                ).fetchone()[0]
-                comp_counts[cm] = db.execute(
-                    "SELECT COUNT(*) FROM chip_model_compatibility WHERE chip_model LIKE ?",
-                    (f"%{cm}%",),
-                ).fetchone()[0]
+            for r in rows:
+                cm = r.get("chip_model", "")
+                if cm:
+                    bm_counts[cm] = db.execute(
+                        "SELECT COUNT(*) FROM chip_model_benchmarks WHERE chip_model LIKE ?",
+                        (f"%{cm}%",),
+                    ).fetchone()[0]
+                    comp_counts[cm] = db.execute(
+                        "SELECT COUNT(*) FROM chip_model_compatibility WHERE chip_model LIKE ?",
+                        (f"%{cm}%",),
+                    ).fetchone()[0]
 
         result_chips = []
         for r in rows:
