@@ -334,6 +334,75 @@ function $(id){return document.getElementById(id)}
 function show(el,disp=''){el.style.display=disp}
 function hide(el){el.style.display='none'}
 
+/* ═══ Model multi-select ═══ */
+const SELECTED_MODELS = [];
+let MODEL_LIST = [];
+
+async function loadModelList(){
+  const data = await fetchJSON(`${API}/models?limit=250`);
+  if(!data._error && data.models){
+    MODEL_LIST = data.models.map(m=>({
+      id: m.model_id || m.id || '',
+      author: m.author||'',
+      params: m.total_params_b||'?',
+      arch: m.architecture_family||'',
+      tag: m.pipeline_tag||'',
+      downloads: parseInt(m.downloads)||0,
+    })).filter(m=>m.id).sort((a,b)=>{
+      const pa=parseFloat(a.params)||0, pb=parseFloat(b.params)||0;
+      return pb-pa||(b.downloads||0)-(a.downloads||0);
+    });
+  }
+}
+
+function handleModelInput(e){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const input=$('rec-model-input'), val=(input.value||'').trim();
+    if(val && !SELECTED_MODELS.includes(val)){
+      SELECTED_MODELS.push(val);
+      renderModelTags();
+    }
+    input.value='';
+    hide($('model-suggestions'));
+  }else if(e.key==='Backspace' && !$('rec-model-input').value && SELECTED_MODELS.length){
+    SELECTED_MODELS.pop();
+    renderModelTags();
+  }
+}
+
+function renderModelTags(){
+  $('model-tags').innerHTML = SELECTED_MODELS.map((m,i)=>`<span style=\"background:var(--accent2);color:#fff;padding:2px 8px;border-radius:4px;font-size:0.73rem;display:flex;align-items:center;gap:4px;cursor:pointer\" onclick=\"SELECTED_MODELS.splice(${i},1);renderModelTags()\">${esc(m)} ✕</span>`).join('');
+  $('rec-model').value = SELECTED_MODELS.join(',');
+}
+
+function suggestModels(){
+  const input=$('rec-model-input'), q=(input.value||'').toLowerCase().trim();
+  const sug=$('model-suggestions');
+  if(!q || q.length<2){hide(sug);return}
+  const matches = MODEL_LIST.filter(m=>
+    m.id.toLowerCase().includes(q) || m.author.toLowerCase().includes(q)
+  ).slice(0,15);
+  if(!matches.length){hide(sug);return}
+  sug.innerHTML = matches.map(m=>`<div style=\"padding:6px 10px;cursor:pointer;font-size:0.78rem;border-bottom:1px solid var(--bg4)\" onmousedown=\"event.preventDefault();addModel('${esc(m.id).replace(/'/g,\"\\\\'\")}')\" onmouseover=\"this.style.background='var(--bg3)'\" onmouseout=\"this.style.background=''\">${esc(m.id)} <span style=\"color:var(--text3);font-size:0.68rem\">${esc(m.params)}B · ${esc(m.arch)}</span></div>`).join('');
+  show(sug,'block');
+}
+function addModel(id){
+  if(!SELECTED_MODELS.includes(id)){
+    SELECTED_MODELS.push(id);
+    renderModelTags();
+  }
+  $('rec-model-input').value='';
+  hide($('model-suggestions'));
+}
+
+// Close suggestions on click outside
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#model-suggestions') && !e.target.closest('#rec-model-input')){
+    hide($('model-suggestions'));
+  }
+});
+
 function esc(s){
   if(!s&&s!==0)return'';
   const d=document.createElement('div');d.textContent=String(s);return d.innerHTML;
@@ -685,9 +754,15 @@ function renderFieldProvenance(fp) {
 /* ═══════════════════ RECOMMEND ═══════════════════ */
 function initRecommend(){
   STATE.vendors = STATE.vendors || [];
+  loadModelList(); // Preload model list for suggestions
   $('rec-form').innerHTML = `
     <div class="recommend-form">
-      <div class="form-group"><label>模型名称 *</label><input type="text" id="rec-model" placeholder="Qwen2.5-7B / Llama-3.1-8B …"></div>
+      <div class="form-group" style="grid-column:1/-1"><label>模型名称 * (多选，逗号分隔或逐个回车添加)</label>
+        <div id="model-tags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px"></div>
+        <input type="text" id="rec-model-input" placeholder="输入模型名模糊搜索… (如 Qwen2.5-7B)" onkeydown="handleModelInput(event)" oninput="suggestModels()" autocomplete="off">
+        <div id="model-suggestions" style="display:none;max-height:200px;overflow-y:auto;background:var(--bg3);border:1px solid var(--bg4);border-radius:4px;margin-top:2px"></div>
+        <input type="hidden" id="rec-model" value="">
+      </div>
       <div class="form-group"><label>场景</label><select id="rec-scenario"><option value="train">训练</option><option value="inference">推理</option></select></div>
       <div class="form-group"><label>期望训练天数</label><input type="number" id="rec-days" placeholder="3" min="0.1" step="0.5"></div>
       <div class="form-group"><label>目标推理吞吐 (tok/s)</label><input type="number" id="rec-tps" placeholder="可选" min="0"></div>
@@ -787,20 +862,23 @@ async function searchCompat(){
   sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 条兼容记录</span>`;
   if(!data.compatibilities||!data.compatibilities.length){results.innerHTML='<div class="empty">未找到匹配的兼容记录</div>';return}
 
-  results.innerHTML = data.compatibilities.map(c=>`
+  results.innerHTML = data.compatibilities.map(c=>{
+    const iden = c.identity || c;
+    const det = c.compat_details || c;
+    return `
     <div style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius-sm);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div>
-        <div style="font-weight:600;font-size:0.85rem">${esc(c.chip_model)} ↔ ${esc(c.model_id)}</div>
+        <div style="font-weight:600;font-size:0.85rem">${esc(iden.chip_model)} ↔ ${esc(iden.model_id)}</div>
         <div style="font-size:0.73rem;color:var(--text2);margin-top:2px">
-          ${esc(c.framework||'')} · ${esc(c.precision||'')}
-          ${c.notes?`<br>${esc(c.notes)}`:''}
-          ${c.verified_at?`<br><span style="color:var(--text3)">验证于: ${esc(c.verified_at)}</span>`:''}
+          ${esc(det.framework||'')} · ${esc(det.precision||'')}
+          ${det.notes?`<br>${esc(det.notes)}`:''}
+          ${det.verified_at?`<br><span style="color:var(--text3)">验证于: ${esc(det.verified_at)}</span>`:''}
         </div>
       </div>
       <span style="font-size:0.75rem;padding:4px 10px;border-radius:4px;font-weight:600;
-        background:${c.compat_status==='verified'?'rgba(52,211,153,0.15)':c.compat_status==='vendor_claimed'?'rgba(251,146,60,0.15)':'rgba(96,165,250,0.15)'};
-        color:${c.compat_status==='verified'?'var(--green)':c.compat_status==='vendor_claimed'?'var(--orange)':'var(--blue)'}">
-        ${esc(c.compat_status)}
+        background:${det.compat_status==='verified'?'rgba(52,211,153,0.15)':det.compat_status==='vendor_claimed'?'rgba(251,146,60,0.15)':'rgba(96,165,250,0.15)'};
+        color:${det.compat_status==='verified'?'var(--green)':det.compat_status==='vendor_claimed'?'var(--orange)':'var(--blue)'}">
+        ${esc(det.compat_status)}
       </span>
     </div>
   `).join('');
