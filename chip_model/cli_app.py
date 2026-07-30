@@ -56,6 +56,24 @@ from chip_model.database import (
     add_model,
     update_model_fields,
     add_benchmark,
+    update_benchmark_fields,
+    add_compatibility,
+    update_compatibility_fields,
+    get_chip_benchmarks_for_model,
+    get_chip_benchmark_mfu,
+    get_chip_benchmark_tps,
+    get_chip_model_compat_count,
+)
+from chip_model.scoring import (  # v2.0 scoring engine
+    parse_fp16,
+    round_up_pow2,
+    RecommendContext,
+    TRAIN_WEIGHTS,
+    INFERENCE_WEIGHTS,
+    aggregate_score,
+    scoring_result_to_dict,
+)
+    add_benchmark,
     add_compat,
     search_links,
     LinkFilters,
@@ -341,8 +359,14 @@ def chip_recommend(
     tier: Optional[str] = typer.Option(
         "datacenter", "--tier", help="芯片级别: datacenter | all"
     ),
+    training_tokens: Optional[float] = typer.Option(
+        None, "--training-tokens", help="训练数据量 (T tokens)，不设则自动推算"
+    ),
     max_cards: Optional[int] = typer.Option(
         None, "--max-cards", help="最大允许卡数（硬排除）"
+    ),
+    min_cards: Optional[int] = typer.Option(
+        None, "--min-cards", help="最小允许卡数（硬下限，自动取2的幂次方）"
     ),
     max_price: Optional[float] = typer.Option(
         None, "--max-price", help="最高单价 万元/片（硬排除）"
@@ -425,6 +449,12 @@ def chip_recommend(
 
         recommended_cards = deadline_cards
 
+        # Min cards floor (round up min_cards to pow2, then enforce)
+        if min_cards:
+            min_cards_pow2 = _round_up_pow2(min_cards)
+            if recommended_cards < min_cards_pow2:
+                recommended_cards = _round_up_pow2(min_cards_pow2)
+
         # Hard exclude
         if max_cards and recommended_cards > max_cards:
             continue
@@ -470,6 +500,7 @@ def chip_recommend(
             "target_training_days": training_days,
             "target_tokens_per_sec": sla_tps,
             "max_cards": max_cards,
+            "min_cards": min_cards,
             "max_price_wan": max_price,
             "min_maturity": min_maturity,
         },
