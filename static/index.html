@@ -384,7 +384,11 @@ function suggestModels(){
     m.id.toLowerCase().includes(q) || m.author.toLowerCase().includes(q)
   ).slice(0,15);
   if(!matches.length){hide(sug);return}
-  sug.innerHTML = matches.map(m=>`<div style=\"padding:6px 10px;cursor:pointer;font-size:0.78rem;border-bottom:1px solid var(--bg4)\" onmousedown=\"event.preventDefault();addModel('${esc(m.id).replace(/'/g,\"\\\\'\")}')\" onmouseover=\"this.style.background='var(--bg3)'\" onmouseout=\"this.style.background=''\">${esc(m.id)} <span style=\"color:var(--text3);font-size:0.68rem\">${esc(m.params)}B · ${esc(m.arch)}</span></div>`).join('');
+  sug.innerHTML = matches.map(m=>{
+    const mid = esc(m.id);
+    const safeId = mid.replace(/'/g, "\\'");
+    return `<div style="padding:6px 10px;cursor:pointer;font-size:0.78rem;border-bottom:1px solid var(--bg4)" onmousedown="event.preventDefault();addModel('${safeId}')" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">${mid} <span style="color:var(--text3);font-size:0.68rem">${esc(m.params)}B ${esc(m.arch)}</span></div>`;
+  }).join('');
   show(sug,'block');
 }
 function addModel(id){
@@ -881,7 +885,8 @@ async function searchCompat(){
         ${esc(det.compat_status)}
       </span>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 /* ═══════════════════ DB STATUS ═══════════════════ */
