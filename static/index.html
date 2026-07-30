@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AISHPerf — 算力选型知识图谱 v0.5</title>
+<style>
+/* ── Reset & Base ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1119;--bg2:#161925;--bg3:#1e2130;--bg4:#262a38;
+  --text:#e2e4ed;--text2:#9ca3b4;--text3:#6b7280;
+  --accent:#818cf8;--accent2:#6366f1;--green:#34d399;--red:#f87171;
+  --orange:#fb923c;--blue:#60a5fa;--purple:#c084fc;
+  --radius:12px;--radius-sm:8px;--transition:0.2s ease;
+}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.6;
+  min-height:100vh;
+}
+a{color:var(--accent);text-decoration:none}
+
+/* ── Header ── */
+header{
+  background:var(--bg2);border-bottom:1px solid var(--bg4);
+  padding:0 24px;position:sticky;top:0;z-index:100;
+  backdrop-filter:blur(12px);
+}
+.header-inner{
+  max-width:1440px;margin:0 auto;display:flex;align-items:center;
+  justify-content:space-between;height:64px;gap:12px;
+}
+.logo{font-size:1.25rem;font-weight:700;letter-spacing:-0.02em}
+.logo span{color:var(--accent)}
+.version{font-size:0.75rem;color:var(--text3)}
+
+/* ── Tabs ── */
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{
+  background:none;border:none;color:var(--text2);font-size:0.8rem;
+  padding:7px 12px;border-radius:var(--radius-sm);cursor:pointer;
+  font-weight:500;transition:var(--transition);white-space:nowrap;
+}
+nav button:hover{color:var(--text);background:var(--bg3)}
+nav button.active{color:var(--accent);background:var(--bg4)}
+
+/* ── Main ── */
+main{max-width:1440px;margin:0 auto;padding:24px}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ── Filters bar ── */
+.filters{
+  display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;
+  align-items:center;padding:16px;background:var(--bg2);
+  border-radius:var(--radius);border:1px solid var(--bg4);
+}
+.filters input,.filters select{
+  background:var(--bg3);color:var(--text);border:1px solid var(--bg4);
+  border-radius:var(--radius-sm);padding:8px 12px;font-size:0.85rem;
+  outline:none;transition:var(--transition);
+}
+.filters input:focus,.filters select:focus{border-color:var(--accent)}
+.filters input{flex:1;min-width:160px}
+.filters select{min-width:100px}
+.filters .btn{
+  background:var(--accent2);color:#fff;border:none;padding:8px 18px;
+  border-radius:var(--radius-sm);font-weight:600;cursor:pointer;
+  font-size:0.85rem;transition:var(--transition);
+}
+.filters .btn:hover{background:var(--accent);transform:translateY(-1px)}
+.vram-slider{display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--text2)}
+.vram-slider input{width:80px;min-width:60px;text-align:center}
+
+/* ── Cards grid ── */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+.card{
+  background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);
+  padding:16px 18px;cursor:pointer;transition:var(--transition);
+}
+.card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(99,102,241,0.12)}
+
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.card-vendor{
+  font-size:0.72rem;padding:2px 8px;border-radius:4px;
+  font-weight:600;letter-spacing:0.04em;
+}
+.vendor-foreign{background:rgba(96,165,250,0.15);color:var(--blue)}
+.vendor-domestic{background:rgba(251,146,60,0.15);color:var(--orange)}
+.card-model{font-size:1rem;font-weight:600;margin-bottom:4px}
+.card-series{font-size:0.78rem;color:var(--text3);margin-bottom:8px}
+
+.card-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px}
+.card-stat{display:flex;justify-content:space-between;font-size:0.78rem}
+.card-stat .label{color:var(--text3)}
+.card-stat .value{font-weight:600;font-variant-numeric:tabular-nums}
+
+.card-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tag{
+  font-size:0.68rem;padding:2px 8px;border-radius:4px;
+  background:var(--bg3);color:var(--text2);
+}
+.tag.precision{color:var(--purple);background:rgba(192,132,252,0.12)}
+.tag.maturity{color:var(--green);background:rgba(52,211,153,0.12)}
+.tag.compat{color:var(--blue);background:rgba(96,165,250,0.12)}
+.tag.undisclosed{color:var(--red);background:rgba(248,113,113,0.12);font-weight:600}
+
+/* ── Detail panel ── */
+.detail-overlay{
+  display:none;position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);
+  overflow-y:auto;padding:24px;
+}
+.detail-overlay.open{display:flex;justify-content:center;align-items:flex-start}
+.detail-panel{
+  background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);
+  width:100%;max-width:900px;margin:24px 0;
+}
+.detail-header{
+  padding:18px 22px;border-bottom:1px solid var(--bg4);
+  display:flex;justify-content:space-between;align-items:center;
+  position:sticky;top:0;background:var(--bg2);border-radius:var(--radius) var(--radius) 0 0;z-index:10;
+}
+.detail-header h2{font-size:1.1rem}
+.detail-close{
+  background:var(--bg4);border:none;color:var(--text);width:30px;height:30px;
+  border-radius:50%;cursor:pointer;font-size:1rem;display:flex;
+  align-items:center;justify-content:center;transition:var(--transition);
+}
+.detail-close:hover{background:var(--red);color:#fff}
+.detail-body{padding:14px 22px 22px}
+
+.group{
+  margin-bottom:14px;border:1px solid var(--bg4);border-radius:var(--radius-sm);
+  overflow:hidden;
+}
+.group-header{
+  padding:9px 14px;background:var(--bg3);
+  font-size:0.78rem;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.05em;color:var(--accent);cursor:pointer;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.group-header::after{content:'-';font-size:0.9rem}
+.group.collapsed .group-header::after{content:'+'}
+.group-body{padding:10px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:5px}
+.group.collapsed .group-body{display:none}
+.group-field{display:flex;justify-content:space-between;font-size:0.78rem;gap:6px}
+.group-field .key{color:var(--text3);white-space:nowrap}
+.group-field .val{font-weight:500;text-align:right;word-break:break-all}
+
+/* Provenance row */
+.prov-row{
+  font-size:0.72rem;padding:4px 8px;background:var(--bg3);border-radius:4px;
+  margin:2px 0;color:var(--text2);
+}
+.prov-row .prov-src{color:var(--accent);word-break:break-all}
+
+/* ── Table view ── */
+.data-table{width:100%;border-collapse:collapse;font-size:0.78rem}
+.data-table th{
+  text-align:left;padding:8px 10px;background:var(--bg3);
+  color:var(--text2);font-weight:600;border-bottom:1px solid var(--bg4);
+  position:sticky;top:0;
+}
+.data-table td{padding:6px 10px;border-bottom:1px solid var(--bg4)}
+.data-table tr:hover{background:var(--bg3)}
+.table-wrap{max-height:500px;overflow:auto;border:1px solid var(--bg4);border-radius:var(--radius-sm)}
+
+/* ── Recommend form ── */
+.recommend-form{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+  gap:10px;padding:18px;background:var(--bg2);border-radius:var(--radius);
+  border:1px solid var(--bg4);margin-bottom:18px;
+}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:0.73rem;color:var(--text2);font-weight:600}
+.form-group input,.form-group select{
+  background:var(--bg3);color:var(--text);border:1px solid var(--bg4);
+  border-radius:var(--radius-sm);padding:8px 10px;font-size:0.85rem;outline:none;
+}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent)}
+.form-actions{grid-column:1/-1;display:flex;gap:8px}
+.form-actions .btn{padding:9px 24px;font-size:0.88rem}
+.toggle-row{display:flex;align-items:center;gap:6px}
+.toggle-row label{font-size:0.8rem;color:var(--text2)}
+.toggle{
+  width:40px;height:22px;background:var(--bg4);border-radius:11px;
+  position:relative;cursor:pointer;transition:var(--transition);
+}
+.toggle.on{background:var(--accent)}
+.toggle::after{
+  content:'';position:absolute;width:16px;height:16px;background:#fff;
+  border-radius:50%;top:3px;left:3px;transition:var(--transition);
+}
+.toggle.on::after{left:21px}
+
+/* ── Recommend result card ── */
+.rec-card{
+  background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);
+  padding:16px 18px;margin-bottom:10px;transition:var(--transition);
+}
+.rec-card:hover{border-color:var(--accent)}
+.rec-card.best{border-color:var(--accent);box-shadow:0 4px 16px rgba(99,102,241,0.2)}
+.rec-rank{font-size:0.72rem;color:var(--accent);font-weight:700;margin-bottom:3px}
+.rec-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.rec-header h3{font-size:0.95rem}
+.rec-score{font-size:1.3rem;font-weight:700;color:var(--accent)}
+.rec-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px;margin-bottom:8px}
+.rec-stat .label{font-size:0.68rem;color:var(--text3)}
+.rec-stat .value{font-size:0.85rem;font-weight:600}
+.rec-rationale{font-size:0.75rem;color:var(--text2);font-style:italic}
+.score-bar{height:5px;background:var(--bg4);border-radius:3px;margin-top:6px;overflow:hidden;}
+.score-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:3px}
+.scoring-dim{font-size:0.68rem;color:var(--text3);margin-top:6px;line-height:1.5}
+
+/* ── Status cards ── */
+.status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.stat-card{
+  background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);
+  padding:14px;text-align:center;
+}
+.stat-card .num{font-size:1.8rem;font-weight:700;color:var(--accent)}
+.stat-card .lbl{font-size:0.75rem;color:var(--text2);margin-top:3px}
+
+/* ── Loading & Empty ── */
+.loading{text-align:center;padding:36px;color:var(--text3)}
+.spinner{
+  width:30px;height:30px;border:3px solid var(--bg4);border-top-color:var(--accent);
+  border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px;
+}@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:36px;color:var(--text3);font-size:0.85rem}
+.error{background:rgba(248,113,113,0.1);color:var(--red);padding:10px 14px;
+  border-radius:var(--radius-sm);font-size:0.8rem;margin-bottom:10px}
+.info{background:rgba(96,165,250,0.1);color:var(--blue);padding:10px 14px;
+  border-radius:var(--radius-sm);font-size:0.8rem;margin-bottom:10px}
+
+/* ── Provenance field history ── */
+.prov-field{border-bottom:1px solid var(--bg4);padding:8px 0}
+.prov-field:last-child{border-bottom:none}
+.prov-field-header{padding:4px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.prov-field-history{padding-left:12px;border-left:2px solid var(--bg4)}
+.prov-history-row{padding:4px 0;border-bottom:1px dashed var(--bg4)}
+.prov-history-row:last-child{border-bottom:none}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .header-inner{flex-wrap:wrap;height:auto;padding:10px 0;gap:6px}
+  nav{order:3;width:100%;overflow-x:auto}
+  .card-grid{grid-template-columns:1fr}
+  .filters{flex-direction:column}
+  .filters input{min-width:100%}
+  .recommend-form{grid-template-columns:1fr}
+  .detail-panel{margin:8px 0}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">⚡ AISH<span>Perf</span> <span class="version">v0.5</span></div>
+    <nav id="main-nav"></nav>
+  </div>
+</header>
+
+<main>
+<!-- ═══ CHIPS ═══ -->
+<section id="tab-chips" class="tab-panel active">
+  <div class="filters" id="chip-filters"></div>
+  <div id="chip-summary" style="margin-bottom:8px"></div>
+  <div id="chip-results" class="card-grid"></div>
+  <div id="chip-loading" class="loading" style="display:none"><div class="spinner"></div></div>
+</section>
+
+<!-- ═══ MODELS ═══ -->
+<section id="tab-models" class="tab-panel">
+  <div class="filters" id="model-filters"></div>
+  <div id="model-summary" style="margin-bottom:8px"></div>
+  <div id="model-results" class="card-grid"></div>
+  <div id="model-loading" class="loading" style="display:none"><div class="spinner"></div></div>
+</section>
+
+<!-- ═══ RECOMMEND ═══ -->
+<section id="tab-recommend" class="tab-panel">
+  <div id="rec-form"></div>
+  <div id="rec-results"></div>
+  <div id="rec-loading" class="loading" style="display:none"><div class="spinner"></div></div>
+</section>
+
+<!-- ═══ COMPAT ═══ -->
+<section id="tab-compat" class="tab-panel">
+  <div class="filters" id="compat-filters"></div>
+  <div id="compat-summary" style="margin-bottom:8px"></div>
+  <div id="compat-results" style="display:grid;gap:10px"></div>
+  <div id="compat-loading" class="loading" style="display:none"><div class="spinner"></div></div>
+</section>
+
+<!-- ═══ STATUS ═══ -->
+<section id="tab-status" class="tab-panel">
+  <div class="status-grid" id="status-cards"></div>
+  <div id="status-loading" class="loading"></div>
+</section>
+</main>
+
+<!-- ── Detail overlay ── -->
+<div class="detail-overlay" id="detail-overlay" onclick="if(event.target===this)closeDetail()">
+  <div class="detail-panel" id="detail-panel"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   AISHPerf v0.5 — Dynamic component-based SPA
+   ═══════════════════════════════════════════════════════════ */
+
+const API = '/api/v1';
+const STATE = { vendors: [], currentTab: 'chips' };
+
+function $(id){return document.getElementById(id)}
+function show(el,disp=''){el.style.display=disp}
+function hide(el){el.style.display='none'}
+
+function esc(s){
+  if(!s&&s!==0)return'';
+  const d=document.createElement('div');d.textContent=String(s);return d.innerHTML;
+}
+function fmtNum(n){
+  if(!n)return'?';n=parseInt(n);if(n>1e9)return (n/1e9).toFixed(1)+'B';
+  if(n>1e6)return (n/1e6).toFixed(1)+'M';if(n>1e3)return (n/1e3).toFixed(1)+'K';
+  return n.toLocaleString();
+}
+function fmtVal(v, unit=''){
+  if(v===null||v===undefined||v==='')return'—';
+  return esc(v)+(unit?' '+unit:'');
+}
+
+async function fetchJSON(url, opts={}){
+  try{
+    const r = await fetch(url, opts);
+    if(!r.ok){const t=await r.text();throw new Error(r.status+': '+t.slice(0,200))}
+    return await r.json();
+  }catch(e){return {_error: e.message}}
+}
+
+function regionBadge(region){
+  return region==='domestic'
+    ? '<span class="card-vendor vendor-domestic">国产</span>'
+    : '<span class="card-vendor vendor-foreign">海外</span>';
+}
+
+/* ═══════════════════ TABS ═══════════════════ */
+const TABS = [
+  {id:'chips',label:'🔍 芯片搜索',action:()=>searchChipsInit()},
+  {id:'models',label:'🧠 模型搜索',action:()=>searchModelsInit()},
+  {id:'recommend',label:'🎯 算力推荐',action:()=>initRecommend()},
+  {id:'compat',label:'🔗 兼容性',action:()=>searchCompatInit()},
+  {id:'status',label:'📊 系统状态',action:()=>loadStatus()},
+];
+
+(function buildNav(){
+  const nav = $('main-nav');
+  nav.innerHTML = TABS.map((t,i)=>`<button data-tab="${t.id}" ${i===0?'class="active"':''}>${t.label}</button>`).join('');
+  nav.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      STATE.currentTab=btn.dataset.tab;
+      nav.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      const panel=document.getElementById('tab-'+btn.dataset.tab);
+      if(panel)panel.classList.add('active');
+      const def=TABS.find(t=>t.id===btn.dataset.tab);
+      if(def&&def.action)def.action();
+    });
+  });
+})();
+
+/* ═══════════════════ CHIP SEARCH ═══════════════════ */
+async function searchChipsInit(){
+  // Build filter UI with vendor dropdown
+  const vendorOptions = STATE.vendors.length
+    ? `<select id="chip-vendor"><option value="">全部厂商</option>${STATE.vendors.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select>`
+    : '';
+  $('chip-filters').innerHTML = `
+    <input type="text" id="chip-search" placeholder="搜索芯片… (名称/厂商/架构)" onkeydown="if(event.key==='Enter')searchChips()">
+    ${vendorOptions}
+    <select id="chip-region"><option value="">全部地区</option><option value="domestic">国产</option><option value="foreign">海外</option></select>
+    <select id="chip-usage"><option value="">全部用途</option><option value="train">训练</option><option value="inference">推理</option><option value="both">训推一体</option></select>
+    <div class="vram-slider">显存<label>≥<input type="number" id="chip-vram-min" placeholder="0" min="0" step="8">GB</label></div>
+    <div class="vram-slider">成熟度<label>≥<select id="chip-maturity" style="width:60px"><option value="">不限</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
+    <button class="btn" onclick="searchChips()">搜索</button>
+  `;
+
+  if(!STATE.vendors.length){
+    const data = await fetchJSON(`${API}/chips?limit=200`);
+    if(!data._error && data.chips){
+      STATE.vendors = [...new Set(data.chips.map(c=>c.vendor_display).filter(Boolean))].sort();
+      searchChipsInit(); // rerender with vendors
+      return;
+    }
+  }
+  searchChips();
+}
+
+async function searchChips(){
+  const loading=$('chip-loading'), results=$('chip-results'), sum=$('chip-summary');
+  show(loading);results.innerHTML='';sum.textContent='';
+
+  const params = new URLSearchParams();
+  const s=($('chip-search')||{}).value; if(s&&s.trim())params.set('search',s.trim());
+  const v=($('chip-vendor')||{}).value; if(v)params.set('vendor',v);
+  const r=($('chip-region')||{}).value; if(r)params.set('region',r);
+  const u=($('chip-usage')||{}).value; if(u)params.set('usage',u);
+  const vm=($('chip-vram-min')||{}).value; if(vm)params.set('vram_min',vm);
+  const mm=($('chip-maturity')||{}).value; if(mm)params.set('min_maturity',mm);
+  params.set('limit','60');
+
+  const data = await fetchJSON(`${API}/chips?${params}`);
+  hide(loading);
+  if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+
+  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 个芯片</span>`;
+  if(!data.chips||!data.chips.length){results.innerHTML='<div class="empty">未找到匹配的芯片</div>';return}
+
+  results.innerHTML = data.chips.map(c=>{
+    const isUndisclosed = c.production_status === '未公开发布';
+    const cardStyle = isUndisclosed ? 'opacity:0.7' : '';
+    return `
+    <div class="card" onclick="openChipProfile('${c.id}')" style="${cardStyle}">
+      <div class="card-header">
+        ${regionBadge(c.vendor_region)}
+        <span style="font-size:0.75rem;color:var(--text2)">${esc(c.vendor_display)}</span>
+        ${c.maturity_level?`<span class="tag maturity">★${c.maturity_level}/5</span>`:''}
+        ${isUndisclosed?`<span class="tag undisclosed">⚠ 未公开</span>`:''}
+      </div>
+      <div class="card-model">${esc(c.chip_model)}</div>
+      <div class="card-series">${esc(c.chip_series||'')} · ${esc(c.chip_type||'')} · ${esc(c.architecture||'')}</div>
+      <div class="card-stats">
+        <div class="card-stat"><span class="label">显存</span><span class="value">${fmtVal(c.vram_gb,'GB')} ${esc(c.vram_type||'')}</span></div>
+        <div class="card-stat"><span class="label">带宽</span><span class="value">${fmtVal(c.vram_bw_gb_s,'GB/s')}</span></div>
+        <div class="card-stat"><span class="label">TDP</span><span class="value">${fmtVal(c.tdp_w,'W')}</span></div>
+        <div class="card-stat"><span class="label">单价</span><span class="value">${fmtVal(c.price_cny_wan,'万')}</span></div>
+      </div>
+      ${c.precision_perf?`<div class="card-tags"><span class="tag precision">${esc(c.precision_perf)}</span></div>`:''}
+      <div class="card-tags">
+        ${c.production_status?`<span class="tag ${isUndisclosed?'undisclosed':''}">${esc(c.production_status)}</span>`:''}
+        ${c.process_node_nm?`<span class="tag">${esc(c.process_node_nm)}nm</span>`:''}
+      </div>
+    </div>
+  `}).join('');
+}
+
+/* ── Chip detail ── */
+const CHIP_GROUPS = [
+  ['identity','标识'],['architecture','架构与制程'],['memory','显存'],
+  ['compute_units','计算单元'],['cache','缓存'],['precision','精度性能'],
+  ['clock_power_physical','时钟/功耗/物理'],['interconnect','互联'],
+  ['software','软件栈'],['pricing','价格'],['lifecycle','生命周期'],
+  ['description','芯片描述'],['ecosystem','生态评估'],
+];
+
+async function openChipProfile(id){
+  const overlay=$('detail-overlay'), panel=$('detail-panel');
+  panel.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  overlay.classList.add('open');
+
+  const data = await fetchJSON(`${API}/chips/${id}`);
+  if(data._error){panel.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+  const chip = data.chip || {};
+
+  const groupsHtml = CHIP_GROUPS.map(([key,label])=>{
+    const g = chip[key];
+    if(!g||Object.keys(g).length===0)return'';
+    const fields = Object.entries(g)
+      .filter(([k])=>k!=='id'&&!k.startsWith('_'))
+      .map(([k,v])=>`<div class="group-field"><span class="key">${esc(k)}</span><span class="val">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}</span></div>`)
+      .join('');
+    return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${label}</div><div class="group-body">${fields}</div></div>`:'';
+  }).join('');
+
+  // Benchmarks section
+  let bmHtml = '';
+  if(data.benchmarks&&data.benchmarks.length){
+    bmHtml = `<div class="group">
+      <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">📊 评测数据 (${data.benchmarks.length})</div>
+      <div class="group-body" style="grid-template-columns:1fr">
+        ${data.benchmarks.map(b=>`<div style="font-size:0.75rem;padding:6px;background:var(--bg3);border-radius:4px;margin:1px 0">
+          <b>${esc(b.model_id)}</b> · ${esc(b.workload_type)} · ${esc(b.suite_name)}<br>
+          <span style="color:var(--accent)">${b.throughput_tok_s?b.throughput_tok_s+' tok/s':''} ${b.mfu_pct?b.mfu_pct+'% MFU':''} ${b.memory_peak_mb?b.memory_peak_mb+'MB peak':''}</span>
+          ${b.test_date?`<span style="color:var(--text3)"> · ${esc(b.test_date)}</span>`:''}
+        </div>`).join('')}
+      </div></div>`;
+  }
+
+  // Compat section
+  let compHtml = '';
+  if(data.compatibilities&&data.compatibilities.length){
+    compHtml = `<div class="group">
+      <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">🔗 兼容模型 (${data.compatibilities.length})</div>
+      <div class="group-body" style="grid-template-columns:1fr">
+        ${data.compatibilities.map(c=>`<div style="font-size:0.75rem;padding:6px;background:var(--bg3);border-radius:4px;margin:1px 0">
+          <b>${esc(c.model_id)}</b> ·
+          <span style="color:${c.compat_status==='verified'?'var(--green)':'var(--orange)'}">${esc(c.compat_status)}</span>
+          · ${esc(c.framework||'')} · ${esc(c.precision||'')}
+          ${c.notes?`<br><span style="color:var(--text3)">${esc(c.notes)}</span>`:''}
+        </div>`).join('')}
+      </div></div>`;
+  }
+
+  // Provenance section — per-field history
+  const provHtml = renderFieldProvenance(data.field_provenance);
+
+  panel.innerHTML = `
+    <div class="detail-header">
+      <h2>${esc(chip.identity?.chip_model||'Chip')} <small style="color:var(--text3);font-weight:400;font-size:0.85rem">ID:${id}</small></h2>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-body">${groupsHtml}${bmHtml}${compHtml}${provHtml}</div>
+  `;
+}
+function closeDetail(){$('detail-overlay').classList.remove('open')}
+
+/* ═══════════════════ MODEL SEARCH ═══════════════════ */
+async function searchModelsInit(){
+  $('model-filters').innerHTML = `
+    <input type="text" id="model-search" placeholder="搜索模型… (名称/作者)" onkeydown="if(event.key==='Enter')searchModels()">
+    <select id="model-arch"><option value="">全部架构</option><option value="dense">Dense</option><option value="moe">MoE</option></select>
+    <div class="vram-slider">参数量<label>≥<input type="number" id="model-params-min" placeholder="0" min="0" step="1">B</label></div>
+    <input type="text" id="model-for-chip" placeholder="按芯片反查…" style="max-width:180px">
+    <button class="btn" onclick="searchModels()">搜索</button>
+  `;
+  searchModels();
+}
+
+async function searchModels(){
+  const loading=$('model-loading'), results=$('model-results'), sum=$('model-summary');
+  show(loading);results.innerHTML='';sum.textContent='';
+
+  const params = new URLSearchParams();
+  const s=($('model-search')||{}).value; if(s&&s.trim())params.set('search',s.trim());
+  const a=($('model-arch')||{}).value; if(a)params.set('architecture',a);
+  const pm=($('model-params-min')||{}).value; if(pm)params.set('params_min',pm);
+  const fc=($('model-for-chip')||{}).value; if(fc&&fc.trim())params.set('for_chip',fc.trim());
+  params.set('limit','50');
+
+  const data = await fetchJSON(`${API}/models?${params}`);
+  hide(loading);
+  if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+
+  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 个模型</span>`;
+  if(!data.models||!data.models.length){results.innerHTML='<div class="empty">未找到匹配的模型</div>';return}
+
+  results.innerHTML = data.models.map(m=>`
+    <div class="card" onclick="openModelProfile('${m.id}')">
+      <div class="card-header">
+        <span class="card-vendor vendor-foreign">${esc(m.author||'?')}</span>
+        ${m.architecture_family?`<span class="tag maturity">${esc(m.architecture_family)}</span>`:''}
+        ${m.pipeline_tag?`<span class="tag compat">${esc(m.pipeline_tag)}</span>`:''}
+      </div>
+      <div class="card-model" style="font-size:0.9rem;word-break:break-all">${esc(m.model_id)}</div>
+      <div class="card-stats">
+        <div class="card-stat"><span class="label">参数量</span><span class="value">${fmtVal(m.total_params_b,'B')}</span></div>
+        <div class="card-stat"><span class="label">下载</span><span class="value">${fmtNum(m.downloads)}</span></div>
+        <div class="card-stat"><span class="label">点赞</span><span class="value">${fmtNum(m.likes)}</span></div>
+        <div class="card-stat"><span class="label">库</span><span class="value">${esc(m.library_name||'')}</span></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function openModelProfile(id){
+  const overlay=$('detail-overlay'), panel=$('detail-panel');
+  panel.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  overlay.classList.add('open');
+
+  const data = await fetchJSON(`${API}/models/${id}`);
+  if(data._error){panel.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+  const model = data.model || {};
+
+  const groups = ['identity','stats','access','architecture','raw'];
+  const groupsHtml = groups.map(key=>{
+    const g = model[key];
+    if(!g||Object.keys(g).length===0)return'';
+    const fields = Object.entries(g)
+      .filter(([k])=>k!=='id'&&!k.startsWith('_'))
+      .map(([k,v])=>`<div class="group-field"><span class="key">${esc(k)}</span><span class="val">${v!=null?esc(String(v).slice(0,300)):'<i style="color:var(--text3)">—</i>'}</span></div>`)
+      .join('');
+    return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${esc(key)}</div><div class="group-body">${fields}</div></div>`:'';
+  }).join('');
+
+  let compHtml = '';
+  if(data.compatible_chips&&data.compatible_chips.length){
+    compHtml = `<div class="group">
+      <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">🔗 兼容芯片 (${data.compatible_chips.length})</div>
+      <div class="group-body" style="grid-template-columns:1fr">
+        ${data.compatible_chips.map(c=>`<div style="font-size:0.75rem;padding:6px;background:var(--bg3);border-radius:4px;margin:1px 0">
+          <b>${esc(c.chip_model)}</b> ·
+          <span style="color:${c.compat_status==='verified'?'var(--green)':'var(--orange)'}">${esc(c.compat_status)}</span>
+          · ${esc(c.framework||'')} · ${esc(c.precision||'')}
+        </div>`).join('')}
+      </div></div>`;
+  }
+
+  // Provenance
+  const provHtml = renderFieldProvenance(data.field_provenance);
+
+  panel.innerHTML = `
+    <div class="detail-header">
+      <h2>${esc(model.identity?.model_id||'Model')} <small style="color:var(--text3);font-weight:400;font-size:0.85rem">ID:${id}</small></h2>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-body">${groupsHtml}${compHtml}${provHtml}</div>
+  `;
+}
+
+// ── Shared provenance renderer for both chip & model detail ──
+function renderFieldProvenance(fp) {
+  if(!fp || Object.keys(fp).length===0) return '';
+  const fieldNames = Object.keys(fp).sort();
+  const fieldsHtml = fieldNames.map(fn => {
+    const fi = fp[fn];
+    const label = fi.field_label || fn;
+    const historyRows = fi.history.map(h => `
+      <div class="prov-history-row">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <span style="color:var(--accent);font-weight:600;min-width:60px">${esc(String(h.new_value||'').slice(0,60))}</span>
+          ${h.old_value ? `<span style="color:var(--text3)">← ${esc(String(h.old_value).slice(0,40))}</span>` : ''}
+        </div>
+        <div style="font-size:0.65rem;color:var(--text3);margin-top:2px">
+          <span class="prov-src">${esc((h.source_url||'').slice(0,100))}</span>
+          <span> · ${esc(h.source_type||'')}</span>
+          <span> · ${esc(h.confidence||'')}</span>
+          ${h.is_official==='1'?' <span style="color:var(--green)">✓官方</span>':''}
+          <span style="float:right">${esc((h.updated_at||'').slice(0,16))}</span>
+        </div>
+      </div>
+    `).join('');
+    return `<div class="prov-field">
+      <div class="prov-field-header">
+        <b>${esc(label)}</b> <code style="color:var(--text3);font-size:0.7rem">${esc(fn)}</code>
+        ${fi.update_count>1?`<span style="color:var(--orange);font-size:0.65rem"> (${fi.update_count}次变更)</span>`:''}
+      </div>
+      <div class="prov-field-history">${historyRows}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="group collapsed">
+    <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">📋 字段来源追溯 (${fieldNames.length}个字段)</div>
+    <div class="group-body" style="grid-template-columns:1fr;max-height:60vh;overflow-y:auto">
+      ${fieldsHtml}
+    </div></div>`;
+}
+
+/* ═══════════════════ RECOMMEND ═══════════════════ */
+function initRecommend(){
+  STATE.vendors = STATE.vendors || [];
+  $('rec-form').innerHTML = `
+    <div class="recommend-form">
+      <div class="form-group"><label>模型名称 *</label><input type="text" id="rec-model" placeholder="Qwen2.5-7B / Llama-3.1-8B …"></div>
+      <div class="form-group"><label>场景</label><select id="rec-scenario"><option value="train">训练</option><option value="inference">推理</option></select></div>
+      <div class="form-group"><label>期望训练天数</label><input type="number" id="rec-days" placeholder="3" min="0.1" step="0.5"></div>
+      <div class="form-group"><label>目标推理吞吐 (tok/s)</label><input type="number" id="rec-tps" placeholder="可选" min="0"></div>
+      <div class="form-group"><label>最大卡数</label><input type="number" id="rec-max-cards" placeholder="可选" min="1"></div>
+      <div class="form-group"><label>最高单价 (万元/片)</label><input type="number" id="rec-max-price" placeholder="可选" min="0"></div>
+      <div class="form-group"><label>最低成熟度</label><select id="rec-maturity"><option value="">不限</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+      <div class="form-group"><label>优先国产</label><div class="toggle-row"><div class="toggle" id="rec-domestic" onclick="this.classList.toggle('on')"></div></div></div>
+      <div class="form-group"><label>优先厂商</label><select id="rec-vendor"><option value="">不限</option>${[...new Set(STATE.vendors)].map(v=>`<option>${esc(v)}</option>`).join('')}</select></div>
+      <div class="form-actions"><button class="btn" onclick="runRecommend()">🎯 推荐芯片方案</button></div>
+    </div>
+  `;
+}
+
+async function runRecommend(){
+  const loading=$('rec-loading'), results=$('rec-results');
+  show(loading);results.innerHTML='';
+
+  const model=$('rec-model').value.trim();
+  if(!model){results.innerHTML='<div class="error">请输入模型名称</div>';hide(loading);return}
+
+  const params = new URLSearchParams();
+  params.set('model',model);
+  params.set('scenario',$('rec-scenario').value);
+  const days=$('rec-days').value;if(days)params.set('training_days',days);
+  const tps=$('rec-tps').value;if(tps)params.set('sla_tps',tps);
+  const mc=$('rec-max-cards').value;if(mc)params.set('max_cards',mc);
+  const mp=$('rec-max-price').value;if(mp)params.set('max_price',mp);
+  const mm=$('rec-maturity').value;if(mm)params.set('min_maturity',mm);
+  if($('rec-domestic').classList.contains('on'))params.set('prefer_domestic','true');
+  const pv=$('rec-vendor').value;if(pv)params.set('prefer_vendor',pv);
+  params.set('limit','6');params.set('tier','datacenter');
+
+  const data = await fetchJSON(`${API}/chips/recommend?${params}`);
+  hide(loading);
+  if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+
+  const req = data.requirements||{};
+  const dims = data.scoring_dimensions||[];
+
+  results.innerHTML = `
+    <div class="info">
+      模型: <b>${esc(data.model||'')}</b> · 场景: <b>${req.scenario==='train'?'训练':'推理'}</b>
+      · 最低显存: <b>${req.min_vram_gb} GB</b>
+      · 候选: <b>${data.candidates?.length||0}</b> · 排除: <b>${data.rejected||0}</b>
+    </div>
+    ${(data.candidates||[]).map((c,i)=>{
+      const rec = c.recommend||{};
+      return `
+        <div class="rec-card ${i===0?'best':''}">
+          <div class="rec-rank">#${i+1} · 综合评分 ${rec.score}</div>
+          <div class="rec-header">
+            <h3>${esc(c.chip_model)} <small style="color:var(--text2);font-size:0.75rem">${esc(c.vendor_display||'')}</small></h3>
+            <div class="rec-score">${rec.score}</div>
+          </div>
+          <div class="rec-stats">
+            <div class="rec-stat"><div class="label">推荐卡数</div><div class="value">${rec.recommended_cards} 卡</div></div>
+            <div class="rec-stat"><div class="label">显存约束卡数</div><div class="value">${rec.vram_cards} 卡</div></div>
+            <div class="rec-stat"><div class="label">预计训练天数</div><div class="value">${rec.estimated_training_days!=null?rec.estimated_training_days+' 天':'—'}</div></div>
+            <div class="rec-stat"><div class="label">满足SLA</div><div class="value" style="color:${rec.meets_sla==='true'||rec.meets_sla===true?'var(--green)':'var(--red)'}">${rec.meets_sla==='true'||rec.meets_sla===true?'✓ 是':'✗ 否'}</div></div>
+            <div class="rec-stat"><div class="label">总价</div><div class="value">${rec.total_cost_wan!=null?rec.total_cost_wan+' 万':'—'}</div></div>
+            <div class="rec-stat"><div class="label">显存</div><div class="value">${c.vram_gb||'?'} GB</div></div>
+          </div>
+          <div class="rec-rationale">${esc(rec.rationale||'')}</div>
+          <div class="score-bar"><div class="score-bar-fill" style="width:${Math.min(100,rec.score/50*100)}%"></div></div>
+          <div class="scoring-dim">评分维度: ${dims.join(' · ')}</div>
+        </div>
+      `;
+    }).join('')}
+  `;
+}
+
+/* ═══════════════════ COMPAT ═══════════════════ */
+async function searchCompatInit(){
+  $('compat-filters').innerHTML = `
+    <input type="text" id="compat-chip" placeholder="芯片名称…" onkeydown="if(event.key==='Enter')searchCompat()">
+    <input type="text" id="compat-model" placeholder="模型名称…">
+    <select id="compat-status"><option value="">全部状态</option><option value="verified">verified</option><option value="vendor_claimed">vendor_claimed</option><option value="community">community</option></select>
+    <button class="btn" onclick="searchCompat()">搜索</button>
+  `;
+  searchCompat();
+}
+
+async function searchCompat(){
+  const loading=$('compat-loading'), results=$('compat-results'), sum=$('compat-summary');
+  show(loading);results.innerHTML='';sum.textContent='';
+
+  const params = new URLSearchParams();
+  const chip=($('compat-chip')||{}).value;if(chip&&chip.trim())params.set('chip',chip.trim());
+  const model=($('compat-model')||{}).value;if(model&&model.trim())params.set('model',model.trim());
+  const st=($('compat-status')||{}).value;if(st)params.set('status',st);
+  params.set('limit','50');
+
+  const data = await fetchJSON(`${API}/compat?${params}`);
+  hide(loading);
+  if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+
+  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 条兼容记录</span>`;
+  if(!data.compatibilities||!data.compatibilities.length){results.innerHTML='<div class="empty">未找到匹配的兼容记录</div>';return}
+
+  results.innerHTML = data.compatibilities.map(c=>`
+    <div style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius-sm);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-weight:600;font-size:0.85rem">${esc(c.chip_model)} ↔ ${esc(c.model_id)}</div>
+        <div style="font-size:0.73rem;color:var(--text2);margin-top:2px">
+          ${esc(c.framework||'')} · ${esc(c.precision||'')}
+          ${c.notes?`<br>${esc(c.notes)}`:''}
+          ${c.verified_at?`<br><span style="color:var(--text3)">验证于: ${esc(c.verified_at)}</span>`:''}
+        </div>
+      </div>
+      <span style="font-size:0.75rem;padding:4px 10px;border-radius:4px;font-weight:600;
+        background:${c.compat_status==='verified'?'rgba(52,211,153,0.15)':c.compat_status==='vendor_claimed'?'rgba(251,146,60,0.15)':'rgba(96,165,250,0.15)'};
+        color:${c.compat_status==='verified'?'var(--green)':c.compat_status==='vendor_claimed'?'var(--orange)':'var(--blue)'}">
+        ${esc(c.compat_status)}
+      </span>
+    </div>
+  `).join('');
+}
+
+/* ═══════════════════ DB STATUS ═══════════════════ */
+async function loadStatus(){
+  const loading=$('status-loading'), cards=$('status-cards');
+  show(loading);
+  const data = await fetchJSON(`${API}/db/status`);
+  hide(loading);
+  if(data._error){cards.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+
+  const tables = data.tables||{};
+  // Also get provenance stats
+  const provData = await fetchJSON(`${API}/provenance/stats`);
+  let provExtra = '';
+  if(!provData._error && provData.total){
+    const bySource = provData.by_source_type || {};
+    const byConf = provData.by_confidence || {};
+    provExtra = `
+      <div style="font-size:0.7rem;color:var(--text2);margin-top:6px;line-height:1.5">
+        <div><b>来源分布:</b> ${Object.entries(bySource).map(([k,v])=>`${esc(k)}: ${v}`).join(' · ')}</div>
+        <div><b>置信度:</b> ${Object.entries(byConf).map(([k,v])=>`${esc(k)}: ${v}`).join(' · ')}</div>
+        <div><b>官方占比:</b> ${provData.by_is_official?.official||0} 官方 / ${provData.by_is_official?.unofficial||0} 非官方</div>
+      </div>`;
+  }
+
+  cards.innerHTML = `
+    <div class="stat-card"><div class="num">${tables.chips||0}</div><div class="lbl">芯片</div></div>
+    <div class="stat-card"><div class="num">${tables.models||0}</div><div class="lbl">模型</div></div>
+    <div class="stat-card"><div class="num">${tables.chip_model_benchmarks||0}</div><div class="lbl">评测数据</div></div>
+    <div class="stat-card"><div class="num">${tables.chip_model_compatibility||0}</div><div class="lbl">兼容性</div></div>
+    <div class="stat-card"><div class="num">${tables.field_provenance||0}</div><div class="lbl">来源追溯</div></div>
+    <div class="stat-card" style="grid-column:span 2">
+      <div class="num" style="font-size:0.85rem">${esc(data.database||'')}</div>
+      <div class="lbl">数据库路径</div>
+      ${provExtra}
+    </div>
+  `;
+}
+
+/* ═══════════════════ INIT ═══════════════════ */
+(function init(){
+  searchChipsInit();
+  loadStatus();
+})();
+</script>
+
+</body>
+</html>

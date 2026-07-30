@@ -1,0 +1,28 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application package
+COPY chip_model/ ./chip_model/
+
+# Copy schema and static assets
+COPY schema.sql .
+COPY static/ ./static/
+
+# Copy data files
+COPY data/ ./data/
+
+# Copy entry scripts
+COPY scripts/ ./scripts/
+
+# Point to the bundled SQLite database
+ENV PARSE1_DB_PATH=/app/data/parse1.db
+
+EXPOSE 8000
+
+# Default: serve API. Use 'python scripts/run_cli.py --help' for CLI mode.
+CMD ["python", "scripts/run_server.py"]
