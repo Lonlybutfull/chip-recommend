@@ -20,7 +20,7 @@ COPY data/ ./data/
 COPY scripts/ ./scripts/
 
 # Point to the bundled SQLite database
-ENV PARSE1_DB_PATH=/app/data/parse1.db
+ENV DATA_DB_PATH=/app/data/data.db
 
 EXPOSE 8000
 

@@ -35,7 +35,7 @@ cd 芯片+模型
 
 | File | Purpose |
 |------|---------|
-| `parse1.db` | Must have chip rows from `/chip-catalog` |
+| `data.db` | Must have chip rows from `/chip-catalog` |
 | `database.py` | Contains `update_chip_field()`, `get_db()`, `get_db_stats()`, `get_chip_profile()` — **use these, never raw SQL** |
 | `schema.sql` | DDL reference (78 chip columns, value format conventions) |
 | `cli.py` | For verification queries |
@@ -159,7 +159,7 @@ provenance record per field, all sharing the same source.
 ### Step 1 — Find chips to enrich
 
 ```bash
-python cli.py --db-path parse1.db chip search --limit 200
+python cli.py --db-path data.db chip search --limit 200
 ```
 
 Identify chips that have identity fields but NULL hardware specs (`vram_gb` is NULL, `precision_perf` is NULL, etc.). These need enrichment.
@@ -167,7 +167,7 @@ Identify chips that have identity fields but NULL hardware specs (`vram_gb` is N
 Also get the total count:
 
 ```bash
-python cli.py --db-path parse1.db db status
+python cli.py --db-path data.db db status
 ```
 
 ### Step 2 — Choose scope
@@ -212,7 +212,7 @@ For each **non-critical** group (10-12):
 ### Step 4 — Verify after each chip
 
 ```bash
-python cli.py --db-path parse1.db chip profile "<exact chip_model>"
+python cli.py --db-path data.db chip profile "<exact chip_model>"
 ```
 
 Check the output shows newly-filled groups. Show a one-line summary:

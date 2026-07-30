@@ -42,7 +42,7 @@
 │   ├── progress.md                # 项目进度
 │   └── data_fixes.md              # 数据修正记录
 ├── data/                          # 数据文件
-│   ├── parse1.db                  # SQLite 数据库
+│   ├── data.db                  # SQLite 数据库
 │   └── 信息来源链接库_final.csv     # 473 个信息来源 URL
 ├── schema.sql                     # 5 表 DDL
 ├── static/

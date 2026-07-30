@@ -66,6 +66,14 @@ class ProvenanceFilters:
     is_official: str | None = None
 
 
+@dataclass
+class LinkFilters:
+    search: str | None = None
+    vendor: str | None = None
+    category: str | None = None
+    accessible: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Connection management
 # ---------------------------------------------------------------------------
@@ -83,18 +91,18 @@ def get_data_dir() -> Path:
     return _PROJECT_ROOT / "data"
 
 
-DEFAULT_DB_PATH = _PROJECT_ROOT / "data" / "parse1.db"
+DEFAULT_DB_PATH = _PROJECT_ROOT / "data" / "data.db"
 
 
 def get_db_path() -> Path:
-    env_path = os.environ.get("PARSE1_DB_PATH")
+    env_path = os.environ.get("DATA_DB_PATH")
     if env_path:
         return Path(env_path)
     return DEFAULT_DB_PATH
 
 
 def set_db_path(path: str | Path) -> None:
-    os.environ["PARSE1_DB_PATH"] = str(Path(path).resolve())
+    os.environ["DATA_DB_PATH"] = str(Path(path).resolve())
 
 
 @contextmanager
@@ -132,7 +140,7 @@ def get_db_stats(db_path: str | Path | None = None) -> dict:
         stats = {}
         tables = [
             "chips", "models", "chip_model_benchmarks",
-            "chip_model_compatibility", "field_provenance",
+            "chip_model_compatibility", "field_provenance", "link_library",
         ]
         for table in tables:
             try:
@@ -943,6 +951,235 @@ def get_provenance_stats(
             "official": official_count,
             "unofficial": unofficial_count,
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# link_library table
+# ---------------------------------------------------------------------------
+
+def search_links(
+    filters: LinkFilters,
+    limit: int = 50,
+    offset: int = 0,
+    db_path: str | Path | None = None,
+) -> dict:
+    """Search link library with filters."""
+    with get_db(db_path, readonly=True) as db:
+        conditions: list[str] = []
+        params: list = []
+
+        if filters.search:
+            conditions.append("(url LIKE ? OR description LIKE ? OR vendor LIKE ?)")
+            like = f"%{filters.search}%"
+            params.extend([like, like, like])
+
+        if filters.vendor:
+            conditions.append("vendor LIKE ?")
+            params.append(f"%{filters.vendor}%")
+
+        if filters.category:
+            conditions.append("category LIKE ?")
+            params.append(f"%{filters.category}%")
+
+        if filters.accessible:
+            conditions.append("accessible = ?")
+            params.append(filters.accessible)
+
+        where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        count = _count(db, "link_library", conditions, params[:])
+
+        sql = f"SELECT * FROM link_library {where} ORDER BY id DESC LIMIT ? OFFSET ?"
+        rows = [dict(r) for r in db.execute(sql, params + [limit, offset]).fetchall()]
+
+    return {"count": count, "links": rows}
+
+
+def add_link(db, fields: dict) -> int:
+    """Insert one link row. Returns row id."""
+    now = _now_iso()
+    db.execute(
+        "INSERT INTO link_library (url, description, vendor, category, access_method, "
+        "accessible, needs_proxy, created_at, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            fields.get("url", ""),
+            fields.get("description", ""),
+            fields.get("vendor", ""),
+            fields.get("category", ""),
+            fields.get("access_method", ""),
+            fields.get("accessible", ""),
+            fields.get("needs_proxy", ""),
+            now,
+            now,
+        ),
+    )
+    db.commit()
+    return db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+
+def update_link(db, link_id: int, fields: dict) -> None:
+    """Update link fields."""
+    set_clauses = []
+    params = []
+    for key in ["url", "description", "vendor", "category", "access_method",
+                "accessible", "needs_proxy"]:
+        if key in fields:
+            set_clauses.append(f"{key} = ?")
+            params.append(fields[key])
+    if not set_clauses:
+        return
+    set_clauses.append("updated_at = ?")
+    params.append(_now_iso())
+    params.append(link_id)
+    db.execute(f"UPDATE link_library SET {', '.join(set_clauses)} WHERE id = ?", params)
+    db.commit()
+
+
+def delete_link(db, link_id: int) -> None:
+    """Delete a link record."""
+    db.execute("DELETE FROM link_library WHERE id = ?", (link_id,))
+    db.commit()
+
+
+def upsert_link(db, fields: dict) -> tuple[int, str]:
+    """Insert or update a link record (matched by URL).
+
+    Args:
+        db: A writeable sqlite3.Connection.
+        fields: Dict with keys url, description, vendor, category,
+                access_method, accessible, needs_proxy.
+
+    Returns:
+        (link_id, action) where action is 'insert' or 'update'.
+    """
+    url = fields.get("url", "")
+    if not url:
+        raise ValueError("url is required for upsert_link")
+
+    now = _now_iso()
+
+    # Check if URL already exists
+    existing = db.execute(
+        "SELECT id FROM link_library WHERE url = ?", (url,)
+    ).fetchone()
+
+    if existing:
+        # Update non-empty fields only
+        link_id = existing["id"]
+        updates = {}
+        for key in ["description", "vendor", "category", "access_method",
+                    "accessible", "needs_proxy"]:
+            if key in fields and fields[key]:
+                updates[key] = fields[key]
+        if updates:
+            set_clauses = [f"{k} = ?" for k in updates]
+            params = list(updates.values()) + [now, link_id]
+            db.execute(
+                f"UPDATE link_library SET {', '.join(set_clauses)}, updated_at = ? WHERE id = ?",
+                params
+            )
+            db.commit()
+        return link_id, "update"
+    else:
+        # Insert new
+        link_id = add_link(db, fields)
+        return link_id, "insert"
+
+
+def import_links_csv(db, csv_path: str | Path, force: bool = False) -> int:
+    """Import links from CSV, skip existing URLs. Returns count imported."""
+    import csv
+
+    # Check existing count if not forcing
+    if not force:
+        existing_count = db.execute("SELECT COUNT(*) as cnt FROM link_library").fetchone()["cnt"]
+        if existing_count > 0:
+            print(f"[import_links] link_library already has {existing_count} rows. "
+                  f"Use --force to re-import.")
+            return 0
+
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        count = 0
+        skipped = 0
+        for row in reader:
+            url = row.get("URL", "").strip()
+            if not url:
+                continue
+            # Skip if URL already exists
+            existing = db.execute(
+                "SELECT id FROM link_library WHERE url = ?", (url,)
+            ).fetchone()
+            if existing:
+                skipped += 1
+                continue
+            fields = {
+                "url": url,
+                "description": row.get("描述", "").strip(),
+                "vendor": row.get("涉及厂商", "").strip(),
+                "category": row.get("分类", "").strip(),
+                "access_method": row.get("获取方式", "").strip(),
+                "accessible": row.get("可访问", "").strip(),
+                "needs_proxy": row.get("需代理", "").strip(),
+            }
+            add_link(db, fields)
+            count += 1
+            if count % 50 == 0:
+                print(f"  Imported {count} links...")
+
+    print(f"[import_links] Imported {count} links, skipped {skipped} duplicates.")
+    return count
+
+
+def export_links_csv(
+    db, output_path: str | Path, filters: LinkFilters | None = None
+) -> int:
+    """Export filtered links to CSV. Returns count exported."""
+    import csv
+
+    if filters is None:
+        filters = LinkFilters()
+
+    result = search_links(filters, limit=10000, offset=0)
+    rows = result["links"]
+
+    with open(output_path, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["id", "url", "description", "vendor", "category",
+                        "access_method", "accessible", "needs_proxy"],
+            extrasaction="ignore",
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+
+    print(f"[export_links] Exported {len(rows)} links to {output_path}")
+    return len(rows)
+
+
+def get_link_library_stats(db_path: str | Path | None = None) -> dict:
+    """Return link library stats."""
+    with get_db(db_path, readonly=True) as db:
+        total = db.execute("SELECT COUNT(*) as cnt FROM link_library").fetchone()["cnt"]
+        by_category = {
+            r["category"]: r["cnt"]
+            for r in db.execute(
+                "SELECT category, COUNT(*) as cnt FROM link_library GROUP BY category"
+            ).fetchall()
+        }
+        by_vendor = {
+            r["vendor"]: r["cnt"]
+            for r in db.execute(
+                "SELECT vendor, COUNT(*) as cnt FROM link_library GROUP BY vendor"
+            ).fetchall()
+        }
+    return {
+        "total": total,
+        "by_category": by_category,
+        "by_vendor": by_vendor,
     }
 
 

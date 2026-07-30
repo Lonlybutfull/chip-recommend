@@ -839,7 +839,7 @@ parse1 provenance show --table chips --row-id 3 --field precision_perf
 
 ```json
 {
-  "database": "芯片+模型/parse1.db",
+  "database": "芯片+模型/data.db",
   "tables": {
     "chips": 12,
     "models": 10,
@@ -863,7 +863,7 @@ parse1 provenance show --table chips --row-id 3 --field precision_perf
 ```json
 {
   "db": {
-    "path": "芯片+模型/parse1.db"
+    "path": "芯片+模型/data.db"
   },
   "output": {
     "default_format": "json"
@@ -883,7 +883,7 @@ parse1 provenance show --table chips --row-id 3 --field precision_perf
 ```json
 {
   "key": "db.path",
-  "value": "芯片+模型/parse1.db",
+  "value": "芯片+模型/data.db",
   "status": "ok"
 }
 ```

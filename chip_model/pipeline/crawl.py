@@ -26,7 +26,7 @@ from bs4 import BeautifulSoup, Comment
 
 HERE = Path(__file__).resolve().parent.parent.parent
 CSV_PATH = HERE / "data" / "信息来源链接库_final.csv"
-DB_PATH = HERE / "data" / "parse1.db"
+DB_PATH = HERE / "data" / "data.db"
 OUTPUT_DIR = HERE / "data" / "crawl_all"
 OUTPUT_DIR.mkdir(exist_ok=True)
 

@@ -263,3 +263,22 @@ CREATE INDEX IF NOT EXISTS idx_compat_chip ON chip_model_compatibility(chip_mode
 CREATE INDEX IF NOT EXISTS idx_compat_model ON chip_model_compatibility(model_id);
 CREATE INDEX IF NOT EXISTS idx_provenance_table_row ON field_provenance(table_name, row_id);
 CREATE INDEX IF NOT EXISTS idx_provenance_source ON field_provenance(source_type);
+
+-- ============================================================
+-- 6. 信息来源链接库
+-- ============================================================
+CREATE TABLE IF NOT EXISTS link_library (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    url           TEXT,
+    description   TEXT,
+    vendor        TEXT,
+    category      TEXT,
+    access_method TEXT,
+    accessible    TEXT,
+    needs_proxy   TEXT,
+    created_at    TEXT,
+    updated_at    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_link_library_category ON link_library(category);
+CREATE INDEX IF NOT EXISTS idx_link_library_vendor ON link_library(vendor);

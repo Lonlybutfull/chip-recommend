@@ -3,10 +3,11 @@ __pycache__/
 *.pyc
 *.db-shm
 *.db-wal
-data/parse1.db
+data/data.db
 data/crawl_all/
 data/crawl_fetched.jsonl
 .env
 *.egg-info/
 dist/
 build/
+.claude/settings.local.json

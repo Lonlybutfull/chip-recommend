@@ -57,6 +57,13 @@ from chip_model.database import (
     update_model_fields,
     add_benchmark,
     add_compat,
+    search_links,
+    LinkFilters,
+    add_link,
+    upsert_link,
+    import_links_csv,
+    export_links_csv,
+    get_link_library_stats,
 )
 from chip_model.config import load_config, set_config
 
@@ -76,6 +83,8 @@ provenance_app = typer.Typer(help="来源追溯查询", no_args_is_help=True)
 db_app = typer.Typer(help="数据库管理", no_args_is_help=True)
 config_app = typer.Typer(help="配置管理", no_args_is_help=True)
 
+link_app = typer.Typer(help="信息来源链接库管理", no_args_is_help=True)
+
 app.add_typer(chip_app, name="chip")
 app.add_typer(model_app, name="model")
 app.add_typer(benchmark_app, name="benchmark")
@@ -83,6 +92,7 @@ app.add_typer(compat_app, name="compat")
 app.add_typer(provenance_app, name="provenance")
 app.add_typer(db_app, name="db")
 app.add_typer(config_app, name="config")
+app.add_typer(link_app, name="link")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -1119,6 +1129,201 @@ def config_set_cmd(
     except Exception as e:
         _err(f"[ERROR] Cannot write config: {e}")
         raise typer.Exit(1)
+
+
+# ══════════════════════════════════════════════════════════════
+# LINK search / add / import-csv / export-csv
+# ══════════════════════════════════════════════════════════════
+
+@link_app.command(name="search")
+def link_search(
+    search: Optional[str] = typer.Option(
+        None, "--search", "-s", help="模糊搜索（url / description / vendor）"
+    ),
+    vendor: Optional[str] = typer.Option(
+        None, "--vendor", "-v", help="厂商过滤"
+    ),
+    category: Optional[str] = typer.Option(
+        None, "--category", "-c", help="分类过滤"
+    ),
+    accessible: Optional[str] = typer.Option(
+        None, "--accessible", help="可访问: 是 | 否"
+    ),
+    limit: int = typer.Option(50, "--limit", "-n", help="返回上限"),
+    offset: int = typer.Option(0, "--offset", help="分页偏移"),
+):
+    """搜索信息来源链接库"""
+    filters = LinkFilters(
+        search=search,
+        vendor=vendor,
+        category=category,
+        accessible=accessible,
+    )
+    result = search_links(filters, limit=limit, offset=offset)
+    if result["count"] == 0:
+        _err("[INFO] 0 links matched.")
+    _print_json(result)
+
+
+@link_app.command(name="add")
+def link_add(
+    data: str = typer.Option(
+        ..., "--data", "-d",
+        help='链接字段 JSON: {"url":"...","description":"...","vendor":"...","category":"...","access_method":"...","accessible":"...","needs_proxy":"..."}'
+    ),
+):
+    """新增链接"""
+    fields = _parse_data(data)
+    if "url" not in fields:
+        _err("[ERROR] --data 中必须包含 url 字段")
+        raise typer.Exit(1)
+
+    db = _get_write_db()
+    try:
+        link_id = add_link(db, fields)
+        db.commit()
+        _print_json({"status": "ok", "action": "add", "link_id": link_id})
+    except Exception as e:
+        db.rollback()
+        _err(f"[ERROR] 新增链接失败: {e}")
+        raise typer.Exit(1)
+    finally:
+        db.close()
+
+
+@link_app.command(name="import-csv")
+def link_import_csv(
+    csv_path: str = typer.Option(
+        "data/信息来源链接库_final.csv", "--csv",
+        help="CSV 文件路径"
+    ),
+    force: bool = typer.Option(False, "--force", help="强制导入（即使库中已有数据）"),
+):
+    """从 CSV 导入链接库"""
+    db = _get_write_db()
+    try:
+        count = import_links_csv(db, csv_path, force=force)
+        db.commit()
+        _print_json({"status": "ok", "imported": count, "csv": csv_path})
+    except FileNotFoundError:
+        _err(f"[ERROR] CSV 文件不存在: {csv_path}")
+        raise typer.Exit(1)
+    except Exception as e:
+        db.rollback()
+        _err(f"[ERROR] 导入失败: {e}")
+        raise typer.Exit(1)
+    finally:
+        db.close()
+
+
+@link_app.command(name="export-csv")
+def link_export_csv(
+    output: str = typer.Option("data/links_export.csv", "--output", "-o", help="输出 CSV 路径"),
+    category: Optional[str] = typer.Option(None, "--category", "-c", help="按分类过滤"),
+    vendor: Optional[str] = typer.Option(None, "--vendor", "-v", help="按厂商过滤"),
+):
+    """导出链接库到 CSV"""
+    filters = LinkFilters(category=category, vendor=vendor)
+    db = _get_write_db()
+    try:
+        count = export_links_csv(db, output, filters=filters)
+        _print_json({"status": "ok", "exported": count, "output": output})
+    except Exception as e:
+        _err(f"[ERROR] 导出失败: {e}")
+        raise typer.Exit(1)
+    finally:
+        db.close()
+
+
+@link_app.command(name="auto-discover")
+def link_auto_discover(
+    url: str = typer.Option(
+        ..., "--url", help="发现的链接 URL"
+    ),
+    description: str = typer.Option(
+        "", "--description", "-d", help="链接描述"
+    ),
+    vendor: str = typer.Option(
+        "", "--vendor", "-v", help="关联厂商"
+    ),
+    category: str = typer.Option(
+        "芯片信息综合", "--category", "-c", help="链接分类（默认: 芯片信息综合）"
+    ),
+    access_method: str = typer.Option(
+        "web_search", "--access-method", help="获取方式: web_search | web_crawl | llm_knowledge | manual"
+    ),
+    accessible: str = typer.Option(
+        "是", "--accessible", help="可访问: 是 | 否"
+    ),
+    needs_proxy: str = typer.Option(
+        "否", "--needs-proxy", help="需要代理: 是 | 否"
+    ),
+    batch: Optional[str] = typer.Option(
+        None, "--batch", "-b", help="批量导入: 指向 JSON Lines 文件"
+    ),
+):
+    """自动发现新链接并写入 link_library（URL 去重 upsert）。
+
+    适用于爬取/搜索过程中发现的新信息来源。如果 URL 已存在，则更新非空字段；
+    如果 URL 不存在，则新增记录。
+
+    Examples:
+      parse1 link auto-discover --url "https://www.nvidia.com/en-us/data-center/h100/" \\
+        --description "NVIDIA H100 官方产品页" --vendor "NVIDIA" --category "芯片官方页面"
+
+      parse1 link auto-discover --batch data/new_links.jsonl
+    """
+    db = _get_write_db()
+    try:
+        results = []
+
+        if batch:
+            import json as _json
+            batch_path = Path(batch)
+            if not batch_path.exists():
+                _err(f"[ERROR] 文件不存在: {batch}")
+                raise typer.Exit(1)
+            with open(batch_path, encoding="utf-8") as f:
+                lines = [line.strip() for line in f if line.strip()]
+            for line in lines:
+                try:
+                    fields = _json.loads(line)
+                except _json.JSONDecodeError as e:
+                    _err(f"[WARN] 跳过无效 JSON 行: {e}")
+                    continue
+                if "url" not in fields:
+                    _err("[WARN] 跳过缺少 url 的行")
+                    continue
+                link_id, action = upsert_link(db, fields)
+                results.append({"url": fields["url"], "action": action, "link_id": link_id})
+        else:
+            fields = {
+                "url": url,
+                "description": description,
+                "vendor": vendor,
+                "category": category,
+                "access_method": access_method,
+                "accessible": accessible,
+                "needs_proxy": needs_proxy,
+            }
+            link_id, action = upsert_link(db, fields)
+            results = [{"url": url, "action": action, "link_id": link_id}]
+
+        inserted = sum(1 for r in results if r["action"] == "insert")
+        updated = sum(1 for r in results if r["action"] == "update")
+
+        _print_json({
+            "status": "ok",
+            "total": len(results),
+            "inserted": inserted,
+            "updated": updated,
+            "results": results[:20],  # limit to 20 in output
+        })
+    except Exception as e:
+        _err(f"[ERROR] auto-discover 失败: {e}")
+        raise typer.Exit(1)
+    finally:
+        db.close()
 
 
 # ══════════════════════════════════════════════════════════════

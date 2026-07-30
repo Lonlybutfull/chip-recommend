@@ -1,0 +1,467 @@
+﻿chip_series,chip_model,vendor,vendor_display,vendor_region,chip_type,tier,discovery_method,source_urls,is_new_to_db,notes
+GTC 2025,GTC 2025,,,,GPU,datacenter,link_library,https://resources.nvidia.com,1,Extracted from: GTC 2025 发布 - Blackwell (Blackwell Ultra系列)
+HBM2e,HBM2e,,,,GPU,datacenter,link_library,https://www.intel.com/content/www/us/en/products/details/processors/ai-accelerators/gaudi.html,1,"Extracted from: Intel官网 - Gaudi (24×100GbE, HBM2e)"
+HBM3,HBM3,,,,GPU,datacenter,link_library,https://docs.nvidia.com/datacenter/tesla/pdf/NVIDIA_Data_Center_GPU_Driver_Release_Notes_580_v2.1.pdf,1,"Extracted from: 官方文档 - Hopper (80GB HBM3, 700W, FP8 1979 TFLOPS (稀疏))"
+HBM3e,HBM3e,,,,GPU,datacenter,link_library,https://docs.nvidia.com/dgx-basepod/reference-architecture-infrastructure-foundation-enterprise-ai/latest/core-components.html,1,"Extracted from: 官方文档 - Hopper (141GB HBM3e, 700W, 4.8 TB/s带宽)"
+思元(Siyuan),思元(Siyuan),,,,GPU,datacenter,link_library,https://cambricon.com/index.php?a=lists&c=index&catid=360,1,"Extracted from: 寒武纪官网产品页面 - 思元(Siyuan) (MLUarch03 Chiplet, 250W, 614.4 GB/s带宽)"
+HBM2e,HBM2e,; 多厂商,; 多厂商,,GPU,datacenter,link_library,https://www.techpowerup.com/gpu-specs/,1,"Extracted from: TechPowerUp - Ampere (40/80GB HBM2e, 400W)"
+Kryptos,AeroBox GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/aerobox-gpu.c3648,1,dbgpu import: GCN 1.0 8GB
+Banded Kestrel,Atari VCS 400 GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/atari-vcs-400-gpu.c3738,1,dbgpu import: GCN 5.0 4GB
+Banded Kestrel,Atari VCS 800 GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/atari-vcs-800-gpu.c3654,1,dbgpu import: GCN 5.0 8GB
+MI250X,MI250X,AMD,AMD,,GPU,datacenter,series_search,https://www.google.com/search?q=AMD+MI250X+specifications,1,Next-gen candidate from MI300X series
+MI300A,MI300A,AMD,AMD,,GPU,datacenter,existing_db,,0,Existing in DB (id=27)
+MI300X,MI300X,AMD,AMD,,GPU,datacenter,existing_db,,0,Existing in DB (id=28)
+MI300X,MI300X 192GB,AMD,AMD,,GPU,datacenter,existing_db,,0,Existing in DB (id=1)
+MI325X,MI325X,AMD,AMD,,GPU,datacenter,existing_db,,0,Existing in DB (id=29)
+MI350X,MI350X,AMD,AMD,,GPU,datacenter,existing_db,,0,Existing in DB (id=30)
+MI350X,MI350X 288GB,AMD,AMD,,GPU,datacenter,existing_db,,0,Existing in DB (id=2)
+MI355X,MI355X,AMD,AMD,,GPU,datacenter,existing_db,,0,Existing in DB (id=31)
+MI400X,MI400X,AMD,AMD,,GPU,datacenter,existing_db,,0,Existing in DB (id=32)
+MI450X,MI450X,AMD,AMD,,GPU,datacenter,series_search,https://www.google.com/search?q=AMD+MI450X+specifications,1,Next-gen candidate from MI350X series
+Oberon,Playstation 5 GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/playstation-5-gpu.c3480,1,dbgpu import: RDNA 2.0 16GB
+Viola,Playstation 5 Pro GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/playstation-5-pro-gpu.c4232,1,dbgpu import: RDNA 2.0 16GB
+Lexa,Radeon 550X 640SP,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-550x-640sp.c3206,1,dbgpu import: GCN 4.0 4GB
+Navi 48,Radeon AI PRO 9600D,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-ai-pro-9600d.c4379,1,dbgpu import: RDNA 4.0 32GB
+Navi 48,Radeon AI PRO R9700,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-ai-pro-r9700.c4290,1,dbgpu import: RDNA 4.0 32GB
+Navi 48,Radeon AI PRO R9700S,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-ai-pro-r9700s.c4378,1,dbgpu import: RDNA 4.0 32GB
+Ellesmere,Radeon E9390 PCIe,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-e9390-pcie.c3617,1,dbgpu import: GCN 4.0 8GB
+Ellesmere,Radeon E9560 PCIe,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-e9560-pcie.c3616,1,dbgpu import: GCN 4.0 8GB
+Arcturus,Radeon Instinct MI100,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi100.c3496,1,dbgpu import: CDNA 1.0 32GB
+Aldebaran,Radeon Instinct MI200,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi200.c4077,1,dbgpu import: CDNA 2.0 64GB
+Aldebaran,Radeon Instinct MI210,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi210.c3857,1,dbgpu import: CDNA 2.0 64GB
+Aldebaran,Radeon Instinct MI250,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi250.c3847,1,dbgpu import: CDNA 2.0 128GB
+Aldebaran,Radeon Instinct MI250X,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi250x.c3837,1,dbgpu import: CDNA 2.0 128GB
+Aqua Vanjaram,Radeon Instinct MI300,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi300.c4019,1,dbgpu import: CDNA 3.0 128GB
+Aqua Vanjaram,Radeon Instinct MI300A,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi300a.c4296,1,dbgpu import: CDNA 3.0 192GB
+Aqua Vanjaram,Radeon Instinct MI300X,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi300x.c4179,1,dbgpu import: CDNA 3.0 192GB
+Aqua Vanjaram,Radeon Instinct MI308X,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi308x.c4295,1,dbgpu import: CDNA 3.0 192GB
+Aqua Vanjaram,Radeon Instinct MI325X,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi325x.c4231,1,dbgpu import: CDNA 3.0 288GB
+Galaxy,Radeon Instinct MI350X,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi350x.c4308,1,dbgpu import: CDNA 4.0 288GB
+Galaxy,Radeon Instinct MI355X,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi355x.c4309,1,dbgpu import: CDNA 4.0 288GB
+Vega 20,Radeon Instinct MI50,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi50.c3335,1,dbgpu import: GCN 5.1 16GB
+Vega 20,Radeon Instinct MI60,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-instinct-mi60.c3233,1,dbgpu import: GCN 5.1 32GB
+Navi 24,Radeon PRO W6400,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w6400.c3873,1,dbgpu import: RDNA 2.0 4GB
+Navi 23,Radeon PRO W6600,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w6600.c3818,1,dbgpu import: RDNA 2.0 8GB
+Navi 21,Radeon PRO W6800,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w6800.c3809,1,dbgpu import: RDNA 2.0 32GB
+Navi 33,Radeon PRO W7500,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w7500.c4170,1,dbgpu import: RDNA 3.0 8GB
+Navi 33,Radeon PRO W7600,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w7600.c4169,1,dbgpu import: RDNA 3.0 8GB
+Navi 32,Radeon PRO W7700,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w7700.c4184,1,dbgpu import: RDNA 3.0 16GB
+Navi 31,Radeon PRO W7800,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w7800.c4148,1,dbgpu import: RDNA 3.0 32GB
+Navi 31,Radeon PRO W7800 48 GB,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w7800-48-gb.c4252,1,dbgpu import: RDNA 3.0 48GB
+Navi 31,Radeon PRO W7900,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w7900.c4147,1,dbgpu import: RDNA 3.0 48GB
+Navi 31,Radeon PRO W7900D,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w7900d.c4361,1,dbgpu import: RDNA 3.0 48GB
+Navi 14,Radeon Pro 5300,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-5300.c3665,1,dbgpu import: RDNA 1.0 4GB
+Navi 14,Radeon Pro 5300M,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-5300m.c3464,1,dbgpu import: RDNA 1.0 4GB
+Navi 14,Radeon Pro 5500M,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-5500m.c3463,1,dbgpu import: RDNA 1.0 8GB
+Polaris 21,Radeon Pro 555X,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-555x.c3283,1,dbgpu import: GCN 4.0 4GB
+Navi 12,Radeon Pro 5600M,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-5600m.c3612,1,dbgpu import: RDNA 1.0 8GB
+Polaris 21,Radeon Pro 560X,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-560x.c3282,1,dbgpu import: GCN 4.0 4GB
+Navi 10,Radeon Pro 5700,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-5700.c3663,1,dbgpu import: RDNA 1.0 8GB
+Ellesmere,Radeon Pro 570X,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-570x.c3396,1,dbgpu import: GCN 4.0 4GB
+Ellesmere,Radeon Pro 575X,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-575x.c3397,1,dbgpu import: GCN 4.0 4GB
+Ellesmere,Radeon Pro 580X,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-580x.c3398,1,dbgpu import: GCN 4.0 8GB
+Vega 10,Radeon Pro V340 16 GB,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-v340-16-gb.c3267,1,dbgpu import: GCN 5.0 16GB
+Vega 10,Radeon Pro V340 8 GB,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-v340-8-gb.c3977,1,dbgpu import: GCN 5.0 8GB
+Navi 12,Radeon Pro V520,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-v520.c3755,1,dbgpu import: RDNA 1.0 8GB
+Vega 20,Radeon Pro VII,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-vii.c3575,1,dbgpu import: GCN 5.1 16GB
+Vega 12,Radeon Pro Vega 16,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-vega-16.c3331,1,dbgpu import: GCN 5.0 4GB
+Vega 12,Radeon Pro Vega 20,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-vega-20.c3263,1,dbgpu import: GCN 5.0 4GB
+Vega 10,Radeon Pro Vega 48,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-vega-48.c3395,1,dbgpu import: GCN 5.0 8GB
+Vega 10,Radeon Pro Vega 64X,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-vega-64x.c3404,1,dbgpu import: GCN 5.0 16GB
+Vega 20,Radeon Pro Vega II,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-vega-ii.c3426,1,dbgpu import: GCN 5.1 32GB
+Vega 20,Radeon Pro Vega II Duo,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-vega-ii-duo.c3268,1,dbgpu import: GCN 5.1 32GB
+Navi 14,Radeon Pro W5300M,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w5300m.c3477,1,dbgpu import: RDNA 1.0 4GB
+Navi 14,Radeon Pro W5500,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w5500.c3479,1,dbgpu import: RDNA 1.0 8GB
+Navi 14,Radeon Pro W5500M,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w5500m.c3478,1,dbgpu import: RDNA 1.0 4GB
+Navi 14,Radeon Pro W5500X,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w5500x.c4105,1,dbgpu import: RDNA 1.0 8GB
+Navi 10,Radeon Pro W5700,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w5700.c3466,1,dbgpu import: RDNA 1.0 8GB
+Navi 10,Radeon Pro W5700X,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w5700x.c3583,1,dbgpu import: RDNA 1.0 16GB
+Navi 23,Radeon Pro W6600M,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w6600m.c3819,1,dbgpu import: RDNA 2.0 8GB
+Navi 23,Radeon Pro W6600X,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w6600x.c4104,1,dbgpu import: RDNA 2.0 8GB
+Navi 21,Radeon Pro W6800X,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w6800x.c3826,1,dbgpu import: RDNA 2.0 32GB
+Navi 21,Radeon Pro W6800X Duo,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w6800x-duo.c3824,1,dbgpu import: RDNA 2.0 32GB
+Navi 21,Radeon Pro W6900X,AMD,AMD,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-w6900x.c3825,1,dbgpu import: RDNA 2.0 32GB
+Polaris 23,Radeon Pro WX 3200,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-wx-3200.c3412,1,dbgpu import: GCN 4.0 4GB
+Polaris 23,Radeon Pro WX 3200 Mobile,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-wx-3200-mobile.c3461,1,dbgpu import: GCN 4.0 4GB
+Vega 10,Radeon Pro WX 8200,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-wx-8200.c3303,1,dbgpu import: GCN 5.0 8GB
+Polaris 22,Radeon Pro WX Vega M GL,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-pro-wx-vega-m-gl.c3352,1,dbgpu import: GCN 4.0 4GB
+Vega 20,Radeon VII,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/radeon-vii.c3358,1,dbgpu import: GCN 5.1 16GB
+Strix Point,Ryzen AI Z2 Extreme GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/ryzen-ai-z2-extreme-gpu.c4305,1,dbgpu import: RDNA 3.5 16GB
+Phoenix,Ryzen Z1 Extreme GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/ryzen-z1-extreme-gpu.c4157,1,dbgpu import: RDNA 3.0 16GB
+Phoenix,Ryzen Z1 GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/ryzen-z1-gpu.c4158,1,dbgpu import: RDNA 3.0 16GB
+Van Gogh,Ryzen Z2 A GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/ryzen-z2-a-gpu.c4306,1,dbgpu import: RDNA 2.0 16GB
+Strix Point,Ryzen Z2 Extreme GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/ryzen-z2-extreme-gpu.c4304,1,dbgpu import: RDNA 3.5 16GB
+Hawk Point,Ryzen Z2 GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/ryzen-z2-gpu.c4303,1,dbgpu import: RDNA 3.0 16GB
+Rembrandt+,Ryzen Z2 Go GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/ryzen-z2-go-gpu.c4307,1,dbgpu import: RDNA 2.0 16GB
+Van Gogh,Steam Deck GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/steam-deck-gpu.c3897,1,dbgpu import: RDNA 2.0 16GB
+Sephiroth,Steam Deck OLED GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/steam-deck-oled-gpu.c4185,1,dbgpu import: RDNA 2.0 16GB
+Lockhart,Xbox Series S GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/xbox-series-s-gpu.c3683,1,dbgpu import: RDNA 2.0 8GB
+Scarlett 6nm,Xbox Series X 6nm GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/xbox-series-x-6nm-gpu.c4240,1,dbgpu import: RDNA 2.0 10GB
+Scarlett,Xbox Series X GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/xbox-series-x-gpu.c3482,1,dbgpu import: RDNA 2.0 10GB
+Fenghuang,Zhongshan Subor Z+ GPU,AMD,AMD,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/zhongshan-subor-z-gpu.c3301,1,dbgpu import: GCN 5.0 8GB
+Inferentia3,Inferentia3,AWS,AWS,,ASIC,datacenter,existing_db,,0,Existing in DB (id=33)
+Trainium3,Trainium3,AWS,AWS,,ASIC,datacenter,existing_db,,0,Existing in DB (id=34)
+壁砺166M (OAM风冷),壁砺166M (OAM风冷),Biren,Biren,,GPU,datacenter,link_library,https://baike.baidu.com/item/壁砺166系列/67163995,1,Extracted from: 硬件规格 - 壁砺166M (OAM风冷) | 壁砺166M (OAM风冷) 硬件规格参考
+MLU220-M,MLU220-M,Cambricon,Cambricon,,GPU,datacenter,link_library,http://www.chinaaet.com/article/3000110706,1,Extracted from: 硬件规格 - MLU220-M.2 | MLU220-M.2 硬件规格参考
+MLU590 (80GB),MLU590 (80GB),Cambricon; 寒武纪,Cambricon; 寒武纪,,GPU,datacenter,link_library,https://www.cambricon.com,0,Extracted from: 寒武纪官方资料 | MLU590 (80GB) 硬件规格参考
+WSE-3,WSE-3,Cerebras,Cerebras,,GPU,datacenter,link_library,https://www.businesswire.com,1,Extracted from: 硬件规格 - WSE-3 | WSE-3 硬件规格参考
+WSE-4,WSE-4,Cerebras,Cerebras,,GPU,datacenter,series_search,https://www.google.com/search?q=Cerebras+WSE-4+specifications,1,Next-gen candidate from WSE-3 series
+邃思(Suisi),邃思(Suisi),Enflame; 燧原科技,Enflame; 燧原科技,,GPU,datacenter,link_library,https://www.enflame-tech.com,1,"Extracted from: 燧原官网 - 邃思(Suisi) (原生FP8, 144GB HBM, 3.6TB/s带宽, 800GB/s互联, 2025年发布) | 云燧L600 (燧原L600) 硬件规格参考"
+FP8 1153,FP8 1153,Google,Google,,GPU,datacenter,link_library,https://cloud.google.com/tpu,1,"Extracted from: Google Cloud - TPU (32GB HBM, FP8 1153 TFLOPS) | 价格数据来源"
+HBM3e,HBM3e,Google,Google,,GPU,datacenter,link_library,https://cloud.google.com/blog/products/compute/ironwood-tpu-age-of-inference,1,"Extracted from: Google Cloud Blog - TPU (192GB HBM3e, FP8 4614 TFLOPS, 9216芯片/Pod) | Ironwood (TPU v7) 硬件规格参考"
+Ironwood,Ironwood,Google,Google,,TPU,datacenter,existing_db,,0,Existing in DB (id=43)
+Ironwood,Ironwood TPU v7,Google,Google,,TPU,datacenter,existing_db,,0,Existing in DB (id=3)
+TPU v5e,TPU v5e,Google,Google,,TPU,datacenter,series_search,https://www.google.com/search?q=Google+TPU v5e+specifications,1,Next-gen candidate from Ironwood series
+TPU v5p,TPU v5p,Google,Google,,TPU,datacenter,series_search,https://www.google.com/search?q=Google+TPU v5p+specifications,1,Next-gen candidate from Ironwood series
+TPU v6e,TPU v6e,Google,Google,,TPU,datacenter,existing_db,,0,Existing in DB (id=44)
+TPU v7,TPU v7,Google,Google,,TPU,datacenter,existing_db,,0,Existing in DB (id=45)
+Trillium,Trillium,Google,Google,,TPU,datacenter,existing_db,,0,Existing in DB (id=46)
+Chips 2021,Chips 2021,Graphcore,Graphcore,,GPU,datacenter,link_library,https://www.graphcore.ai/posts/designing-the-colossus-mk2-ipu-simon-knowles-at-hot-chips-2021,1,Extracted from: Graphcore官方博客 - Hot Chips 2021 Colossus MK2 (GC200) IPU设计详解及规格
+MK2 (GC200),MK2 (GC200),Graphcore,Graphcore,,IPU,datacenter,existing_db,http://www.graphcore.ai/hubfs/MK2-%20The%20Graphcore%202nd%20Generation%20IPU%20Final%20v7.14.2020.pdf,0,Extracted from: 硬件规格 - Colossus MK2 (GC200) | Colossus MK2 (GC200) 硬件规格参考
+Gen1,Gen1,Groq,Groq,,GPU,datacenter,link_library,https://groq.com,1,"Extracted from: Groq官网 - GroqChip (LPU架构, 专注LLM推理) | GroqCard (LPU Gen1) 硬件规格参考"
+Atlas 800I,Atlas 800I,Huawei,Huawei,,GPU,datacenter,link_library,https://developer.baidu.com/article/detail.html?id=6623945,1,Extracted from: 硬件规格 - Atlas 800I A2 | Atlas 800I A2 硬件规格参考
+昇腾310P,昇腾310P,Huawei,Huawei,,GPU,datacenter,link_library,https://post.smzdm.com/p/arlxz9mw/,1,Extracted from: 硬件规格 - 昇腾310P | 昇腾310P 硬件规格参考
+昇腾910C (OAM 128GB),昇腾910C (OAM 128GB),Huawei,Huawei,,GPU,datacenter,link_library,https://baike.baidu.com/item/华为昇腾910C/67777523,1,Extracted from: 硬件规格 - 昇腾910C (OAM 128GB) | 昇腾910C (OAM 128GB) 硬件规格参考
+昇腾950PR (128GB),昇腾950PR (128GB),Huawei,Huawei,,GPU,datacenter,link_library,https://baike.baidu.com/item/昇腾950PR芯片/66772899,1,Extracted from: 媒体爆料，规格未确认 | 昇腾950PR (128GB) 硬件规格参考
+C86-4G (64核),C86-4G (64核),Hygon,Hygon,,GPU,datacenter,link_library,https://baike.baidu.com/item/海光C86,0,Extracted from: 硬件规格 - C86-4G (64核) | C86-4G (64核) 硬件规格参考
+C86-5G (128核 规划),C86-5G (128核 规划),Hygon,Hygon,,GPU,datacenter,link_library,https://www.eastmoney.com,0,Extracted from: 硬件规格 - C86-5G (128核 规划) | C86-5G (128核 规划) 硬件规格参考
+K100 (标准版 64GB),K100 (标准版 64GB),Hygon,Hygon,,DCU,datacenter,existing_db,,0,Existing in DB (id=52)
+GDDR6,GDDR6,Hygon; 海光信息,Hygon; 海光信息,,GPU,datacenter,link_library,https://www.hygon.com,1,"Extracted from: 海光官方产品页（K100-AI, 64GB GDDR6, 896GB/s） | 深算一号 (Z100) 硬件规格参考"
+深算一号 (Z100),深算一号 (Z100),Hygon; 海光信息,Hygon; 海光信息,,GPU,datacenter,link_library,https://www.hygon.com,1,"Extracted from: 海光官方产品页（K100-AI, 64GB GDDR6, 896GB/s） | 深算一号 (Z100) 硬件规格参考"
+天垓(Tiangai),天垓(Tiangai),Iluvatar; 天数智芯,Iluvatar; 天数智芯,,GPU,datacenter,link_library,https://www.iluvatar.com,1,"Extracted from: 天数智芯官网 - 天垓(Tiangai) (2024年Q3发布, 预计2026年Q1量产, PCIe 5.0) | 天垓100 (Gen1) 硬件规格参考"
+天垓100 (Gen1),天垓100 (Gen1),Iluvatar; 天数智芯,Iluvatar; 天数智芯,,GPU,datacenter,link_library,https://www.iluvatar.com,1,"Extracted from: 天数智芯官网 - 天垓(Tiangai) (2024年Q3发布, 预计2026年Q1量产, PCIe 5.0) | 天垓100 (Gen1) 硬件规格参考"
+DG2-128,Arc Pro A30M,Intel,Intel,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/arc-pro-a30m.c3927,1,dbgpu import: Xe-HPG 4GB
+DG2-128,Arc Pro A40,Intel,Intel,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/arc-pro-a40.c3925,1,dbgpu import: Xe-HPG 6GB
+DG2-128,Arc Pro A50,Intel,Intel,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/arc-pro-a50.c3926,1,dbgpu import: Xe-HPG 6GB
+DG2-256,Arc Pro A60,Intel,Intel,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/arc-pro-a60.c4160,1,dbgpu import: Xe-HPG 12GB
+DG2-256,Arc Pro A60M,Intel,Intel,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/arc-pro-a60m.c4161,1,dbgpu import: Xe-HPG 8GB
+BMG-G21,Arc Pro B50,Intel,Intel,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/arc-pro-b50.c4345,1,dbgpu import: Xe2-HPG 16GB
+BMG-G21,Arc Pro B60,Intel,Intel,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/arc-pro-b60.c4350,1,dbgpu import: Xe2-HPG 24GB
+Arctic Sound,Arctic Sound 1T,Intel,Intel,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/arctic-sound-1t.c3886,1,dbgpu import: Generation 12.5 16GB
+Arctic Sound,Arctic Sound 2T,Intel,Intel,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/arctic-sound-2t.c3503,1,dbgpu import: Generation 12.5 16GB
+Arctic Sound,Arctic Sound-M,Intel,Intel,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/arctic-sound-m.c3885,1,dbgpu import: Generation 12.5 16GB
+DG2-128,Data Center GPU Flex 140,Intel,Intel,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/data-center-gpu-flex-140.c4072,1,dbgpu import: Xe-HPG 6GB
+DG2-512,Data Center GPU Flex 170,Intel,Intel,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/data-center-gpu-flex-170.c4071,1,dbgpu import: Xe-HPG 16GB
+Ponte Vecchio,Data Center GPU Max 1100,Intel,Intel,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/data-center-gpu-max-1100.c4066,1,dbgpu import: Generation 12.5 48GB
+Ponte Vecchio,Data Center GPU Max 1350,Intel,Intel,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/data-center-gpu-max-1350.c4067,1,dbgpu import: Generation 12.5 96GB
+Ponte Vecchio,Data Center GPU Max 1550,Intel,Intel,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/data-center-gpu-max-1550.c4068,1,dbgpu import: Generation 12.5 128GB
+Ponte Vecchio,Data Center GPU Max Subsystem,Intel,Intel,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/data-center-gpu-max-subsystem.c4070,1,dbgpu import: Generation 12.5 128GB
+Falcon Shores,Falcon Shores,Intel,Intel,,ASIC,datacenter,existing_db,,0,Existing in DB (id=53)
+Gaudi 3,Gaudi 3,Intel,Intel,,ASIC,datacenter,existing_db,,0,Existing in DB (id=54)
+Gaudi 3,Gaudi 3 128GB,Intel,Intel,,ASIC,datacenter,existing_db,,0,Existing in DB (id=4)
+Gaudi 4,Gaudi 4,Intel,Intel,,ASIC,datacenter,existing_db,,0,Existing in DB (id=55)
+DG1,H3C XG310,Intel,Intel,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/h3c-xg310.c3745,1,dbgpu import: Generation 12.1 8GB
+DG1,Iris Xe MAX Graphics,Intel,Intel,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/iris-xe-max-graphics.c3737,1,dbgpu import: Generation 12.1 4GB
+Jaguar Shores,Jaguar Shores,Intel,Intel,,ASIC,datacenter,series_search,https://www.google.com/search?q=Intel+Jaguar Shores+specifications,1,Next-gen candidate from Falcon Shores series
+DG1,Xe DG1,Intel,Intel,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/xe-dg1.c3718,1,dbgpu import: Generation 12.1 4GB
+JM7200 (JM7系列),JM7200 (JM7系列),JingjiaMicro,JingjiaMicro,,GPU,datacenter,existing_db,https://blog.csdn.net/wujianing_110117/article/details/119265576,0,Extracted from: 硬件规格 - JM7200 (JM7系列) | JM7200 (JM7系列) 硬件规格参考
+JM9200 (JH920),JM9200 (JH920),JingjiaMicro,JingjiaMicro,,GPU,datacenter,existing_db,https://news.pconline.com.cn/1486/14862624.html,0,Extracted from: 硬件规格 - JM9200 (JH920) | JM9200 (JH920) 硬件规格参考
+M100,M100,Kunlunxin,Kunlunxin,,NPU,datacenter,existing_db,,0,Existing in DB (id=59)
+P800 (OAM),P800 (OAM),Kunlunxin,Kunlunxin,,NPU,datacenter,existing_db,,0,Existing in DB (id=60)
+昆仑芯1,昆仑芯1,Kunlunxin,Kunlunxin,,GPU,datacenter,link_library,https://baike.baidu.com,1,Extracted from: 硬件规格 - 昆仑芯1 K200 | 昆仑芯1 K200 硬件规格参考
+昆仑芯II,昆仑芯II,Kunlunxin,Kunlunxin,,GPU,datacenter,link_library,https://baike.baidu.com/item/昆仑芯,1,Extracted from: 硬件规格 - 昆仑芯II R300 | 昆仑芯II R300 硬件规格参考
+昆仑芯M100,昆仑芯M100,Kunlunxin,Kunlunxin,,GPU,datacenter,link_library,https://developer.baidu.com,1,Extracted from: 硬件规格 - 昆仑芯M100 | 昆仑芯M100 硬件规格参考
+昆仑芯P800 (OAM),昆仑芯P800 (OAM),Kunlunxin,Kunlunxin,,GPU,datacenter,link_library,https://baike.baidu.com/item/昆仑芯P800/67786426,1,Extracted from: 硬件规格 - 昆仑芯P800 (OAM) | 昆仑芯P800 (OAM) 硬件规格参考
+昆仑芯R300,昆仑芯R300,Kunlunxin,Kunlunxin,,GPU,datacenter,link_library,https://www.ameya360.com/product_ie6/7643061,1,Extracted from: 昆仑芯R300 AI推理芯片完整产品参数(AMEYA360电子元器件采购网): 7nm XPU-R架构 32GB GDDR6 512GB/s INT8 256TOPS FP16 128TFLOPS K
+昆仑芯1,昆仑芯1,Kunlunxin; 昆仑芯(百度),Kunlunxin; 昆仑芯(百度),,GPU,datacenter,link_library,https://kunlunxin.com,1,Extracted from: 硬件规格 - 昆仑芯P800 (OAM) | 昆仑芯P800 (OAM) 硬件规格参考 | 昆仑芯官网（96GB HBM3） | 昆仑芯1 K200 生态评估
+昆仑芯P800 (OAM),昆仑芯P800 (OAM),Kunlunxin; 昆仑芯(百度),Kunlunxin; 昆仑芯(百度),,GPU,datacenter,link_library,https://kunlunxin.com,1,Extracted from: 硬件规格 - 昆仑芯P800 (OAM) | 昆仑芯P800 (OAM) 硬件规格参考 | 昆仑芯官网（96GB HBM3） | 昆仑芯1 K200 生态评估
+昆仑芯官网,昆仑芯官网,Kunlunxin; 昆仑芯(百度),Kunlunxin; 昆仑芯(百度),,GPU,datacenter,link_library,https://kunlunxin.com,1,Extracted from: 硬件规格 - 昆仑芯P800 (OAM) | 昆仑芯P800 (OAM) 硬件规格参考 | 昆仑芯官网（96GB HBM3） | 昆仑芯1 K200 生态评估
+Maia 200,Maia 200,Microsoft,Microsoft,,ASIC,datacenter,existing_db,https://azure.microsoft.com,0,Extracted from: Microsoft Azure - Maia (Azure自研AI加速器) | Maia 200 硬件规格参考
+Maia 300,Maia 300,Microsoft,Microsoft,,ASIC,datacenter,series_search,https://www.google.com/search?q=Microsoft+Maia 300+specifications,1,Next-gen candidate from Maia 200 series
+Maia 400,Maia 400,Microsoft,Microsoft,,ASIC,datacenter,series_search,https://www.google.com/search?q=Microsoft+Maia 400+specifications,1,Next-gen candidate from Maia 200 series
+PH100芯片,PH100芯片,MooreThreads,MooreThreads,,GPU,datacenter,link_library,https://www.mthreads.com/product/S5000,1,"Extracted from: 摩尔线程官网 - MTT S (MUSA平湖架构, PH100芯片, 80GB, FP8 920-1000 TFLOPS, 对标H100) | MTT S5000 (OAM) 硬件规格参考"
+S5000 (OAM),S5000 (OAM),MooreThreads,MooreThreads,,GPU,datacenter,link_library,https://www.mthreads.com/product/S5000,1,"Extracted from: 摩尔线程官网 - MTT S (MUSA平湖架构, PH100芯片, 80GB, FP8 920-1000 TFLOPS, 对标H100) | MTT S5000 (OAM) 硬件规格参考"
+GA102,A10 PCIe,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a10-pcie.c3793,1,dbgpu import: Ampere 24GB
+A100,A100,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,https://www.nvidia.com/en-us/data-center/,0,Extracted from: NVIDIA 官方产品页 | A100 PCIe 40 GB 生态评估
+GA100,A100 PCIe 40 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a100-pcie-40-gb.c3623,1,dbgpu import: Ampere 40GB
+GA100,A100 PCIe 80 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a100-pcie-80-gb.c3821,1,dbgpu import: Ampere 80GB
+GA100,A100 SXM4 40 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a100-sxm4-40-gb.c3506,1,dbgpu import: Ampere 40GB
+GA100,A100 SXM4 80 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a100-sxm4-80-gb.c3746,1,dbgpu import: Ampere 80GB
+A100,A100 SXM4 80GB,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=5)
+GA100,A100X,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a100x.c3958,0,dbgpu import: Ampere 80GB
+GA102,A10G,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a10g.c3798,1,dbgpu import: Ampere 24GB
+GA102,A10M,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/a10m.c4200,1,dbgpu import: Ampere 20GB
+GA107,A16 PCIe,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/a16-pcie.c3794,1,dbgpu import: Ampere 16GB
+GA107,A2,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/a2.c3848,1,dbgpu import: Ampere 16GB
+GA107,A2 PCIe,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/a2-pcie.c4112,1,dbgpu import: Ampere 16GB
+A30,A30,NVIDIA,NVIDIA,,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA+A30+specifications,1,Next-gen candidate from A100 series
+GA100,A30 PCIe,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a30-pcie.c3792,1,dbgpu import: Ampere 24GB
+GA100,A30X,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a30x.c3968,1,dbgpu import: Ampere 24GB
+A40,A40,NVIDIA,NVIDIA,,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA+A40+specifications,1,Next-gen candidate from A100 series
+GA102,A40 PCIe,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a40-pcie.c3700,1,dbgpu import: Ampere 48GB
+A800,A800,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=64)
+GA100,A800 PCIe 40 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a800-pcie-40-gb.c3964,1,dbgpu import: Ampere 40GB
+GA100,A800 PCIe 80 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a800-pcie-80-gb.c3965,1,dbgpu import: Ampere 80GB
+GA100,A800 SXM4 80 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/a800-sxm4-80-gb.c3966,1,dbgpu import: Ampere 80GB
+B100,B100,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=65)
+GB100,B200,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/b200.c4210,0,dbgpu import: Blackwell 90GB
+B200,B200 SXM 192GB,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=6)
+B200 Ultra,B200 Ultra,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=67)
+GB110,B300,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/b300.c4375,0,dbgpu import: Blackwell Ultra 144GB
+B300,B300 NVL16 288GB,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=7)
+GV100,CMP 100HX-210,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/cmp-100hx-210.c4202,1,dbgpu import: Volta 16GB
+GA100,CMP 170HX 10 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/cmp-170hx-10-gb.c3957,1,dbgpu import: Ampere 10GB
+GA100,CMP 170HX 8 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/cmp-170hx-8-gb.c3830,1,dbgpu import: Ampere 8GB
+TU116,CMP 30HX,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/cmp-30hx.c3780,1,dbgpu import: Turing 6GB
+TU106,CMP 40HX,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/cmp-40hx.c3781,1,dbgpu import: Turing 8GB
+TU102,CMP 50HX,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/cmp-50hx.c3782,1,dbgpu import: Turing 10GB
+GA104,CMP 70HX,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/cmp-70hx.c3822,1,dbgpu import: Ampere 8GB
+GA102,CMP 90HX,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/cmp-90hx.c3783,1,dbgpu import: Ampere 10GB
+GA100,DRIVE A100 PROD,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/drive-a100-prod.c3967,1,dbgpu import: Ampere 32GB
+GB20B,GB10,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/gb10.c4342,0,dbgpu import: Blackwell 2.0 128GB
+GB200,GB200,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=70)
+GB300,GB300,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=71)
+GA100,GRID A100A,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/grid-a100a.c3579,1,dbgpu import: Ampere 32GB
+GA100,GRID A100B,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/grid-a100b.c3578,1,dbgpu import: Ampere 48GB
+TU102,GRID RTX T10-4,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/grid-rtx-t10-4.c3500,1,dbgpu import: Turing 4GB
+H100,H100,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,https://resources.nvidia.com/en-us-data-center-overview-mc,0,Extracted from: NVIDIA H100 数据表
+GH100,H100 CNX,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h100-cnx.c4131,1,dbgpu import: Hopper 80GB
+H100 NVL,H100 NVL,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=73)
+GH100,H100 NVL 94 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h100-nvl-94-gb.c4327,1,dbgpu import: Hopper 94GB
+H100 NVL,H100 NVL 94GB,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=8)
+GH100,H100 PCIe 80 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h100-pcie-80-gb.c3899,1,dbgpu import: Hopper 80GB
+GH100,H100 PCIe 96 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h100-pcie-96-gb.c4164,1,dbgpu import: Hopper 96GB
+GH100,H100 SXM5 64 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h100-sxm5-64-gb.c4165,1,dbgpu import: Hopper 64GB
+GH100,H100 SXM5 80 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h100-sxm5-80-gb.c3900,1,dbgpu import: Hopper 80GB
+H100,H100 SXM5 80GB,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=9)
+GH100,H100 SXM5 94 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h100-sxm5-94-gb.c4294,1,dbgpu import: Hopper 94GB
+GH100,H100 SXM5 96 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h100-sxm5-96-gb.c3974,1,dbgpu import: Hopper 96GB
+H200,H200,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=74)
+GH100,H200 NVL,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h200-nvl.c4254,0,dbgpu import: Hopper 141GB
+GH100,H200 SXM 141 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h200-sxm-141-gb.c4255,1,dbgpu import: Hopper 141GB
+H200,H200 SXM 141GB,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=10)
+H800,H800,NVIDIA,NVIDIA,,GPU,datacenter,existing_db,,0,Existing in DB (id=76)
+GH100,H800 PCIe 80 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h800-pcie-80-gb.c4181,1,dbgpu import: Hopper 80GB
+GH100,H800 SXM5,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/h800-sxm5.c3975,1,dbgpu import: Hopper 80GB
+GA10B,Jetson AGX Orin 32 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-agx-orin-32-gb.c4084,1,dbgpu import: Ampere 32GB
+GA10B,Jetson AGX Orin 64 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-agx-orin-64-gb.c4085,1,dbgpu import: Ampere 64GB
+GV10B,Jetson AGX Xavier 16 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-agx-xavier-16-gb.c3232,1,dbgpu import: Volta 16GB
+GV10B,Jetson AGX Xavier 32 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-agx-xavier-32-gb.c4088,1,dbgpu import: Volta 32GB
+GM20B,Jetson Nano,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-nano.c3643,1,dbgpu import: Maxwell 2.0 4GB
+GA10B,Jetson Orin NX 16 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-orin-nx-16-gb.c4086,1,dbgpu import: Ampere 16GB
+GA10B,Jetson Orin NX 8 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-orin-nx-8-gb.c4081,1,dbgpu import: Ampere 8GB
+GA10B,Jetson Orin Nano 4 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-orin-nano-4-gb.c4083,1,dbgpu import: Ampere 4GB
+GA10B,Jetson Orin Nano 8 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-orin-nano-8-gb.c4082,1,dbgpu import: Ampere 8GB
+GA10B,Jetson Orin Nano Super,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-orin-nano-super.c4377,1,dbgpu import: Ampere 8GB
+GB10B,Jetson T4000,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-t4000.c4369,1,dbgpu import: Blackwell 64GB
+GB10B,Jetson T5000,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-t5000.c4370,1,dbgpu import: Blackwell 128GB
+GV10B,Jetson Xavier NX 16 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-xavier-nx-16-gb.c4087,1,dbgpu import: Volta 16GB
+GV10B,Jetson Xavier NX 8 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/jetson-xavier-nx-8-gb.c3642,1,dbgpu import: Volta 8GB
+AD102,L20,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/l20.c4206,1,dbgpu import: Ada Lovelace 48GB
+AD104,L4,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/l4.c4091,1,dbgpu import: Ada Lovelace 24GB
+AD102,L40,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/l40.c3959,1,dbgpu import: Ada Lovelace 48GB
+AD102,L40 CNX,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/l40-cnx.c3961,1,dbgpu import: Ada Lovelace 24GB
+AD102,L40G,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/l40g.c3960,1,dbgpu import: Ada Lovelace 24GB
+AD102,L40S,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/l40s.c4173,1,dbgpu import: Ada Lovelace 48GB
+GP102,P102-100,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/p102-100.c3100,1,dbgpu import: Pascal 5GB
+GP102,P102-101,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/p102-101.c3284,1,dbgpu import: Pascal 10GB
+GP104,P104-101,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/p104-101.c3064,1,dbgpu import: Pascal 4GB
+GP106,P106M,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/p106m.c3773,1,dbgpu import: Pascal 4GB
+GA100,PG506-207,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/pg506-207.c3962,1,dbgpu import: Ampere 24GB
+GA100,PG506-217,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/pg506-217.c3963,1,dbgpu import: Ampere 24GB
+GA100,PG506-232,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/pg506-232.c3799,1,dbgpu import: Ampere 24GB
+GA100,PG506-242,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/pg506-242.c3823,1,dbgpu import: Ampere 24GB
+GV100,Quadro GV100,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-gv100.c3066,1,dbgpu import: Volta 32GB
+GP106,Quadro P2200,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-p2200.c3442,1,dbgpu import: Pascal 5GB
+GP104,Quadro P3200 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-p3200-max-q.c3315,1,dbgpu import: Pascal 6GB
+GP104,Quadro P3200 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-p3200-mobile.c3147,1,dbgpu import: Pascal 6GB
+GP104,Quadro P4200 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-p4200-max-q.c4004,1,dbgpu import: Pascal 8GB
+GP104,Quadro P4200 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-p4200-mobile.c3199,1,dbgpu import: Pascal 8GB
+GP108,Quadro P520 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-p520-max-q.c4005,1,dbgpu import: Pascal 4GB
+GP104,Quadro P5200 Max-Q,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-p5200-max-q.c3347,1,dbgpu import: Pascal 16GB
+GP104,Quadro P5200 Mobile,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-p5200-mobile.c3020,1,dbgpu import: Pascal 16GB
+GP107,Quadro P620 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-p620-mobile.c3456,1,dbgpu import: Pascal 4GB
+TU106,Quadro RTX 3000 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-3000-max-q.c3429,1,dbgpu import: Turing 6GB
+TU106,Quadro RTX 3000 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-3000-mobile.c3428,1,dbgpu import: Turing 6GB
+TU106,Quadro RTX 3000 Mobile Refresh,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-3000-mobile-refresh.c3697,1,dbgpu import: Turing 6GB
+TU106,Quadro RTX 3000 X2 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-3000-x2-mobile.c4120,1,dbgpu import: Turing 6GB
+TU104,Quadro RTX 4000,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-4000.c3336,1,dbgpu import: Turing 8GB
+TU104,Quadro RTX 4000 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-4000-max-q.c3427,1,dbgpu import: Turing 8GB
+TU104,Quadro RTX 4000 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-4000-mobile.c3430,1,dbgpu import: Turing 8GB
+TU104,Quadro RTX 5000,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-5000.c3308,1,dbgpu import: Turing 16GB
+TU104,Quadro RTX 5000 Max-Q,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-5000-max-q.c3432,1,dbgpu import: Turing 16GB
+TU104,Quadro RTX 5000 Mobile,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-5000-mobile.c3431,1,dbgpu import: Turing 16GB
+TU104B,Quadro RTX 5000 Mobile Refresh,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-5000-mobile-refresh.c3625,1,dbgpu import: Turing 16GB
+TU104,Quadro RTX 5000 X2 Mobile,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-5000-x2-mobile.c4121,1,dbgpu import: Turing 16GB
+TU102,Quadro RTX 6000,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-6000.c3307,1,dbgpu import: Turing 24GB
+TU102,Quadro RTX 6000 Mobile,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-6000-mobile.c3497,1,dbgpu import: Turing 24GB
+TU102,Quadro RTX 6000 Passive,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-6000-passive.c3469,1,dbgpu import: Turing 24GB
+TU102,Quadro RTX 8000,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-8000.c3306,1,dbgpu import: Turing 48GB
+TU102,Quadro RTX 8000 Passive,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-rtx-8000-passive.c3470,1,dbgpu import: Turing 48GB
+TU117,Quadro T1000 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-t1000-max-q.c3807,1,dbgpu import: Turing 4GB
+TU117,Quadro T1000 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-t1000-mobile.c3435,1,dbgpu import: Turing 4GB
+TU117,Quadro T1000 Mobile GDDR6,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-t1000-mobile-gddr6.c3624,1,dbgpu import: Turing 4GB
+TU117,Quadro T1200 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-t1200-max-q.c4006,1,dbgpu import: Turing 4GB
+TU117,Quadro T1200 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-t1200-mobile.c3803,1,dbgpu import: Turing 4GB
+TU117,Quadro T2000 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-t2000-max-q.c3436,1,dbgpu import: Turing 4GB
+TU117,Quadro T2000 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/quadro-t2000-mobile.c3434,1,dbgpu import: Turing 4GB
+AD107,RTX 1000 Mobile Ada Generation,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-1000-mobile-ada-generation.c4208,1,dbgpu import: Ada Lovelace 6GB
+AD104,RTX 3500 Embedded Ada Generation,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-3500-embedded-ada-generation.c4201,1,dbgpu import: Ada Lovelace 12GB
+AD104,RTX 3500 Mobile Ada Generation,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-3500-mobile-ada-generation.c4098,1,dbgpu import: Ada Lovelace 12GB
+AD103,RTX 4500 Ada Generation,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-4500-ada-generation.c4172,1,dbgpu import: Ada Lovelace 24GB
+AD102,RTX 5880 Ada Generation,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-5880-ada-generation.c4191,1,dbgpu import: Ada Lovelace 48GB
+AD102,RTX 6000 Ada Generation,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-6000-ada-generation.c3933,1,dbgpu import: Ada Lovelace 48GB
+GB202,RTX 6000D,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-6000d.c4363,1,dbgpu import: Blackwell 2.0 84GB
+GA107,RTX A1000,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a1000.c4211,1,dbgpu import: Ampere 8GB
+GA107S,RTX A1000 Embedded,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a1000-embedded.c3895,1,dbgpu import: Ampere 4GB
+GA107,RTX A1000 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a1000-mobile.c3920,1,dbgpu import: Ampere 4GB
+GA107,RTX A1000 Mobile 6 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a1000-mobile-6-gb.c4137,1,dbgpu import: Ampere 6GB
+GA106,RTX A2000,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a2000.c3820,1,dbgpu import: Ampere 6GB
+GA106,RTX A2000 12 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a2000-12-gb.c3853,1,dbgpu import: Ampere 12GB
+GA107,RTX A2000 Embedded,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a2000-embedded.c3861,1,dbgpu import: Ampere 4GB
+GA107,RTX A2000 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a2000-max-q.c4007,1,dbgpu import: Ampere 4GB
+GA107,RTX A2000 Max-Q 8 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a2000-max-q-8-gb.c4288,1,dbgpu import: Ampere 8GB
+GA107,RTX A2000 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a2000-mobile.c3827,1,dbgpu import: Ampere 4GB
+GA107,RTX A2000 Mobile 8 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a2000-mobile-8-gb.c4287,1,dbgpu import: Ampere 8GB
+GA104,RTX A3000 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a3000-mobile.c3806,1,dbgpu import: Ampere 6GB
+GA104,RTX A3000 Mobile 12 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a3000-mobile-12-gb.c3904,1,dbgpu import: Ampere 12GB
+GA107,RTX A4 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a4-mobile.c3789,1,dbgpu import: Ampere 4GB
+GA107,RTX A400,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a400.c4212,1,dbgpu import: Ampere 4GB
+GA104,RTX A4000,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a4000.c3756,1,dbgpu import: Ampere 16GB
+GA104,RTX A4000 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a4000-max-q.c4008,1,dbgpu import: Ampere 8GB
+GA104,RTX A4000 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a4000-mobile.c3804,1,dbgpu import: Ampere 8GB
+GA104,RTX A4000H,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a4000h.c3969,1,dbgpu import: Ampere 16GB
+GA102,RTX A4500,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a4500.c3849,1,dbgpu import: Ampere 20GB
+GA104,RTX A4500 Embedded,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a4500-embedded.c3893,1,dbgpu import: Ampere 16GB
+GA104,RTX A4500 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a4500-max-q.c4009,1,dbgpu import: Ampere 16GB
+GA104,RTX A4500 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a4500-mobile.c3851,1,dbgpu import: Ampere 16GB
+GA107,RTX A500,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a500.c3989,1,dbgpu import: Ampere 4GB
+GA107S,RTX A500 Embedded,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a500-embedded.c3896,1,dbgpu import: Ampere 4GB
+GA107S,RTX A500 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a500-mobile.c3939,1,dbgpu import: Ampere 4GB
+GA102,RTX A5000,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a5000.c3748,1,dbgpu import: Ampere 24GB
+GA104,RTX A5000 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a5000-max-q.c4010,1,dbgpu import: Ampere 16GB
+GA104,RTX A5000 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a5000-mobile.c3805,1,dbgpu import: Ampere 16GB
+GA102,RTX A5000-12Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a5000-12q.c3991,1,dbgpu import: Ampere 12GB
+GA102,RTX A5000-8Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a5000-8q.c3990,1,dbgpu import: Ampere 8GB
+GA102,RTX A5500,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a5500.c3901,1,dbgpu import: Ampere 24GB
+GA103,RTX A5500 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a5500-max-q.c4011,1,dbgpu import: Ampere 16GB
+GA103,RTX A5500 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a5500-mobile.c3902,1,dbgpu import: Ampere 16GB
+GA102,RTX A6000,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-a6000.c3686,1,dbgpu import: Ampere 48GB
+GB206,RTX PRO 2000 Blackwell,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-pro-2000-blackwell.c4330,1,dbgpu import: Blackwell 2.0 16GB
+GB203,RTX PRO 4000 Blackwell,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-pro-4000-blackwell.c4279,1,dbgpu import: Blackwell 2.0 24GB
+GB203,RTX PRO 4000 Blackwell SFF,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-pro-4000-blackwell-sff.c4329,1,dbgpu import: Blackwell 2.0 24GB
+GB203,RTX PRO 4500 Blackwell,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-pro-4500-blackwell.c4278,1,dbgpu import: Blackwell 2.0 32GB
+GB202,RTX PRO 5000 72 GB Blackwell,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-pro-5000-72-gb-blackwell.c4357,1,dbgpu import: Blackwell 2.0 72GB
+GB202,RTX PRO 5000 Blackwell,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-pro-5000-blackwell.c4276,1,dbgpu import: Blackwell 2.0 48GB
+GB202,RTX PRO 6000 Blackwell,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-pro-6000-blackwell.c4272,1,dbgpu import: Blackwell 2.0 96GB
+GB202,RTX PRO 6000 Blackwell Max-Q,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-pro-6000-blackwell-max-q.c4273,1,dbgpu import: Blackwell 2.0 96GB
+GB202,RTX PRO 6000 Blackwell Server,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-pro-6000-blackwell-server.c4274,1,dbgpu import: Blackwell 2.0 96GB
+GB202,RTX PRO 6000D Blackwell Max-Q,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/rtx-pro-6000d-blackwell-max-q.c4364,1,dbgpu import: Blackwell 2.0 96GB
+GA10B,Switch 2 GPU,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/switch-2-gpu.c4313,1,dbgpu import: Ampere 12GB
+GM20B,Switch GPU 16nm,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/switch-gpu-16nm.c3754,1,dbgpu import: Maxwell 2.0 4GB
+TU117,T1000,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/t1000.c3797,1,dbgpu import: Turing 4GB
+TU117,T1000 8 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/t1000-8-gb.c3842,1,dbgpu import: Turing 8GB
+TU117,T400 4 GB,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/t400-4-gb.c3843,1,dbgpu import: Turing 4GB
+TU117,T500 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/t500-max-q.c4103,1,dbgpu import: Turing 4GB
+TU117,T500 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/t500-mobile.c3747,1,dbgpu import: Turing 4GB
+TU117,T550 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/t550-mobile.c3918,1,dbgpu import: Turing 4GB
+TU117,T600,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/t600.c3796,1,dbgpu import: Turing 4GB
+TU117,T600 Max-Q,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/t600-max-q.c3817,1,dbgpu import: Turing 4GB
+TU117,T600 Mobile,NVIDIA,NVIDIA,foreign,GPU,workstation,dbgpu,https://www.techpowerup.com/gpu-specs/t600-mobile.c4151,1,dbgpu import: Turing 4GB
+TU102,TITAN RTX,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/titan-rtx.c3311,1,dbgpu import: Turing 24GB
+GV100,TITAN V CEO Edition,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/titan-v-ceo-edition.c3277,1,dbgpu import: Volta 32GB
+GV100,Tesla PG500-216,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-pg500-216.c3791,1,dbgpu import: Volta 32GB
+GV100,Tesla PG503-216,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-pg503-216.c3790,1,dbgpu import: Volta 32GB
+TU102,Tesla T10 16 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-t10-16-gb.c4036,1,dbgpu import: Turing 16GB
+TU104,Tesla T4,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-t4.c3316,1,dbgpu import: Turing 16GB
+TU104,Tesla T4G,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-t4g.c4134,1,dbgpu import: Turing 16GB
+GV100,Tesla V100 DGXS 16 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-v100-dgxs-16-gb.c3763,1,dbgpu import: Volta 16GB
+GV100,Tesla V100 DGXS 32 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-v100-dgxs-32-gb.c3186,1,dbgpu import: Volta 32GB
+GV100,Tesla V100 FHHL,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-v100-fhhl.c3248,1,dbgpu import: Volta 16GB
+GV100,Tesla V100 PCIe 32 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-v100-pcie-32-gb.c3184,1,dbgpu import: Volta 32GB
+GV100,Tesla V100 SXM2 16 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-v100-sxm2-16-gb.c3471,1,dbgpu import: Volta 16GB
+GV100,Tesla V100 SXM2 32 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-v100-sxm2-32-gb.c3185,1,dbgpu import: Volta 32GB
+GV100,Tesla V100 SXM3 32 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-v100-sxm3-32-gb.c3472,1,dbgpu import: Volta 32GB
+GV100,Tesla V100S PCIe 32 GB,NVIDIA,NVIDIA,foreign,GPU,datacenter,dbgpu,https://www.techpowerup.com/gpu-specs/tesla-v100s-pcie-32-gb.c3467,1,dbgpu import: Volta 32GB
+SN40L,SN40L,SambaNova,SambaNova,,RDU,datacenter,existing_db,https://ieeexplore.ieee.org/document/10904578,0,Extracted from: 硬件规格 - SN40L | SN40L 硬件规格参考
+SN50,SN50,SambaNova,SambaNova,,RDU,datacenter,series_search,https://www.google.com/search?q=SambaNova+SN50+specifications,1,Next-gen candidate from SN40L series
+SV100,SV100,Vastai,Vastai,,GPU,datacenter,link_library,https://www.vastai.com,1,Extracted from: 瀚博半导体官网 - 瀚博 (云端推理芯片) | SV100 硬件规格参考
+昇腾910B,Ascend 910B B1 64GB,Huawei,华为,domestic,NPU,datacenter,existing_db,,0,Existing in DB (id=11)
+昇腾910C,Ascend 910C OAM 128GB,Huawei,华为,domestic,NPU,datacenter,existing_db,,0,Existing in DB (id=12)
+B1 (64GB),B1 (64GB),Huawei,华为,domestic,NPU,datacenter,existing_db,,0,Existing in DB (id=49)
+昇腾910A,昇腾910A,Huawei,华为,domestic,NPU,datacenter,existing_db,,0,Existing in DB (id=78)
+昇腾910B,昇腾910B,Huawei,华为,domestic,NPU,datacenter,existing_db,https://tech.yahoo.com/ai/articles/huaweis-homegrown-ai-chip-examined-153035411.html,0,Extracted from: 硬件规格 - 昇腾910B B1 (64GB) | 昇腾910B B1 (64GB) 硬件规格参考
+昇腾910C,昇腾910C,Huawei,华为,domestic,NPU,datacenter,existing_db,,0,Existing in DB (id=80)
+昇腾920,昇腾920,Huawei,华为,domestic,NPU,datacenter,existing_db,,0,Existing in DB (id=81)
+昇腾930,昇腾930,Huawei,华为,domestic,NPU,datacenter,series_search,https://www.google.com/search?q=Huawei+昇腾930+specifications,1,Next-gen candidate from 昇腾910C series
+昇腾950P,昇腾950P,Huawei,华为,domestic,NPU,datacenter,existing_db,,0,Existing in DB (id=82)
+昇腾950PR,昇腾950PR,Huawei,华为,domestic,NPU,datacenter,existing_db,,0,Existing in DB (id=83)
+昇腾(Ascend),昇腾(Ascend),华为(昇腾),华为(昇腾),,GPU,datacenter,link_library,https://www.hiascend.com/software/modelzoo,1,Extracted from: 华为昇腾社区 - 昇腾(Ascend) (软件生态) |  - 昇腾社区页面自动解析
+昇腾社区页面自动解析,昇腾社区页面自动解析,华为(昇腾),华为(昇腾),,GPU,datacenter,link_library,https://www.hiascend.com/software/modelzoo,1,Extracted from: 华为昇腾社区 - 昇腾(Ascend) (软件生态) |  - 昇腾社区页面自动解析
+BR100,BR100,Biren,壁仞,,GPU,datacenter,existing_db,,0,Existing in DB (id=84)
+BR100,BR100 64GB,Biren,壁仞,,GPU,datacenter,existing_db,,0,Existing in DB (id=13)
+BR104,BR104,Biren,壁仞,,GPU,datacenter,existing_db,,0,Existing in DB (id=85)
+BR104,BR104 64GB,Biren,壁仞,,GPU,datacenter,existing_db,,0,Existing in DB (id=14)
+BR108,BR108,Biren,壁仞,,GPU,datacenter,existing_db,,0,Existing in DB (id=86)
+BR200,BR200,Biren,壁仞,,GPU,datacenter,existing_db,,0,Existing in DB (id=87)
+BR100 (壁砺100),BR100 (壁砺100),Biren,壁仞科技,,GPU,datacenter,existing_db,https://www.163.com/dy/article/HEBJUBD80511CPVM.html,0,Extracted from: 硬件规格 - BR100 (壁砺100) | BR100 (壁砺100) 硬件规格参考
+BR104 (壁砺104),BR104 (壁砺104),Biren,壁仞科技,,GPU,datacenter,existing_db,https://blog.csdn.net/weixin_42405819/article/details/134774705,0,Extracted from: 硬件规格 - BR104 (壁砺104) | BR104 (壁砺104) 硬件规格参考
+C114通信网,C114通信网,壁仞科技; Biren,壁仞科技; Biren,,GPU,datacenter,link_library,https://www.c114.com.cn/expo/13/a1206612.html,1,Extracted from: C114通信网 - 壁仞BR100/BR104(壁砺系列)芯片展品介绍 硬件规格
+Chips 34官方演示,Chips 34官方演示,壁仞科技; Biren,壁仞科技; Biren,,GPU,datacenter,link_library,https://www.eepw.com.cn/article/202209/438306.htm,1,Extracted from: EEPW - 壁仞BR100/BR104芯片规格深度分析（引用Hot Chips 34官方演示）
+天垓100,TianGai 100 32GB,Iluvatar,天数智芯,,GPU,datacenter,existing_db,,0,Existing in DB (id=15)
+天垓200,天垓200,Iluvatar,天数智芯,,GPU,datacenter,series_search,https://www.google.com/search?q=Iluvatar+天垓200+specifications,1,Next-gen candidate from 天垓100 series
+智铠100,智铠100,Iluvatar,天数智芯,,GPU,datacenter,series_search,https://www.google.com/search?q=Iluvatar+智铠100+specifications,1,Next-gen candidate from 天垓100 series
+天垓100,天垓100,Iluvatar,天数智芯(Iluvatar),,GPU,datacenter,existing_db,,0,Existing in DB (id=88)
+FP8,FP8,寒武纪,寒武纪,,GPU,datacenter,link_library,https://github.com/Cambricon/mlu-ops,1,Extracted from: 寒武纪 GitHub（mlu-ops 含原生 FP8 指令）
+Inferentia2,Inferentia2,AWS,寒武纪,domestic,MLU,datacenter,series_search,https://www.google.com/search?q=AWS+Inferentia2+specifications,1,Next-gen candidate from Trainium2 series
+MLU220,MLU220,Cambricon,寒武纪,domestic,MLU,datacenter,series_search,https://www.google.com/search?q=Cambricon+MLU220+specifications,1,Next-gen candidate from MLU270 series
+MLU270,MLU270,Cambricon,寒武纪,domestic,MLU,datacenter,existing_db,,0,Existing in DB (id=89)
+MLU270-S4,MLU270-S4,Cambricon,寒武纪,domestic,MLU,datacenter,existing_db,https://www.leiphone.com/category/chips/KYLlEUESm47dg24u.html,0,Extracted from: 硬件规格 - MLU270-S4 | MLU270-S4 硬件规格参考
+MLU290,MLU290,Cambricon,寒武纪,domestic,MLU,datacenter,existing_db,,0,Existing in DB (id=90)
+MLU290,MLU290-M5,Cambricon,寒武纪,,MLU,datacenter,existing_db,https://aipfia.zhidx.com/p/253907.html,0,Extracted from: 硬件规格 - MLU290-M5 | MLU290-M5 硬件规格参考
+MLU370,MLU370,Cambricon,寒武纪,domestic,MLU,datacenter,existing_db,,0,Existing in DB (id=91)
+MLU370-S4 (24GB),MLU370-S4 (24GB),Cambricon,寒武纪,domestic,MLU,datacenter,existing_db,https://ssd.ssfkg.com/product-detail/MLU370_S4.html,0,Extracted from: 硬件规格 - MLU370-S4 (24GB) | MLU370-S4 (24GB) 硬件规格参考
+MLU370-X4 (24GB),MLU370-X4 (24GB),Cambricon,寒武纪,domestic,MLU,datacenter,existing_db,http://www.cloudhin.com/xk/showproduct.php?id=270,0,Extracted from: 硬件规格 - MLU370-X4 (24GB) | MLU370-X4 (24GB) 硬件规格参考
+MLU370,MLU370-X4 24GB,Cambricon,寒武纪,domestic,MLU,datacenter,existing_db,,0,Existing in DB (id=16)
+MLU370-X8 (48GB),MLU370-X8 (48GB),Cambricon,寒武纪,domestic,MLU,datacenter,existing_db,https://baike.baidu.com/item/寒武纪 MLU370-X8/60369997,0,Extracted from: 硬件规格 - MLU370-X8 (48GB) | MLU370-X8 (48GB) 硬件规格参考
+MLU590,MLU590,Cambricon,寒武纪,domestic,MLU,datacenter,existing_db,,0,Existing in DB (id=92)
+MLU590 (80GB),MLU590 (80GB),Cambricon,寒武纪,domestic,MLU,datacenter,existing_db,https://blog.ailemon.net/2025/10/31/national-ai-chip-param-info-collection/,0,Extracted from: 硬件规格 - MLU590 (80GB) | MLU590 (80GB) 硬件规格参考
+MLU590,MLU590 80GB,Cambricon,寒武纪,domestic,MLU,datacenter,existing_db,,0,Existing in DB (id=17)
+MLU690,MLU690,Cambricon,寒武纪,,MLU,datacenter,existing_db,https://q.stock.sohu.com/cn/news.html?textId=1015284293&type=120,0,Extracted from: 硬件规格 - MLU690 | MLU690 硬件规格参考
+MLU790,MLU790,Cambricon,寒武纪,,MLU,datacenter,existing_db,,0,Existing in DB (id=94)
+Trainium2,Trainium2,AWS,寒武纪,domestic,MLU,datacenter,existing_db,https://aws.amazon.com/machine-learning/trainium/,0,"Extracted from: AWS官网 - Trainium (自研训练芯片, 96GB HBM) | Trainium2 硬件规格参考"
+HBM2e,HBM2e,平头哥(阿里),平头哥(阿里),,GPU,datacenter,link_library,https://www.t-head.cn,1,"Extracted from: 平头哥官网 - 真武(Zhenwu) (自研PPU并行架构, 96GB HBM2e, 700GB/s互联, PCIe 5.0, 性能超A800) | 真武810E (PPU) 硬件规格参考"
+S4000,MTT S4000 48GB,MooreThreads,摩尔线程,,GPU,datacenter,existing_db,,0,Existing in DB (id=18)
+S4000,S4000,MooreThreads,摩尔线程,,GPU,datacenter,existing_db,https://docs.mthreads.com/s4000/,0,Extracted from: 硬件规格 - MTT S4000 | MTT S4000 硬件规格参考
+S4000,S4000,摩尔线程,摩尔线程,,GPU,datacenter,link_library,https://www.mthreads.com,0,"Extracted from: 摩尔线程官方（2026-02 公开：80GB, 1.6TB/s） | MTT S4000 生态评估"
+S5000,S5000,MooreThreads,摩尔线程,,GPU,datacenter,series_search,https://www.google.com/search?q=MooreThreads+S5000+specifications,1,Next-gen candidate from S4000 series
+S6000,S6000,MooreThreads,摩尔线程,,GPU,datacenter,series_search,https://www.google.com/search?q=MooreThreads+S6000+specifications,1,Next-gen candidate from S4000 series
+P800,Kunlunxin P800 96GB,Kunlunxin,昆仑芯,,NPU,datacenter,existing_db,,0,Existing in DB (id=19)
+P1000,P1000,Kunlunxin,昆仑芯,,NPU,datacenter,series_search,https://www.google.com/search?q=Kunlunxin+P1000+specifications,1,Next-gen candidate from P800 series
+P800,P800,Kunlunxin,昆仑芯,,NPU,datacenter,existing_db,,0,Existing in DB (id=96)
+P800s,P800s,Kunlunxin,昆仑芯,,NPU,datacenter,series_search,https://www.google.com/search?q=Kunlunxin+P800s+specifications,1,Next-gen candidate from P800 series
+P900,P900,Kunlunxin,昆仑芯,,NPU,datacenter,series_search,https://www.google.com/search?q=Kunlunxin+P900+specifications,1,Next-gen candidate from P800 series
+R300,R300,Kunlunxin,昆仑芯(Kunlunxin),,NPU,datacenter,existing_db,,0,Existing in DB (id=61)
+FP32 6,FP32 6,景嘉微,景嘉微,,GPU,datacenter,link_library,https://www.jingjiamicro.com,1,"Extracted from: 景嘉微官网 - JM系列 (第四代GPU, 1.5GHz, FP32 6 TFLOPS, FP16 12 TFLOPS, <150W) | JM1100 (JM11系列) 生态评估"
+JM1100 (JM11系列),JM1100 (JM11系列),JingjiaMicro,景嘉微,,GPU,datacenter,existing_db,https://data.eastmoney.com/notices/detail/300474/AN202501171642300918.html,0,Extracted from: 硬件规格 - JM1100 (JM11系列) | JM1100 (JM11系列) 硬件规格参考
+JM1100 (JM11系列),JM1100 (JM11系列),景嘉微,景嘉微,,GPU,datacenter,link_library,https://www.jingjiamicro.com,0,"Extracted from: 景嘉微官网 - JM系列 (第四代GPU, 1.5GHz, FP32 6 TFLOPS, FP16 12 TFLOPS, <150W) | JM1100 (JM11系列) 生态评估"
+JM9200,JM9200,JingjiaMicro,景嘉微,,GPU,datacenter,existing_db,,0,Existing in DB (id=97)
+JM9200,JM9200 32GB,JingjiaMicro,景嘉微,,GPU,datacenter,existing_db,,0,Existing in DB (id=20)
+C500,C500,MetaX,沐曦,,GPU,datacenter,existing_db,,0,Existing in DB (id=98)
+C500,C500 64GB,MetaX,沐曦,,GPU,datacenter,existing_db,,0,Existing in DB (id=21)
+C550,C550,MetaX,沐曦,,GPU,datacenter,existing_db,,0,Existing in DB (id=99)
+C600,C600,MetaX,沐曦,,GPU,datacenter,existing_db,,0,Existing in DB (id=100)
+C600,C600 144GB,MetaX,沐曦,,GPU,datacenter,existing_db,,0,Existing in DB (id=22)
+C700,C700,MetaX,沐曦,,GPU,datacenter,existing_db,,0,Existing in DB (id=101)
+C800,C800,MetaX,沐曦,,GPU,datacenter,series_search,https://www.google.com/search?q=MetaX+C800+specifications,1,Next-gen candidate from C600 series
+C500 (OAM 64GB HBM2e),C500 (OAM 64GB HBM2e),沐曦股份,沐曦股份,,GPU,datacenter,existing_db,,0,Existing in DB (id=102)
+C600 (144GB HBM3e),C600 (144GB HBM3e),沐曦股份,沐曦股份,,GPU,datacenter,existing_db,,0,Existing in DB (id=103)
+FP8 1000,FP8 1000,沐曦股份,沐曦股份,,GPU,datacenter,link_library,https://www.metax-tech.com,1,"Extracted from: 沐曦官网 - 曦云(Xiyun) (XCORE 1.5架构, FP8 1000 TFLOPS, 2025年7月发布) | 曦云C500 (OAM 64GB HBM2e) 生态评估"
+HBM2e,HBM2e,沐曦股份,沐曦股份,,GPU,datacenter,link_library,https://ai.gitee.com/docs/compute/clusters_gpu/mx_gpu,1,Extracted from: 硬件规格 - 曦云C500 (OAM 64GB HBM2e) | 曦云C500 (OAM 64GB HBM2e) 硬件规格参考
+HBM3e,HBM3e,沐曦股份,沐曦股份,,GPU,datacenter,link_library,https://baike.baidu.com/item/曦云C600/66256324,1,Extracted from: 硬件规格 - 曦云C600 (144GB HBM3e) | 曦云C600 (144GB HBM3e) 硬件规格参考
+N100 (16GB HBM2e),N100 (16GB HBM2e),沐曦股份,沐曦股份,,GPU,datacenter,existing_db,,0,Existing in DB (id=104)
+N260 (64GB HBM2e),N260 (64GB HBM2e),沐曦股份,沐曦股份,,GPU,datacenter,existing_db,,0,Existing in DB (id=105)
+K100,K100,Hygon,海光,,DCU,datacenter,existing_db,,0,Existing in DB (id=106)
+K100,K100 AI 64GB,Hygon,海光,,DCU,datacenter,existing_db,,0,Existing in DB (id=23)
+K200,K200,Hygon,海光,,DCU,datacenter,existing_db,,0,Existing in DB (id=107)
+K300,K300,Hygon,海光,,DCU,datacenter,existing_db,,0,Existing in DB (id=108)
+深算三号,深算三号,Hygon,海光,,DCU,datacenter,series_search,https://www.google.com/search?q=Hygon+深算三号+specifications,1,Next-gen candidate from K100 series
+深算二号,深算二号,Hygon,海光,,DCU,datacenter,existing_db,https://baike.baidu.com/item/深算二号,0,Extracted from: 硬件规格 - 深算二号 K100 (标准版 64GB) | 深算二号 K100 (标准版 64GB) 硬件规格参考
+TX510,TX510,清微智能,清微智能,,ASIC,edge,existing_db,https://huanqiu.com,0,Extracted from: 硬件规格 - TX510 | TX510 硬件规格参考
+"TX8 (CGRA可重构架构, FP16 512 TFLOPS/模组, 支持4096卡互联)","TX8 (CGRA可重构架构, FP16 512 TFLOPS/模组, 支持4096卡互联)",清微智能,清微智能,,GPU,datacenter,link_library,https://tsingmicro.com,1,"Extracted from: 硬件规格 - TX510 | TX510 硬件规格参考 | 清微智能官网 - TX8 (CGRA可重构架构, FP16 512 TFLOPS/模组, 支持4096卡互联) | TX510 生态评估"
+TX81 (REX1032服务器),TX81 (REX1032服务器),清微智能,清微智能,,GPU,datacenter,link_library,https://36kr.com,0,Extracted from: 硬件规格 - TX81 (REX1032服务器) | TX81 (REX1032服务器) 硬件规格参考
+TX82 (规划中),TX82 (规划中),清微智能,清微智能,,RPU,datacenter,existing_db,https://www.pconline.com.cn,0,Extracted from: 硬件规格 - TX82 (规划中) | TX82 (规划中) 硬件规格参考
+T20 (邃思2.0),T20 (邃思2.0),Enflame,燧原科技,,GCU,datacenter,existing_db,,0,Existing in DB (id=42)
+邃思(Suisi),邃思(Suisi),燧原科技,燧原科技,,GPU,datacenter,link_library,https://support.enflame-tech.com/onlinedoc_hw/,1,"Extracted from: 燧原技术支持文档 - 邃思(Suisi) (INT8 256 TOPS, TF32 160 TFLOPS, 64GB HBM2e)"
+HBM2e,HBM2e,燧原科技; Enflame,燧原科技; Enflame,,GPU,datacenter,link_library,https://www.icsmart.cn/46679/,1,Extracted from: icsmart - 燧原邃思2.0/云燧T20发布:12nm/32GB HBM2e/FP32 32TFLOPS 详细参数
+BM1690,BM1690,算能科技,算能科技,,GPU,datacenter,link_library,https://www.sophgo.com,1,Extracted from: 算能科技官网 - 算能 (RISC-V + AI) | BM1690 硬件规格参考

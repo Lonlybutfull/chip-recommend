@@ -1,0 +1,113 @@
+﻿chip_series,chip_model,vendor,vendor_display,chip_type,tier,discovery_method,source_urls,is_new_to_db,notes
+MI300A,MI300A,AMD,AMD,GPU,datacenter,series_search,https://www.google.com/search?q=AMD+MI300A+specifications,1,Next-gen candidate from MI300X series
+MI300X,MI300X,AMD,AMD,GPU,datacenter,series_search,https://www.google.com/search?q=AMD MI300X 下一代 GPU NPU 2025 2026|https://www.google.com/search?q=AMD 新一代 AI芯片 加速卡 2025 2026,1,Generic search: AMD 新一代 AI芯片 加速卡 2025 2026
+MI300X,MI300X 192GB,AMD,AMD,GPU,datacenter,seed,,1,
+MI325X,MI325X,AMD,AMD,GPU,datacenter,series_search,https://www.google.com/search?q=AMD+MI325X+specifications,1,Next-gen candidate from MI300X series
+MI350X,MI350X,AMD,AMD,GPU,datacenter,series_search,https://www.google.com/search?q=AMD MI350X 下一代 GPU NPU 2025 2026|https://www.google.com/search?q=AMD 新一代 AI芯片 加速卡 2025 2026,1,Generic search: AMD 新一代 AI芯片 加速卡 2025 2026
+MI350X,MI350X 288GB,AMD,AMD,GPU,datacenter,seed,,1,
+MI355X,MI355X,AMD,AMD,GPU,datacenter,series_search,https://www.google.com/search?q=AMD+MI355X+specifications,1,Next-gen candidate from MI300X series
+MI400X,MI400X,AMD,AMD,GPU,datacenter,series_search,https://www.google.com/search?q=AMD+MI400X+specifications,1,Next-gen candidate from MI300X series
+Inferentia3,Inferentia3,AWS,AWS,ASIC,datacenter,series_search,https://www.google.com/search?q=AWS+Inferentia3+specifications,1,Next-gen candidate from Trainium2 series
+Trainium2,Trainium2,AWS,AWS,ASIC,datacenter,seed,|https://www.google.com/search?q=AWS 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=AWS Trainium2 下一代 GPU NPU 2025 2026,1,
+Trainium3,Trainium3,AWS,AWS,ASIC,datacenter,series_search,https://www.google.com/search?q=AWS+Trainium3+specifications,1,Next-gen candidate from Trainium2 series
+BR100 (壁砺100),BR100 (壁砺100),Biren,Biren,GPU,datacenter,link_library_crawl,https://www.c114.com.cn/expo/13/a1206612.html|https://www.expreview.com/84428.html|https://www.eepw.com.cn/zhuanlan/253873.html|https://zhuanlan.zhihu.com/p/2017278722395366997|https://www.leiphone.com/category/chips/StgkDsyt73yfFe0b.html|https://www.163.com/dy/article/HEBJUBD80511CPVM.html,1,Extracted from link: 硬件规格 - BR100 (壁砺100) | BR100 (壁砺100) 硬件规格参考
+BR104 (壁砺104),BR104 (壁砺104),Biren,Biren,GPU,datacenter,link_library_crawl,https://blog.csdn.net/weixin_42405819/article/details/134774705|https://m.thepaper.cn/newsDetail_forward_19476306|https://www.jiemian.com/article/8015472.html|https://www.innohere.com/ir/132861/product.html,1,Extracted from link: 硬件规格 - BR104 (壁砺104) | BR104 (壁砺104) 硬件规格参考
+MLU270-S4,MLU270-S4,Cambricon,Cambricon,GPU,datacenter,link_library_crawl,https://www.manualslib.com/manual/2717211/Cambricon-Mlu270-F-Series.html|https://www.leiphone.com/category/chips/KYLlEUESm47dg24u.html|https://www.manualslib.com/manual/4028189/Cambricon-Mlu270-S-Series.html,1,Extracted from link: 硬件规格 - MLU270-S4 | MLU270-S4 硬件规格参考
+MLU370-S4 (24GB),MLU370-S4 (24GB),Cambricon,Cambricon,GPU,datacenter,link_library_crawl,https://zhuanlan.zhihu.com/p/687436193|https://www.cambricon.com/index.php?a=lists&c=index&catid=365|https://ssd.ssfkg.com/product-detail/MLU370_S4.html,1,Extracted from link: 硬件规格 - MLU370-S4 (24GB) | MLU370-S4 (24GB) 硬件规格参考
+MLU370-X4 (24GB),MLU370-X4 (24GB),Cambricon,Cambricon,GPU,datacenter,link_library_crawl,http://www.cloudhin.com/xk/showproduct.php?id=270|https://www.cambricon.com/index.php?a=lists&catid=371,1,Extracted from link: 硬件规格 - MLU370-X4 (24GB) | MLU370-X4 (24GB) 硬件规格参考
+MLU370-X8 (48GB),MLU370-X8 (48GB),Cambricon,Cambricon,GPU,datacenter,link_library_crawl,https://baike.baidu.com/item/寒武纪 MLU370-X8/60369997|https://www.cambricon.com/index.php?m=content&c=index&a=lists&catid=406,1,Extracted from link: 硬件规格 - MLU370-X8 (48GB) | MLU370-X8 (48GB) 硬件规格参考
+MLU590 (80GB),MLU590 (80GB),Cambricon,Cambricon,GPU,datacenter,link_library_crawl,https://www.iczoom.com/t-news/81872-industry.html|https://blog.ailemon.net/2025/10/31/national-ai-chip-param-info-collection/,1,Extracted from link: 硬件规格 - MLU590 (80GB) | MLU590 (80GB) 硬件规格参考
+T20 (邃思2.0),T20 (邃思2.0),Enflame,Enflame,GPU,datacenter,link_library_crawl,https://baike.baidu.com/item/邃思2.0,1,Extracted from link: 硬件规格 - 云燧T20 (邃思2.0) | 云燧T20 (邃思2.0) 硬件规格参考
+Ironwood,Ironwood,Google,Google,TPU,datacenter,series_search,https://www.google.com/search?q=Google 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=Google Ironwood 下一代 GPU NPU 2025 2026,1,Generic search: Google 新一代 AI芯片 加速卡 2025 2026
+Ironwood,Ironwood TPU v7,Google,Google,TPU,datacenter,seed,,1,
+TPU v6e,TPU v6e,Google,Google,TPU,datacenter,series_search,https://www.google.com/search?q=Google+TPU v6e+specifications,1,Next-gen candidate from Ironwood series
+TPU v7,TPU v7,Google,Google,TPU,datacenter,series_search,https://www.google.com/search?q=Google+TPU v7+specifications,1,Next-gen candidate from Ironwood series
+Trillium,Trillium,Google,Google,TPU,datacenter,series_search,https://www.google.com/search?q=Google+Trillium+specifications,1,Next-gen candidate from Ironwood series
+MK2 (GC200),MK2 (GC200),Graphcore,Graphcore,GPU,datacenter,link_library_crawl,http://www.graphcore.ai/hubfs/MK2-%20The%20Graphcore%202nd%20Generation%20IPU%20Final%20v7.14.2020.pdf|https://hc33.hotchips.org,1,Extracted from link: 硬件规格 - Colossus MK2 (GC200) | Colossus MK2 (GC200) 硬件规格参考
+Atlas 800I A2,Atlas 800I A2,Huawei,Huawei,GPU,datacenter,link_library_crawl,https://www.hiascend.com/hardware/ai-server|https://developer.baidu.com/article/detail.html?id=6623945|https://meipian.cn/5bylvwyp|https://www.hiascend.com/document/detail/en/AscendFAQ/ProduTech/productform/hardwaredesc_0001.html,1,Extracted from link: 硬件规格 - Atlas 800I A2 | Atlas 800I A2 硬件规格参考
+B1 (64GB),B1 (64GB),Huawei,Huawei,GPU,datacenter,link_library_crawl,https://tech.yahoo.com/ai/articles/huaweis-homegrown-ai-chip-examined-153035411.html|https://www.huaweicentral.com/leak-shows-huawei-smic-ascend-910b-entirely-differs-from-tsmc-ascend-910/|https://www.jygpu.com/article/676.html,1,Extracted from link: 硬件规格 - 昇腾910B B1 (64GB) | 昇腾910B B1 (64GB) 硬件规格参考
+C86-4G (64核),C86-4G (64核),Hygon,Hygon,GPU,datacenter,link_library_crawl,https://baike.baidu.com/item/海光C86,1,Extracted from link: 硬件规格 - C86-4G (64核) | C86-4G (64核) 硬件规格参考
+C86-5G (128核 规划),C86-5G (128核 规划),Hygon,Hygon,GPU,datacenter,link_library_crawl,https://www.eastmoney.com,1,Extracted from link: 硬件规格 - C86-5G (128核 规划) | C86-5G (128核 规划) 硬件规格参考
+K100 (标准版 64GB),K100 (标准版 64GB),Hygon,Hygon,GPU,datacenter,link_library_crawl,https://baike.baidu.com/item/深算二号,1,Extracted from link: 硬件规格 - 深算二号 K100 (标准版 64GB) | 深算二号 K100 (标准版 64GB) 硬件规格参考
+Falcon Shores,Falcon Shores,Intel,Intel,ASIC,datacenter,series_search,https://www.google.com/search?q=Intel+Falcon Shores+specifications,1,Next-gen candidate from Gaudi 3 series
+Gaudi 3,Gaudi 3,Intel,Intel,ASIC,datacenter,series_search,https://www.google.com/search?q=Intel 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=Intel Gaudi 3 下一代 GPU NPU 2025 2026,1,Generic search: Intel 新一代 AI芯片 加速卡 2025 2026
+Gaudi 3,Gaudi 3 128GB,Intel,Intel,ASIC,datacenter,seed,,1,
+Gaudi 4,Gaudi 4,Intel,Intel,ASIC,datacenter,series_search,https://www.google.com/search?q=Intel+Gaudi 4+specifications,1,Next-gen candidate from Gaudi 3 series
+JM1100 (JM11系列),JM1100 (JM11系列),JingjiaMicro,JingjiaMicro,GPU,datacenter,link_library_crawl,https://www.jemoic.com/products_6/820.html|https://data.eastmoney.com/notices/detail/300474/AN202501171642300918.html,1,Extracted from link: 硬件规格 - JM1100 (JM11系列) | JM1100 (JM11系列) 硬件规格参考
+JM7200 (JM7系列),JM7200 (JM7系列),JingjiaMicro,JingjiaMicro,GPU,datacenter,link_library_crawl,https://blog.csdn.net/wujianing_110117/article/details/119265576|https://www.zhihu.com/question/400528680,1,Extracted from link: 硬件规格 - JM7200 (JM7系列) | JM7200 (JM7系列) 硬件规格参考
+JM9200 (JH920),JM9200 (JH920),JingjiaMicro,JingjiaMicro,GPU,datacenter,link_library_crawl,https://www.hangyan.co|https://news.pconline.com.cn/1486/14862624.html|https://www.chinaz.com/2021/1211/1340145.shtml,1,Extracted from link: 硬件规格 - JM9200 (JH920) | JM9200 (JH920) 硬件规格参考
+M100,M100,Kunlunxin,Kunlunxin,GPU,datacenter,link_library_crawl,https://developer.baidu.com|https://www.c114.net.cn/industry/101818.html,1,Extracted from link: 硬件规格 - 昆仑芯M100 | 昆仑芯M100 硬件规格参考
+P800 (OAM),P800 (OAM),Kunlunxin,Kunlunxin,GPU,datacenter,link_library_crawl,https://kunlunxin.com|https://baike.baidu.com/item/昆仑芯P800/67786426,1,Extracted from link: 硬件规格 - 昆仑芯P800 (OAM) | 昆仑芯P800 (OAM) 硬件规格参考
+R300,R300,Kunlunxin,Kunlunxin,GPU,datacenter,link_library_crawl,https://baike.baidu.com/item/昆仑芯|https://www.ameya360.com,1,Extracted from link: 硬件规格 - 昆仑芯II R300 | 昆仑芯II R300 硬件规格参考
+Maia 200,Maia 200,Microsoft,Microsoft,ASIC,datacenter,seed,|https://www.google.com/search?q=Microsoft 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=Microsoft Maia 200 下一代 GPU NPU 2025 2026|https://techcrunch.com/2026/01/26/microsoft-announces-powerful-new-chip-for-ai-inference/,1,
+A100,A100,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA A100 下一代 GPU NPU 2025 2026|https://www.google.com/search?q=NVIDIA 新一代 AI芯片 加速卡 2025 2026,1,Generic search: NVIDIA 新一代 AI芯片 加速卡 2025 2026
+A100,A100 SXM4 80GB,NVIDIA,NVIDIA,GPU,datacenter,seed,,1,
+A100X,A100X,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA+A100X+specifications,1,Next-gen candidate from A100 series
+A800,A800,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA+A800+specifications,1,Next-gen candidate from A100 series
+B100,B100,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA+B100+specifications,1,Next-gen candidate from B200 series
+B200,B200,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA B200 下一代 GPU NPU 2025 2026|https://www.google.com/search?q=NVIDIA 新一代 AI芯片 加速卡 2025 2026,1,Generic search: NVIDIA 新一代 AI芯片 加速卡 2025 2026
+B200,B200 SXM 192GB,NVIDIA,NVIDIA,GPU,datacenter,seed,,1,
+B200 Ultra,B200 Ultra,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA+B200 Ultra+specifications,1,Next-gen candidate from B200 series
+B300,B300,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA B300 下一代 GPU NPU 2025 2026|https://www.google.com/search?q=NVIDIA 新一代 AI芯片 加速卡 2025 2026,1,Generic search: NVIDIA 新一代 AI芯片 加速卡 2025 2026
+B300,B300 NVL16 288GB,NVIDIA,NVIDIA,GPU,datacenter,seed,,1,
+GB10,GB10,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA+GB10+specifications,1,Next-gen candidate from B200 series
+GB200,GB200,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA+GB200+specifications,1,Next-gen candidate from B200 series
+GB300,GB300,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA+GB300+specifications,1,Next-gen candidate from B200 series
+H100,H100,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=NVIDIA H100 下一代 GPU NPU 2025 2026,1,Generic search: NVIDIA 新一代 AI芯片 加速卡 2025 2026
+H100 NVL,H100 NVL,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=NVIDIA H100 NVL 下一代 GPU NPU 2025 2026,1,Generic search: NVIDIA 新一代 AI芯片 加速卡 2025 2026
+H100 NVL,H100 NVL 94GB,NVIDIA,NVIDIA,GPU,datacenter,seed,,1,
+H100,H100 SXM5 80GB,NVIDIA,NVIDIA,GPU,datacenter,seed,,1,
+H200,H200,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA H200 下一代 GPU NPU 2025 2026|https://www.google.com/search?q=NVIDIA 新一代 AI芯片 加速卡 2025 2026,1,Generic search: NVIDIA 新一代 AI芯片 加速卡 2025 2026
+H200 NVL,H200 NVL,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA+H200 NVL+specifications,1,Next-gen candidate from H200 series
+H200,H200 SXM 141GB,NVIDIA,NVIDIA,GPU,datacenter,seed,,1,
+H800,H800,NVIDIA,NVIDIA,GPU,datacenter,series_search,https://www.google.com/search?q=NVIDIA+H800+specifications,1,Next-gen candidate from H100 series
+SN40L,SN40L,SambaNova,SambaNova,GPU,datacenter,link_library_crawl,https://sambanova.ai/products/sn40l-rdu-ai-chip|https://ieeexplore.ieee.org/document/10904578,1,Extracted from link: 硬件规格 - SN40L | SN40L 硬件规格参考
+昇腾910B,Ascend 910B B1 64GB,Huawei,华为,NPU,datacenter,seed,,1,
+昇腾910C,Ascend 910C OAM 128GB,Huawei,华为,NPU,datacenter,seed,,1,
+昇腾910A,昇腾910A,Huawei,华为,NPU,datacenter,series_search,https://www.google.com/search?q=Huawei+昇腾910A+specifications,1,Next-gen candidate from 昇腾910B series
+昇腾910B,昇腾910B,Huawei,华为,NPU,datacenter,series_search,https://www.google.com/search?q=Huawei 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=华为 昇腾910B 下一代 GPU NPU 2025 2026,1,Generic search: Huawei 新一代 AI芯片 加速卡 2025 2026
+昇腾910C,昇腾910C,Huawei,华为,NPU,datacenter,series_search,https://www.google.com/search?q=华为 昇腾910C 下一代 GPU NPU 2025 2026|https://www.google.com/search?q=Huawei 新一代 AI芯片 加速卡 2025 2026,1,Generic search: Huawei 新一代 AI芯片 加速卡 2025 2026
+昇腾920,昇腾920,Huawei,华为,NPU,datacenter,series_search,https://www.google.com/search?q=Huawei+昇腾920+specifications,1,Next-gen candidate from 昇腾910C series
+昇腾950P,昇腾950P,Huawei,华为,NPU,datacenter,series_search,https://www.google.com/search?q=Huawei+昇腾950P+specifications,1,Next-gen candidate from 昇腾910B series
+昇腾950PR,昇腾950PR,Huawei,华为,NPU,datacenter,series_search,https://www.google.com/search?q=Huawei+昇腾950PR+specifications,1,Next-gen candidate from 昇腾910B series
+BR100,BR100,Biren,壁仞,GPU,datacenter,series_search,https://www.google.com/search?q=Biren 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=壁仞 BR100 下一代 GPU NPU 2025 2026,1,Generic search: Biren 新一代 AI芯片 加速卡 2025 2026
+BR100,BR100 64GB,Biren,壁仞,GPU,datacenter,seed,,1,
+BR104,BR104,Biren,壁仞,GPU,datacenter,series_search,https://www.google.com/search?q=Biren 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=壁仞 BR104 下一代 GPU NPU 2025 2026,1,Generic search: Biren 新一代 AI芯片 加速卡 2025 2026
+BR104,BR104 64GB,Biren,壁仞,GPU,datacenter,seed,,1,
+BR108,BR108,Biren,壁仞,GPU,datacenter,series_search,https://www.google.com/search?q=Biren+BR108+specifications,1,Next-gen candidate from BR100 series
+BR200,BR200,Biren,壁仞,GPU,datacenter,series_search,https://www.google.com/search?q=Biren+BR200+specifications,1,Next-gen candidate from BR100 series
+天垓100,TianGai 100 32GB,Iluvatar,天数智芯,GPU,datacenter,seed,,1,
+天垓100,天垓100,Iluvatar,天数智芯,GPU,datacenter,series_search,https://www.google.com/search?q=Iluvatar 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=天数智芯 天垓100 下一代 GPU NPU 2025 2026,1,Generic search: Iluvatar 新一代 AI芯片 加速卡 2025 2026
+MLU270,MLU270,Cambricon,寒武纪,MLU,datacenter,series_search,https://www.google.com/search?q=Cambricon+MLU270+specifications,1,Next-gen candidate from MLU370 series
+MLU290,MLU290,Cambricon,寒武纪,MLU,datacenter,series_search,https://www.google.com/search?q=Cambricon 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=寒武纪 MLU290 下一代 GPU NPU 2025 2026,1,Generic search: Cambricon 新一代 AI芯片 加速卡 2025 2026
+MLU290,MLU290-M5,Cambricon,寒武纪,MLU,datacenter,seed,|https://hub.baai.ac.cn/view/5990|https://stock.jrj.com.cn/2021/01/21215931740002.shtml|https://news.mydrivers.com/1/738/738438.htm|https://aipfia.zhidx.com/p/253907.html,1,
+MLU370,MLU370,Cambricon,寒武纪,MLU,datacenter,series_search,https://www.google.com/search?q=Cambricon 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=寒武纪 MLU370 下一代 GPU NPU 2025 2026,1,Generic search: Cambricon 新一代 AI芯片 加速卡 2025 2026
+MLU370,MLU370-X4 24GB,Cambricon,寒武纪,MLU,datacenter,seed,,1,
+MLU590,MLU590,Cambricon,寒武纪,MLU,datacenter,series_search,https://www.google.com/search?q=Cambricon 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=寒武纪 MLU590 下一代 GPU NPU 2025 2026,1,Generic search: Cambricon 新一代 AI芯片 加速卡 2025 2026
+MLU590,MLU590 80GB,Cambricon,寒武纪,MLU,datacenter,seed,,1,
+MLU690,MLU690,Cambricon,寒武纪,MLU,datacenter,series_search,https://www.google.com/search?q=Cambricon+MLU690+specifications|https://q.stock.sohu.com/cn/news.html?textId=1015284293&type=120,1,Next-gen candidate from MLU370 series
+MLU790,MLU790,Cambricon,寒武纪,MLU,datacenter,series_search,https://www.google.com/search?q=Cambricon+MLU790+specifications,1,Next-gen candidate from MLU590 series
+S4000,MTT S4000 48GB,MooreThreads,摩尔线程,GPU,datacenter,seed,,1,
+S4000,S4000,MooreThreads,摩尔线程,GPU,datacenter,series_search,https://www.google.com/search?q=摩尔线程 S4000 下一代 GPU NPU 2025 2026|https://docs.mthreads.com/s4000/|https://www.google.com/search?q=MooreThreads 新一代 AI芯片 加速卡 2025 2026,1,Generic search: MooreThreads 新一代 AI芯片 加速卡 2025 2026
+P800,Kunlunxin P800 96GB,Kunlunxin,昆仑芯,NPU,datacenter,seed,,1,
+P800,P800,Kunlunxin,昆仑芯,NPU,datacenter,series_search,https://www.google.com/search?q=Kunlunxin 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=昆仑芯 P800 下一代 GPU NPU 2025 2026,1,Generic search: Kunlunxin 新一代 AI芯片 加速卡 2025 2026
+JM9200,JM9200,JingjiaMicro,景嘉微,GPU,datacenter,series_search,https://www.google.com/search?q=JingjiaMicro 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=景嘉微 JM9200 下一代 GPU NPU 2025 2026,1,Generic search: JingjiaMicro 新一代 AI芯片 加速卡 2025 2026
+JM9200,JM9200 32GB,JingjiaMicro,景嘉微,GPU,datacenter,seed,,1,
+C500,C500,MetaX,沐曦,GPU,datacenter,series_search,https://www.google.com/search?q=MetaX 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=沐曦 C500 下一代 GPU NPU 2025 2026,1,Generic search: MetaX 新一代 AI芯片 加速卡 2025 2026
+C500,C500 64GB,MetaX,沐曦,GPU,datacenter,seed,,1,
+C550,C550,MetaX,沐曦,GPU,datacenter,series_search,https://www.google.com/search?q=MetaX+C550+specifications,1,Next-gen candidate from C500 series
+C600,C600,MetaX,沐曦,GPU,datacenter,series_search,https://www.google.com/search?q=MetaX 新一代 AI芯片 加速卡 2025 2026|https://www.google.com/search?q=沐曦 C600 下一代 GPU NPU 2025 2026,1,Generic search: MetaX 新一代 AI芯片 加速卡 2025 2026
+C600,C600 144GB,MetaX,沐曦,GPU,datacenter,seed,,1,
+C700,C700,MetaX,沐曦,GPU,datacenter,series_search,https://www.google.com/search?q=MetaX+C700+specifications,1,Next-gen candidate from C500 series
+C500 (OAM 64GB HBM2e),C500 (OAM 64GB HBM2e),沐曦股份,沐曦股份,GPU,datacenter,link_library_crawl,https://www.metax-tech.com/prod.html?cid=107&id=21|https://ai.gitee.com/docs/compute/clusters_gpu/mx_gpu|https://damodev.csdn.net/68633c36b93e2f417961cb68.html,1,Extracted from link: 硬件规格 - 曦云C500 (OAM 64GB HBM2e) | 曦云C500 (OAM 64GB HBM2e) 硬件规格参考
+C600 (144GB HBM3e),C600 (144GB HBM3e),沐曦股份,沐曦股份,GPU,datacenter,link_library_crawl,https://baike.baidu.com/item/曦云C600/66256324|https://tech.ifeng.com/c/8nc6pcmgSla|https://www.163.com/dy/article/KCANLDJT05119JRD.html|https://www.metax-tech.com/ndetail/12528.html|https://www.metax-tech.com/prod.html?cid=107&id=68,1,Extracted from link: 硬件规格 - 曦云C600 (144GB HBM3e) | 曦云C600 (144GB HBM3e) 硬件规格参考
+N100 (16GB HBM2e),N100 (16GB HBM2e),沐曦股份,沐曦股份,GPU,datacenter,link_library_crawl,https://www.metax-tech.com/prod.html?cid=106&id=34|https://www.securitychina.com.cn/exhibitonThing?id=e5818640-0237-470e-9f8b-eb7432a7d4bc|https://www.ithome.com/0/698/445.htm|https://news.pconline.com.cn/broadcasting/2306/16239724.html,1,Extracted from link: 硬件规格 - 曦思N100 (16GB HBM2e) | 曦思N100 (16GB HBM2e) 硬件规格参考
+N260 (64GB HBM2e),N260 (64GB HBM2e),沐曦股份,沐曦股份,GPU,datacenter,link_library_crawl,https://www.metax-tech.com/prod.html?cid=106&id=39,1,Extracted from link: 硬件规格 - 曦思N260 (64GB HBM2e) | 曦思N260 (64GB HBM2e) 硬件规格参考
+K100,K100,Hygon,海光,DCU,datacenter,series_search,https://www.google.com/search?q=海光 K100 下一代 GPU NPU 2025 2026|https://www.google.com/search?q=Hygon 新一代 AI芯片 加速卡 2025 2026,1,Generic search: Hygon 新一代 AI芯片 加速卡 2025 2026
+K100,K100 AI 64GB,Hygon,海光,DCU,datacenter,seed,,1,
+K200,K200,Hygon,海光,DCU,datacenter,series_search,https://www.google.com/search?q=Hygon+K200+specifications|https://baike.baidu.com,1,Next-gen candidate from K100 series
+K300,K300,Hygon,海光,DCU,datacenter,series_search,https://www.google.com/search?q=Hygon+K300+specifications,1,Next-gen candidate from K100 series
+深算二号,深算二号,Hygon,海光,DCU,datacenter,series_search,https://www.google.com/search?q=Hygon+深算二号+specifications,1,Next-gen candidate from K100 series
+TX510,TX510,清微智能,清微智能,GPU,datacenter,link_library_crawl,https://huanqiu.com|https://tsingmicro.com,1,Extracted from link: 硬件规格 - TX510 | TX510 硬件规格参考
+TX81 (REX1032服务器),TX81 (REX1032服务器),清微智能,清微智能,GPU,datacenter,link_library_crawl,https://gelonghui.com|https://36kr.com|https://finance.sina.cn,1,Extracted from link: 硬件规格 - TX81 (REX1032服务器) | TX81 (REX1032服务器) 硬件规格参考
+TX82 (规划中),TX82 (规划中),清微智能,清微智能,GPU,datacenter,link_library_crawl,https://www.pconline.com.cn|https://www.zhihu.com|https://zol.com.cn,1,Extracted from link: 硬件规格 - TX82 (规划中) | TX82 (规划中) 硬件规格参考

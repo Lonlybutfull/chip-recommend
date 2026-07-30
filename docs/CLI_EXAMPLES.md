@@ -3,7 +3,7 @@
 ## 约定
 
 - 所有命令在 `芯片+模型/parse1/` 目录下执行
-- `--db-path` 指向 `芯片+模型/parse1.db`
+- `--db-path` 指向 `芯片+模型/data.db`
 - `-o json` 输出 JSON，`-o yaml` 输出 YAML，`-o table` 输出表格
 - 模糊匹配：`--search` / `-m` / chip name / model name 均用 LIKE `%xxx%`
 
@@ -13,25 +13,25 @@
 
 ```bash
 # 全量
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip list -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip list -o json
 
 # 模糊搜索
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip list --search "H100" -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip list --search "H100" -o json
 
 # 国产芯片
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip list --region domestic -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip list --region domestic -o json
 
 # 国外数据中心级芯片
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip list --region foreign --tier datacenter -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip list --region foreign --tier datacenter -o json
 
 # 显存范围 + 用途
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip list --vram-min 64 --vram-max 192 --usage train -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip list --vram-min 64 --vram-max 192 --usage train -o json
 
 # 特定厂商
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip list --vendor "NVIDIA" -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip list --vendor "NVIDIA" -o json
 
 # 分页
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip list --limit 10 --offset 20 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip list --limit 10 --offset 20 -o json
 ```
 
 ---
@@ -40,16 +40,16 @@ python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip list --li
 
 ```bash
 # 单芯片完整画像
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip profile "H100 SXM5" -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip profile "H100 SXM5" -o json
 
 # 批量
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip profile "H100 SXM5" "昇腾910B" "MI300X" -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip profile "H100 SXM5" "昇腾910B" "MI300X" -o json
 
 # 精简画像
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip profile "H100 SXM5" -f compact -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip profile "H100 SXM5" -f compact -o json
 
 # 自定义格式串
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip profile "H100" -f "{{chip_model}}: {{vram_gb}}GB, {{precision_perf}}" -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip profile "H100" -f "{{chip_model}}: {{vram_gb}}GB, {{precision_perf}}" -o json
 ```
 
 ---
@@ -58,22 +58,22 @@ python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip profile "
 
 ```bash
 # 硬约束筛选
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip filter --region domestic --vram-min 64 --tdp-max 400 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip filter --region domestic --vram-min 64 --tdp-max 400 -o json
 
 # 价格 + 生态成熟度排除
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip filter --price-max 20 --min-maturity 3 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip filter --price-max 20 --min-maturity 3 -o json
 
 # 互联带宽要求
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip filter --interconnect-min 600 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip filter --interconnect-min 600 -o json
 
 # 模型驱动：自动推算显存需求（训练）
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip filter --for-model "Qwen2.5-7B" --scenario train -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip filter --for-model "Qwen2.5-7B" --scenario train -o json
 
 # 模型驱动 + 训练天数 + 最大卡数
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip filter --for-model "Qwen2.5-72B" --scenario train --training-days 7 --max-cards 16 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip filter --for-model "Qwen2.5-72B" --scenario train --training-days 7 --max-cards 16 -o json
 
 # 模型驱动（推理）
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip filter --for-model "Llama-3.1-8B" --scenario inference -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip filter --for-model "Llama-3.1-8B" --scenario inference -o json
 ```
 
 ---
@@ -82,31 +82,31 @@ python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip filter --
 
 ```bash
 # 基础训练推荐
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip recommend -m "Qwen2.5-7B" -s train -d 3 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip recommend -m "Qwen2.5-7B" -s train -d 3 -o json
 
 # 训练 + 硬约束（卡数/价格/成熟度）
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip recommend -m "Qwen2.5-7B" -s train -d 3 --max-cards 8 --max-price 30 --min-maturity 3 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip recommend -m "Qwen2.5-7B" -s train -d 3 --max-cards 8 --max-price 30 --min-maturity 3 -o json
 
 # 国产优先
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip recommend -m "Qwen2.5-7B" -s train -d 5 --domestic -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip recommend -m "Qwen2.5-7B" -s train -d 5 --domestic -o json
 
 # 指定厂商优先
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip recommend -m "Qwen2.5-7B" -s train -d 3 --prefer-vendor "NVIDIA" -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip recommend -m "Qwen2.5-7B" -s train -d 3 --prefer-vendor "NVIDIA" -o json
 
 # 推理推荐（吞吐SLA）
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip recommend -m "Qwen2.5-72B" -s inference --sla-tps 5000 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip recommend -m "Qwen2.5-72B" -s inference --sla-tps 5000 -o json
 
 # 大模型推理 + 价格上限
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip recommend -m "Llama-3.1-70B" -s inference --sla-tps 3000 --max-price 25 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip recommend -m "Llama-3.1-70B" -s inference --sla-tps 3000 --max-price 25 -o json
 
 # MoE 模型推理
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip recommend -m "Mixtral-8x22B" -s inference -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip recommend -m "Mixtral-8x22B" -s inference -o json
 
 # 不限级别（含 consumer）
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip recommend -m "Qwen2.5-7B" -s train -d 3 --tier all -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip recommend -m "Qwen2.5-7B" -s train -d 3 --tier all -o json
 
 # 返回更多候选
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip recommend -m "Qwen2.5-7B" -s train -d 3 -n 10 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" chip recommend -m "Qwen2.5-7B" -s train -d 3 -n 10 -o json
 ```
 
 ---
@@ -115,20 +115,20 @@ python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" chip recommend
 
 ```bash
 # 全量
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model list -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model list -o json
 
 # 名称搜索
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model list --search "Qwen" -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model list --search "Qwen" -o json
 
 # 按架构筛选
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model list --architecture dense -o json
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model list --architecture moe -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model list --architecture dense -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model list --architecture moe -o json
 
 # 参数量范围
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model list --params-min 30 --params-max 100 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model list --params-min 30 --params-max 100 -o json
 
 # 大模型（≥70B）
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model list --params-min 70 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model list --params-min 70 -o json
 ```
 
 ---
@@ -137,13 +137,13 @@ python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model list --p
 
 ```bash
 # 单模型
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model profile "Qwen2.5-7B" -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model profile "Qwen2.5-7B" -o json
 
 # 批量
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model profile "Qwen2.5-7B" "DeepSeek-V3" "Llama-3.1-8B" -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model profile "Qwen2.5-7B" "DeepSeek-V3" "Llama-3.1-8B" -o json
 
 # 精简
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model profile "Qwen2.5-7B" -f compact -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model profile "Qwen2.5-7B" -f compact -o json
 ```
 
 ---
@@ -152,16 +152,16 @@ python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model profile 
 
 ```bash
 # 按芯片反查兼容模型
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model filter --for-chip "H100" -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model filter --for-chip "H100" -o json
 
 # 国产芯片能跑哪些模型
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model filter --for-chip "昇腾910B" -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model filter --for-chip "昇腾910B" -o json
 
 # 芯片 + 架构约束
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model filter --for-chip "MI300X" --architecture dense -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model filter --for-chip "MI300X" --architecture dense -o json
 
 # 芯片 + 参数量
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model filter --for-chip "H100" --params-min 30 -o json
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" model filter --for-chip "H100" --params-min 30 -o json
 ```
 
 ---
@@ -169,13 +169,13 @@ python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" model filter -
 ## 8. db status — 数据库状态
 
 ```bash
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" db status
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" db status
 ```
 
 输出示例：
 
 ```yaml
-database: 芯片+模型/parse1.db
+database: 芯片+模型/data.db
 tables:
   chips: 12
   models: 10
@@ -190,12 +190,12 @@ tables:
 
 ```bash
 # 全量重建
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" db migrate
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" db migrate
 
 # 分批导入
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" db migrate --chips-only
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" db migrate --models-only
-python "芯片+模型/cli.py" --db-path "芯片+模型/parse1.db" db migrate --benchmarks-only
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" db migrate --chips-only
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" db migrate --models-only
+python "芯片+模型/cli.py" --db-path "芯片+模型/data.db" db migrate --benchmarks-only
 ```
 
 ---
