@@ -60,6 +60,7 @@ from chip_model.database import (
     search_links,
     LinkFilters,
     add_link,
+    upsert_link,
     import_links_csv,
     export_links_csv,
     get_link_library_stats,
@@ -1229,6 +1230,97 @@ def link_export_csv(
         _print_json({"status": "ok", "exported": count, "output": output})
     except Exception as e:
         _err(f"[ERROR] 导出失败: {e}")
+        raise typer.Exit(1)
+    finally:
+        db.close()
+
+
+@link_app.command(name="auto-discover")
+def link_auto_discover(
+    url: str = typer.Option(
+        ..., "--url", help="发现的链接 URL"
+    ),
+    description: str = typer.Option(
+        "", "--description", "-d", help="链接描述"
+    ),
+    vendor: str = typer.Option(
+        "", "--vendor", "-v", help="关联厂商"
+    ),
+    category: str = typer.Option(
+        "芯片信息综合", "--category", "-c", help="链接分类（默认: 芯片信息综合）"
+    ),
+    access_method: str = typer.Option(
+        "web_search", "--access-method", help="获取方式: web_search | web_crawl | llm_knowledge | manual"
+    ),
+    accessible: str = typer.Option(
+        "是", "--accessible", help="可访问: 是 | 否"
+    ),
+    needs_proxy: str = typer.Option(
+        "否", "--needs-proxy", help="需要代理: 是 | 否"
+    ),
+    batch: Optional[str] = typer.Option(
+        None, "--batch", "-b", help="批量导入: 指向 JSON Lines 文件"
+    ),
+):
+    """自动发现新链接并写入 link_library（URL 去重 upsert）。
+
+    适用于爬取/搜索过程中发现的新信息来源。如果 URL 已存在，则更新非空字段；
+    如果 URL 不存在，则新增记录。
+
+    Examples:
+      parse1 link auto-discover --url "https://www.nvidia.com/en-us/data-center/h100/" \\
+        --description "NVIDIA H100 官方产品页" --vendor "NVIDIA" --category "芯片官方页面"
+
+      parse1 link auto-discover --batch data/new_links.jsonl
+    """
+    db = _get_write_db()
+    try:
+        results = []
+
+        if batch:
+            import json as _json
+            batch_path = Path(batch)
+            if not batch_path.exists():
+                _err(f"[ERROR] 文件不存在: {batch}")
+                raise typer.Exit(1)
+            with open(batch_path, encoding="utf-8") as f:
+                lines = [line.strip() for line in f if line.strip()]
+            for line in lines:
+                try:
+                    fields = _json.loads(line)
+                except _json.JSONDecodeError as e:
+                    _err(f"[WARN] 跳过无效 JSON 行: {e}")
+                    continue
+                if "url" not in fields:
+                    _err("[WARN] 跳过缺少 url 的行")
+                    continue
+                link_id, action = upsert_link(db, fields)
+                results.append({"url": fields["url"], "action": action, "link_id": link_id})
+        else:
+            fields = {
+                "url": url,
+                "description": description,
+                "vendor": vendor,
+                "category": category,
+                "access_method": access_method,
+                "accessible": accessible,
+                "needs_proxy": needs_proxy,
+            }
+            link_id, action = upsert_link(db, fields)
+            results = [{"url": url, "action": action, "link_id": link_id}]
+
+        inserted = sum(1 for r in results if r["action"] == "insert")
+        updated = sum(1 for r in results if r["action"] == "update")
+
+        _print_json({
+            "status": "ok",
+            "total": len(results),
+            "inserted": inserted,
+            "updated": updated,
+            "results": results[:20],  # limit to 20 in output
+        })
+    except Exception as e:
+        _err(f"[ERROR] auto-discover 失败: {e}")
         raise typer.Exit(1)
     finally:
         db.close()

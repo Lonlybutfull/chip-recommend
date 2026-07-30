@@ -1043,6 +1043,51 @@ def delete_link(db, link_id: int) -> None:
     db.commit()
 
 
+def upsert_link(db, fields: dict) -> tuple[int, str]:
+    """Insert or update a link record (matched by URL).
+
+    Args:
+        db: A writeable sqlite3.Connection.
+        fields: Dict with keys url, description, vendor, category,
+                access_method, accessible, needs_proxy.
+
+    Returns:
+        (link_id, action) where action is 'insert' or 'update'.
+    """
+    url = fields.get("url", "")
+    if not url:
+        raise ValueError("url is required for upsert_link")
+
+    now = _now_iso()
+
+    # Check if URL already exists
+    existing = db.execute(
+        "SELECT id FROM link_library WHERE url = ?", (url,)
+    ).fetchone()
+
+    if existing:
+        # Update non-empty fields only
+        link_id = existing["id"]
+        updates = {}
+        for key in ["description", "vendor", "category", "access_method",
+                    "accessible", "needs_proxy"]:
+            if key in fields and fields[key]:
+                updates[key] = fields[key]
+        if updates:
+            set_clauses = [f"{k} = ?" for k in updates]
+            params = list(updates.values()) + [now, link_id]
+            db.execute(
+                f"UPDATE link_library SET {', '.join(set_clauses)}, updated_at = ? WHERE id = ?",
+                params
+            )
+            db.commit()
+        return link_id, "update"
+    else:
+        # Insert new
+        link_id = add_link(db, fields)
+        return link_id, "insert"
+
+
 def import_links_csv(db, csv_path: str | Path, force: bool = False) -> int:
     """Import links from CSV, skip existing URLs. Returns count imported."""
     import csv
