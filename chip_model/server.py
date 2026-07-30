@@ -2,7 +2,7 @@
 
 Usage:
     python server.py                    # standalone
-    python cli.py --server --db-path parse1.db   # via CLI flag
+    python cli.py --server --db-path data.db   # via CLI flag
 """
 
 import re
@@ -44,7 +44,7 @@ from chip_model.database import (
 async def lifespan(app: FastAPI):
     """On startup: set DB path if env var provided."""
     import os
-    env_path = os.environ.get("PARSE1_DB_PATH")
+    env_path = os.environ.get("DATA_DB_PATH")
     if env_path:
         set_db_path(env_path)
     yield

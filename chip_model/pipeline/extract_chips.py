@@ -19,7 +19,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent.parent
 CRAWL_FILE = HERE / "data" / "crawl_all" / "chip_pages.jsonl"
-DB_PATH = HERE / "data" / "parse1.db"
+DB_PATH = HERE / "data" / "data.db"
 
 from chip_model.database import add_chip, update_chip_fields, get_db
 

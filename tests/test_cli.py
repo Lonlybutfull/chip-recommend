@@ -7,7 +7,7 @@ from pathlib import Path
 
 PROJECT_DIR = Path(__file__).parent.parent
 CLI_PATH = PROJECT_DIR / "scripts" / "run_cli.py"
-DB_PATH = PROJECT_DIR / "data" / "parse1.db"
+DB_PATH = PROJECT_DIR / "data" / "data.db"
 
 
 def _run(*args):

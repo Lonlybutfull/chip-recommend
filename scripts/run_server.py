@@ -4,7 +4,7 @@
 Usage:
     python scripts/run_server.py
     python scripts/run_server.py --port 8080
-    python scripts/run_server.py --db-path /path/to/parse1.db
+    python scripts/run_server.py --db-path /path/to/data.db
 """
 import sys
 import os

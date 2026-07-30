@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Override DB path before importing server modules
 import os
-os.environ["PARSE1_DB_PATH"] = str(Path(__file__).parent.parent / "data" / "parse1.db")
+os.environ["DATA_DB_PATH"] = str(Path(__file__).parent.parent / "data" / "data.db")
 
 from fastapi.testclient import TestClient
 from chip_model.server import app

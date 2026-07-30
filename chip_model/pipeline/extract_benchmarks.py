@@ -13,7 +13,7 @@ from datetime import datetime
 
 HERE = Path(__file__).resolve().parent.parent.parent
 BENCH_FILE = HERE / "data" / "crawl_all" / "bench_pages.jsonl"
-DB_PATH = HERE / "data" / "parse1.db"
+DB_PATH = HERE / "data" / "data.db"
 
 from chip_model.database import add_benchmark
 

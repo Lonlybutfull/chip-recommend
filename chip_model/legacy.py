@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
-DB_PATH = HERE / "data" / "parse1.db"
+DB_PATH = HERE / "data" / "data.db"
 from chip_model.database import update_chip_fields
 
 NOW = datetime.now().isoformat(timespec="seconds")

@@ -38,7 +38,7 @@ cd 芯片+模型
 | `信息来源链接库_final.csv` | Source CSV (474 rows of chip/model/test/price references) |
 | `schema.sql` | DDL reference for the 78 chip columns |
 | `database.py` | Contains `insert_chip()`, `get_db()` — **use these, never raw SQL** |
-| `parse1.db` | SQLite database |
+| `data.db` | SQLite database |
 
 If any required file is missing, tell the user and stop.
 
@@ -156,7 +156,7 @@ SOURCE = {
 }
 
 def run():
-    conn = sqlite3.connect("parse1.db")
+    conn = sqlite3.connect("data.db")
     conn.execute("PRAGMA journal_mode=WAL")
     now = datetime.now().isoformat()
 
@@ -208,7 +208,7 @@ python _seed_chip_list.py
 ### Step 5 — Verify
 
 ```bash
-python cli.py --db-path parse1.db db status
+python cli.py --db-path data.db db status
 ```
 
 Report the result. Show chip count per vendor_region.

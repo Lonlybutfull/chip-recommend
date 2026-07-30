@@ -11,7 +11,7 @@
 cd 芯片+模型
 
 # 全局选项
---db-path parse1.db      # 数据库路径
+--db-path data.db      # 数据库路径
 --version                 # 显示版本
 ```
 
@@ -22,7 +22,7 @@ cd 芯片+模型
 ### 1.1 正常输入/输出
 
 ```bash
-python cli.py --db-path parse1.db db status
+python cli.py --db-path data.db db status
 ```
 
 <details open>
@@ -30,7 +30,7 @@ python cli.py --db-path parse1.db db status
 
 ```json
 {
-  "database": "E:\\BUPT_PS\\P_0\\芯片+模型\\parse1\\芯片+模型\\parse1.db",
+  "database": "E:\\BUPT_PS\\P_0\\芯片+模型\\parse1\\芯片+模型\\data.db",
   "tables": {
     "chips": 26,
     "models": 204,
@@ -56,7 +56,7 @@ python cli.py --db-path parse1.db db status
 ### 2.1 全量搜索
 
 ```bash
-python cli.py --db-path parse1.db chip search
+python cli.py --db-path data.db chip search
 ```
 
 <details>
@@ -91,7 +91,7 @@ python cli.py --db-path parse1.db chip search
 ### 2.2 模糊搜索
 
 ```bash
-python cli.py --db-path parse1.db chip search --search H100
+python cli.py --db-path data.db chip search --search H100
 ```
 
 | 输出 | count=2, H100 NVL 94GB + H100 SXM5 80GB |
@@ -99,7 +99,7 @@ python cli.py --db-path parse1.db chip search --search H100
 ### 2.3 国产芯片筛选
 
 ```bash
-python cli.py --db-path parse1.db chip search --region domestic
+python cli.py --db-path data.db chip search --region domestic
 ```
 
 | 输出 | count=14, 含华为昇腾/寒武纪/壁仞/海光/沐曦/昆仑芯/天数/摩尔线程/景嘉微 |
@@ -107,7 +107,7 @@ python cli.py --db-path parse1.db chip search --region domestic
 ### 2.4 多条件组合筛选
 
 ```bash
-python cli.py --db-path parse1.db chip search --vram-min 80 --vram-max 96 --tdp-max 400 --tier datacenter
+python cli.py --db-path data.db chip search --vram-min 80 --vram-max 96 --tdp-max 400 --tier datacenter
 ```
 
 | 输出 | count=3: H100 NVL 94GB (400W), A100 SXM4 80GB (400W), MLU590 80GB (250W) |
@@ -115,7 +115,7 @@ python cli.py --db-path parse1.db chip search --vram-min 80 --vram-max 96 --tdp-
 ### 2.5 模型驱动VRAM推算 (训练)
 
 ```bash
-python cli.py --db-path parse1.db chip search --for-model "Qwen2.5-7B" --scenario train
+python cli.py --db-path data.db chip search --for-model "Qwen2.5-7B" --scenario train
 ```
 
 推算: 7B × 12 × 1.3 = 109.2GB VRAM下限
@@ -124,7 +124,7 @@ python cli.py --db-path parse1.db chip search --for-model "Qwen2.5-7B" --scenari
 ### 2.6 模型驱动 + 手动VRAM叠加
 
 ```bash
-python cli.py --db-path parse1.db chip search --for-model "Qwen2.5-7B" --scenario train --vram-min 200
+python cli.py --db-path data.db chip search --for-model "Qwen2.5-7B" --scenario train --vram-min 200
 ```
 
 应取 max(auto=109.2, manual=200) = 200
@@ -134,19 +134,19 @@ python cli.py --db-path parse1.db chip search --for-model "Qwen2.5-7B" --scenari
 
 ```bash
 # 训练
-python cli.py --db-path parse1.db chip search --usage train     # → 23 (训推一体 + 训练)
+python cli.py --db-path data.db chip search --usage train     # → 23 (训推一体 + 训练)
 # 推理
-python cli.py --db-path parse1.db chip search --usage inference  # → 26 (训推一体 + 推理)
+python cli.py --db-path data.db chip search --usage inference  # → 26 (训推一体 + 推理)
 # 训推一体
-python cli.py --db-path parse1.db chip search --usage both       # → 23 (仅训推一体)
+python cli.py --db-path data.db chip search --usage both       # → 23 (仅训推一体)
 ```
 
 ### 2.8 价格/生态/互联筛选
 
 ```bash
-python cli.py --db-path parse1.db chip search --price-max 10          # ≤10万/片
-python cli.py --db-path parse1.db chip search --min-maturity 3        # 成熟度≥3
-python cli.py --db-path parse1.db chip search --interconnect-min 600  # 互联带宽≥600GB/s
+python cli.py --db-path data.db chip search --price-max 10          # ≤10万/片
+python cli.py --db-path data.db chip search --min-maturity 3        # 成熟度≥3
+python cli.py --db-path data.db chip search --interconnect-min 600  # 互联带宽≥600GB/s
 ```
 
 ### 2.9 测试用例
@@ -175,7 +175,7 @@ python cli.py --db-path parse1.db chip search --interconnect-min 600  # 互联�
 ### 3.1 正常输入/输出
 
 ```bash
-python cli.py --db-path parse1.db chip profile "H100 SXM5"
+python cli.py --db-path data.db chip profile "H100 SXM5"
 ```
 
 <details>
@@ -256,7 +256,7 @@ python cli.py --db-path parse1.db chip profile "H100 SXM5"
 ### 3.2 英文别名自动映射
 
 ```bash
-python cli.py --db-path parse1.db chip profile "Ascend"    # → 昇腾910C (OAM 128GB)
+python cli.py --db-path data.db chip profile "Ascend"    # → 昇腾910C (OAM 128GB)
 ```
 
 ### 3.3 测试用例
@@ -276,7 +276,7 @@ python cli.py --db-path parse1.db chip profile "Ascend"    # → 昇腾910C (OAM
 ### 4.1 训练推荐 (基础)
 
 ```bash
-python cli.py --db-path parse1.db chip recommend -m "Qwen2.5-7B" -s train -d 3 -n 5
+python cli.py --db-path data.db chip recommend -m "Qwen2.5-7B" -s train -d 3 -n 5
 ```
 
 <details>
@@ -344,7 +344,7 @@ python cli.py --db-path parse1.db chip recommend -m "Qwen2.5-7B" -s train -d 3 -
 ### 4.2 推理推荐 (SLA)
 
 ```bash
-python cli.py --db-path parse1.db chip recommend -m "Qwen2.5-7B" -s inference --sla-tps 5000
+python cli.py --db-path data.db chip recommend -m "Qwen2.5-7B" -s inference --sla-tps 5000
 ```
 
 | 输出 | 5候选，B300(score=99), B200(79.3), MI350X(68.2), MI300X(57.9), H100(51.9) |
@@ -352,7 +352,7 @@ python cli.py --db-path parse1.db chip recommend -m "Qwen2.5-7B" -s inference --
 ### 4.3 国产优先
 
 ```bash
-python cli.py --db-path parse1.db chip recommend -m "Qwen2.5-7B" -s train -d 3 --domestic -n 5
+python cli.py --db-path data.db chip recommend -m "Qwen2.5-7B" -s train -d 3 --domestic -n 5
 ```
 
 | 排名 | 芯片 | 分数 | 说明 |
@@ -366,7 +366,7 @@ python cli.py --db-path parse1.db chip recommend -m "Qwen2.5-7B" -s train -d 3 -
 ### 4.4 厂商偏好 (+8分)
 
 ```bash
-python cli.py --db-path parse1.db chip recommend -m "Qwen2.5-7B" -s train -d 3 --prefer-vendor "NVIDIA" -n 5
+python cli.py --db-path data.db chip recommend -m "Qwen2.5-7B" -s train -d 3 --prefer-vendor "NVIDIA" -n 5
 ```
 
 | NVIDIA芯片占据前3: B300(111.9), B200(91.5), H100(67.4) |
@@ -374,7 +374,7 @@ python cli.py --db-path parse1.db chip recommend -m "Qwen2.5-7B" -s train -d 3 -
 ### 4.5 硬约束排除
 
 ```bash
-python cli.py --db-path parse1.db chip recommend -m "Qwen2.5-7B" -s train -d 3 --max-cards 1 --max-price 15 -n 5
+python cli.py --db-path data.db chip recommend -m "Qwen2.5-7B" -s train -d 3 --max-cards 1 --max-price 15 -n 5
 ```
 
 | 输出 | 3候选 (仅单卡+≤15万的芯片) |
@@ -398,8 +398,8 @@ python cli.py --db-path parse1.db chip recommend -m "Qwen2.5-7B" -s train -d 3 -
 ### 5.1 全量/模糊搜索
 
 ```bash
-python cli.py --db-path parse1.db model search                          # 全量204
-python cli.py --db-path parse1.db model search --search Qwen --limit 5  # Qwen系列43
+python cli.py --db-path data.db model search                          # 全量204
+python cli.py --db-path data.db model search --search Qwen --limit 5  # Qwen系列43
 ```
 
 <details>
@@ -427,23 +427,23 @@ python cli.py --db-path parse1.db model search --search Qwen --limit 5  # Qwen�
 ### 5.2 按架构筛选
 
 ```bash
-python cli.py --db-path parse1.db model search --architecture moe  # → 13个MoE模型
-python cli.py --db-path parse1.db model search --architecture dense  # → 191个Dense模型
+python cli.py --db-path data.db model search --architecture moe  # → 13个MoE模型
+python cli.py --db-path data.db model search --architecture dense  # → 191个Dense模型
 ```
 
 ### 5.3 按参数量范围
 
 ```bash
-python cli.py --db-path parse1.db model search --params-min 70    # ≥70B大模型
-python cli.py --db-path parse1.db model search --params-min 30 --params-max 100  # 30-100B
+python cli.py --db-path data.db model search --params-min 70    # ≥70B大模型
+python cli.py --db-path data.db model search --params-min 30 --params-max 100  # 30-100B
 ```
 
 ### 5.4 按芯片反查兼容模型
 
 ```bash
-python cli.py --db-path parse1.db model search --for-chip "H100"       # → 5个兼容模型
-python cli.py --db-path parse1.db model search --for-chip "昇腾"        # → 3个
-python cli.py --db-path parse1.db model search --for-chip "Ascend"     # → 3个 (English alias)
+python cli.py --db-path data.db model search --for-chip "H100"       # → 5个兼容模型
+python cli.py --db-path data.db model search --for-chip "昇腾"        # → 3个
+python cli.py --db-path data.db model search --for-chip "Ascend"     # → 3个 (English alias)
 ```
 
 ### 5.5 测试用例
@@ -466,7 +466,7 @@ python cli.py --db-path parse1.db model search --for-chip "Ascend"     # → 3�
 ### 6.1 正常输入/输出
 
 ```bash
-python cli.py --db-path parse1.db model profile "Qwen2.5-7B"
+python cli.py --db-path data.db model profile "Qwen2.5-7B"
 ```
 
 <details>
@@ -539,12 +539,12 @@ python cli.py --db-path parse1.db model profile "Qwen2.5-7B"
 
 ```bash
 # 按芯片查评测
-python cli.py --db-path parse1.db benchmark search --chip H100
+python cli.py --db-path data.db benchmark search --chip H100
 # 按模型查评测
-python cli.py --db-path parse1.db benchmark search --model Qwen
+python cli.py --db-path data.db benchmark search --model Qwen
 # 按类型 + 套件
-python cli.py --db-path parse1.db benchmark search --workload training
-python cli.py --db-path parse1.db benchmark search --suite MLPerf
+python cli.py --db-path data.db benchmark search --workload training
+python cli.py --db-path data.db benchmark search --suite MLPerf
 ```
 
 <details>
@@ -598,8 +598,8 @@ python cli.py --db-path parse1.db benchmark search --suite MLPerf
 ### 8.1 正常输入/输出
 
 ```bash
-python cli.py --db-path parse1.db compat search --chip H100           # H100兼容所有模型
-python cli.py --db-path parse1.db compat search --status verified     # 仅实测验证的
+python cli.py --db-path data.db compat search --chip H100           # H100兼容所有模型
+python cli.py --db-path data.db compat search --status verified     # 仅实测验证的
 ```
 
 <details>
@@ -643,11 +643,11 @@ python cli.py --db-path parse1.db compat search --status verified     # 仅实�
 
 ```bash
 # 查某芯片的所有字段来源
-python cli.py --db-path parse1.db provenance show --table chips --row-id 1 --limit 10
+python cli.py --db-path data.db provenance show --table chips --row-id 1 --limit 10
 # 查低置信度数据
-python cli.py --db-path parse1.db provenance show --confidence low --limit 5
+python cli.py --db-path data.db provenance show --confidence low --limit 5
 # 查价格字段来源
-python cli.py --db-path parse1.db provenance show --table chips --row-id 1 --field price
+python cli.py --db-path data.db provenance show --table chips --row-id 1 --field price
 ```
 
 <details>
@@ -696,8 +696,8 @@ python cli.py --db-path parse1.db provenance show --table chips --row-id 1 --fie
 ### 10.1 正常输入/输出
 
 ```bash
-python cli.py --db-path parse1.db provenance stats           # 全量统计
-python cli.py --db-path parse1.db provenance stats --table chips  # 仅芯片统计
+python cli.py --db-path data.db provenance stats           # 全量统计
+python cli.py --db-path data.db provenance stats --table chips  # 仅芯片统计
 ```
 
 <details>
@@ -757,7 +757,7 @@ python cli.py --db-path parse1.db provenance stats --table chips  # 仅芯片统
 ### 11.1 正常输入/输出
 
 ```bash
-python cli.py --db-path parse1.db config show
+python cli.py --db-path data.db config show
 ```
 
 ```json
@@ -772,8 +772,8 @@ python cli.py --db-path parse1.db config show
 ```
 
 ```bash
-python cli.py --db-path parse1.db config set db.path "parse1.db"
-# → {"key": "db.path", "value": "parse1.db", "status": "ok"}
+python cli.py --db-path data.db config set db.path "data.db"
+# → {"key": "db.path", "value": "data.db", "status": "ok"}
 ```
 
 ### 11.2 测试用例
@@ -840,7 +840,7 @@ python cli.py --db-path parse1.db config set db.path "parse1.db"
 ```bash
 # 一键运行所有测试 (在 芯片+模型/ 目录)
 cd 芯片+模型
-DB="--db-path parse1.db"
+DB="--db-path data.db"
 
 # === db ===
 python cli.py $DB db status
