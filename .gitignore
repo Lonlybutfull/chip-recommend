@@ -10,3 +10,4 @@ data/crawl_fetched.jsonl
 *.egg-info/
 dist/
 build/
+.claude/settings.local.json

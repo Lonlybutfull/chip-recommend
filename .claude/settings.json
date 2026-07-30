@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python -c \"import sys,json; d=json.load(sys.stdin); cmd=d.get('tool_input',{}).get('command',''); sys.exit(0 if 'git commit' in cmd else 1)\" && echo '{\"systemMessage\": \"💡 别忘了 push 到 myfork: git push myfork master\"}' || true"
+          }
+        ]
+      }
+    ]
+  }
+}
