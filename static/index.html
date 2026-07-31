@@ -228,6 +228,31 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 .score-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:3px}
 .scoring-dim{font-size:0.68rem;color:var(--text3);margin-top:6px;line-height:1.5}
 
+/* ── Chat panel ── */
+#chat-widget{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:800px;z-index:300;background:var(--bg2);border:1px solid var(--bg4);border-bottom:none;border-radius:var(--radius) var(--radius) 0 0;box-shadow:0 -4px 24px rgba(0,0,0,0.4);transition:height 0.3s ease}
+#chat-widget.minimized{height:44px;overflow:hidden}
+#chat-widget:not(.minimized){height:520px}
+#chat-toggle{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;cursor:pointer;user-select:none;font-size:0.85rem;font-weight:600;border-bottom:1px solid var(--bg4)}
+#chat-toggle:hover{background:var(--bg3)}
+#chat-body{display:flex;flex-direction:column;height:calc(100% - 45px)}
+#chat-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.chat-msg{max-width:85%;padding:8px 12px;border-radius:12px;font-size:0.8rem;line-height:1.5;word-break:break-word}
+.chat-msg.user{align-self:flex-end;background:var(--accent2);color:#fff;border-bottom-right-radius:4px}
+.chat-msg.assistant{align-self:flex-start;background:var(--bg3);color:var(--text);border-bottom-left-radius:4px}
+.chat-msg.tool{background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);color:var(--blue);font-size:0.7rem;max-width:90%}
+.chat-msg.tool pre{font-size:0.65rem;max-height:120px;overflow:auto;margin:4px 0 0;padding:4px 6px;background:var(--bg2);border-radius:4px;white-space:pre-wrap}
+#chat-input-area{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--bg4)}
+#chat-input{flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--bg4);border-radius:20px;padding:8px 14px;font-size:0.82rem;outline:none}
+#chat-input:focus{border-color:var(--accent)}
+#chat-send{background:var(--accent2);color:#fff;border:none;border-radius:20px;padding:8px 18px;font-weight:600;cursor:pointer;font-size:0.82rem;transition:var(--transition)}
+#chat-send:hover{background:var(--accent)}
+#chat-send:disabled{opacity:0.5;cursor:default}
+.chat-typing{display:flex;gap:4px;padding:8px 12px}
+.chat-typing span{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:chatBounce 1.2s infinite}
+.chat-typing span:nth-child(2){animation-delay:0.2s}
+.chat-typing span:nth-child(3){animation-delay:0.4s}
+@keyframes chatBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+
 /* ── Status cards ── */
 .status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
 .stat-card{
@@ -279,6 +304,23 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 </header>
 
 <main>
+<!-- ═══ CHAT WIDGET ═══ -->
+<div id="chat-widget" class="minimized">
+  <div id="chat-toggle" onclick="toggleChat()">
+    <span>💬 AI 芯片选型助手</span>
+    <span id="chat-toggle-icon">▲</span>
+  </div>
+  <div id="chat-body">
+    <div id="chat-messages">
+      <div class="chat-msg assistant">你好！我是 AI 芯片选型助手 🤖<br>我可以帮你根据模型、场景和预算推荐最合适的芯片。<br><br>请告诉我你的需求，比如：<br>• 想训练/推理什么模型？<br>• 预算、功耗、时延有什么要求？<br>• 更偏好哪家厂商？</div>
+    </div>
+    <div id="chat-input-area">
+      <input type="text" id="chat-input" placeholder="输入你的需求…" onkeydown="if(event.key==='Enter')sendChat()">
+      <button id="chat-send" onclick="sendChat()">发送</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ CHIPS ═══ -->
 <section id="tab-chips" class="tab-panel active">
   <div class="filters" id="chip-filters"></div>
@@ -333,6 +375,138 @@ const STATE = { vendors: [], currentTab: 'chips' };
 function $(id){return document.getElementById(id)}
 function show(el,disp=''){el.style.display=disp}
 function hide(el){el.style.display='none'}
+
+/* ═══ Chat Widget ═══ */
+const CHAT_HISTORY = []; // in-memory only, no history persistence
+
+function toggleChat(){
+  const w=$('chat-widget'), icon=$('chat-toggle-icon');
+  w.classList.toggle('minimized');
+  icon.textContent=w.classList.contains('minimized')?'▲':'▼';
+  if(!w.classList.contains('minimized')) $('chat-input').focus();
+}
+
+async function sendChat(){
+  const input=$('chat-input'), msg=input.value.trim();
+  if(!msg)return;
+  input.value='';
+  input.disabled=true;
+  $('chat-send').disabled=true;
+
+  // Show user message
+  appendChatMsg('user',msg);
+  CHAT_HISTORY.push({role:'user',content:msg});
+
+  // Show typing indicator
+  const typing=appendTyping();
+
+  try{
+    const resp=await fetch(`${API}/chat`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:CHAT_HISTORY})
+    });
+    if(!resp.ok){throw new Error(resp.status+': '+await resp.text())}
+
+    let assistantText='';
+    let currentAssistantEl=null;
+    let toolResults=[];
+
+    const reader=resp.body.getReader();
+    const decoder=new TextDecoder();
+    let buffer='';
+
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      buffer+=decoder.decode(value,{stream:true});
+      const lines=buffer.split('\n');
+      buffer=lines.pop()||'';
+
+      for(const line of lines){
+        if(!line.startsWith('data: '))continue;
+        const data=line.slice(6).trim();
+        if(data==='[DONE]')break;
+        try{
+          const d=JSON.parse(data);
+          if(d.type==='text'){
+            assistantText+=d.content;
+            if(!currentAssistantEl){
+              typing.remove();
+              currentAssistantEl=appendChatMsg('assistant','');
+            }
+            currentAssistantEl.innerHTML=renderMarkdown(assistantText);
+            $('chat-messages').scrollTop=$('chat-messages').scrollHeight;
+          }else if(d.type==='tool_call'){
+            const toolMsg=`🔧 调用工具: <b>${d.name}</b><br><code>${esc(d.arguments||'')}</code>`;
+            appendChatMsg('tool',toolMsg);
+          }else if(d.type==='tool_start'){
+            const ts=`⏳ 执行命令: <code>${esc(d.command||'')}</code>`;
+            appendChatMsg('tool',ts);
+          }else if(d.type==='tool_result'){
+            toolResults.push(d.result);
+            const trEl=appendChatMsg('tool','📊 获取到数据');
+            try{
+              const parsed=JSON.parse(d.result);
+              const summary=summarizeResult(parsed,d.result);
+              trEl.innerHTML='📊 '+summary;
+            }catch(e){
+              trEl.innerHTML='📊 获取到数据 ('+d.result.length+' 字符)';
+            }
+          }
+        }catch(e){}
+      }
+    }
+
+    if(assistantText){
+      CHAT_HISTORY.push({role:'assistant',content:assistantText});
+    }
+  }catch(e){
+    typing.remove();
+    appendChatMsg('assistant','抱歉，请求出错了: '+esc(e.message));
+  }
+
+  input.disabled=false;
+  $('chat-send').disabled=false;
+  input.focus();
+}
+
+function appendChatMsg(role,content){
+  const msgs=$('chat-messages');
+  const el=document.createElement('div');
+  el.className='chat-msg '+role;
+  el.innerHTML=content;
+  msgs.appendChild(el);
+  msgs.scrollTop=msgs.scrollHeight;
+  return el;
+}
+
+function appendTyping(){
+  const msgs=$('chat-messages');
+  const el=document.createElement('div');
+  el.className='chat-typing';
+  el.innerHTML='<span></span><span></span><span></span>';
+  msgs.appendChild(el);
+  msgs.scrollTop=msgs.scrollHeight;
+  return el;
+}
+
+function renderMarkdown(text){
+  let html=esc(text);
+  html=html.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  html=html.replace(/\*(.+?)\*/g,'<i>$1</i>');
+  html=html.replace(/`(.+?)`/g,'<code>$1</code>');
+  html=html.replace(/\n/g,'<br>');
+  return html;
+}
+
+function summarizeResult(parsed,raw){
+  if(parsed.candidates) return `推荐结果: ${parsed.candidates.length} 颗候选芯片`;
+  if(parsed.count!==undefined) return `查询结果: ${parsed.count} 条记录`;
+  if(parsed.chip) return `芯片画像: ${parsed.chip.identity?.chip_model||'?'}`;
+  if(parsed.error) return `错误: ${esc(parsed.error)}`;
+  return '获取到数据 ('+Math.round(raw.length/1024)+'KB)';
+}
 
 /* ═══ Model multi-select ═══ */
 const SELECTED_MODELS = [];

@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import FastAPI, Query, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from scalar_fastapi import get_scalar_api_reference, Theme
 
@@ -107,6 +108,36 @@ async def scalar_docs():
 
 class BatchRequest(BaseModel):
     identifiers: list[str]
+
+
+class ChatRequest(BaseModel):
+    messages: list[dict]
+    model: str | None = None
+
+
+# ═══════════════════════════════════════════════════════════════
+# Chat Agent (DeepSeek streaming)
+# ═══════════════════════════════════════════════════════════════
+
+@app.post("/api/v1/chat")
+async def api_chat(body: ChatRequest):
+    """Streaming chat with DeepSeek + AISHPerf tool calling."""
+    from chip_model.chat_agent import chat_stream, DEEPSEEK_MODEL
+
+    async def event_generator():
+        async for chunk in chat_stream(body.messages, body.model or DEEPSEEK_MODEL):
+            yield chunk
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 # ═══════════════════════════════════════════════════════════════
