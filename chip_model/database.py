@@ -499,7 +499,10 @@ def get_chip_recommend_candidates(
             usage_cond = ""
             usage_params = []
 
-        min_vram_per_card = max(8.0, min_vram_total / 8)
+        # Use a low VRAM floor (8 GB) to keep all chips in play.
+        # The scoring engine later estimates card counts based on the per-chip
+        # VRAM, so the user still sees multi-card cluster recommendations.
+        min_vram_per_card = 8.0
 
         # Build query
         region_cond = "AND vendor_region = 'domestic'" if prefer_domestic else ""
@@ -1866,7 +1869,8 @@ def get_chip_benchmarks_for_model(
     """Get all relevant benchmark rows for a chip+model combination.
 
     Tries exact chip+model match first, then falls back to same-scale models
-    (params within 0.5×–2× of target).
+    (params within 0.5×–2× of target). If nothing in range, returns all
+    benchmarks for this chip with a note that they are approximate references.
     """
     with get_db(db_path, readonly=True) as db:
         # Exact match on chip_model and model_id
@@ -1876,7 +1880,10 @@ def get_chip_benchmarks_for_model(
             (f"%{chip_model_name}%", f"%{model_id}%"),
         ).fetchall()
         if rows:
-            return [dict(r) for r in rows]
+            result = [dict(r) for r in rows]
+            for r in result:
+                r["_match_quality"] = "exact"
+            return result
 
         # Fallback: same-scale models on the same chip
         lo, hi = params_B * 0.5, params_B * 2.0
@@ -1887,7 +1894,22 @@ def get_chip_benchmarks_for_model(
             "AND CAST(m.total_params_b AS REAL) BETWEEN ? AND ?",
             (f"%{chip_model_name}%", lo, hi),
         ).fetchall()
-        return [dict(r) for r in rows]
+        if rows:
+            result = [dict(r) for r in rows]
+            for r in result:
+                r["_match_quality"] = "scale_match"
+            return result
+
+        # Second fallback: any benchmarks for this chip (approximate reference)
+        rows = db.execute(
+            "SELECT * FROM chip_model_benchmarks "
+            "WHERE chip_model LIKE ?",
+            (f"%{chip_model_name}%",),
+        ).fetchall()
+        result = [dict(r) for r in rows]
+        for r in result:
+            r["_match_quality"] = "chip_only"
+        return result
 
 
 def get_chip_benchmark_mfu(chip_model_name: str,

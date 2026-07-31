@@ -355,6 +355,8 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">📊 H100 和 昇腾910C 对比</span><span class="qc-desc">规格 + 性能 + 生态对比</span></button>
 	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">🖥️ 当前数据库中有多少芯片和模型？</span><span class="qc-desc">数据库概览统计</span></button>
 	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">🛠️ 你有哪些技能？列出所有skill</span><span class="qc-desc">查看项目安装的全部 skill</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">🎯 我想训练 DeepSeek-R1 满血版，有什么方案？</span><span class="qc-desc">MoE大模型训练可行性分析</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">📈 国产芯片中，谁的单卡算力最强？</span><span class="qc-desc">国产芯片算力排行</span></button>
 	</div>
   </div>
 </section>
@@ -545,13 +547,15 @@ let MODEL_LIST = [];  // { id, author, params, arch, tag, downloads }
 
 async function ensureChipList(){
   if(CHIP_LIST.length) return;
-  // Paginate to load all chips (API limit is 200 per page)
+  // Load all chips in fewer, larger requests
+  const BATCH = 1000;
   let allChips = [];
-  for(let off=0; off<1200; off+=200){
+  for(let off=0; off<2000; off+=BATCH){
     try {
-      const data = await fetchJSON(`${API}/chips?limit=200&offset=${off}&tier=all`);
+      const data = await fetchJSON(`${API}/chips?limit=${BATCH}&offset=${off}&tier=all`);
       if(data._error || !data.chips || !data.chips.length) break;
       allChips = allChips.concat(data.chips);
+      if(data.chips.length < BATCH) break; // last page
     } catch(e) { break; }
   }
   CHIP_LIST = allChips.map(c=>({
@@ -563,13 +567,14 @@ async function ensureChipList(){
 
 async function ensureModelList(){
   if(MODEL_LIST.length) return;
-  // Paginate to load all models (API limit is 200 per page)
   let allModels = [];
-  for(let off=0; off<1400; off+=200){
+  const BATCH = 2000; // API now allows 2000
+  for(let off=0; off<2000; off+=BATCH){
     try {
-      const data = await fetchJSON(`${API}/models?limit=200&offset=${off}`);
+      const data = await fetchJSON(`${API}/models?limit=${BATCH}&offset=${off}`);
       if(data._error || !data.models || !data.models.length) break;
       allModels = allModels.concat(data.models);
+      if(data.models.length < BATCH) break;
     } catch(e) { break; }
   }
   MODEL_LIST = allModels.map(m=>({
@@ -854,6 +859,7 @@ async function searchChipsInit(){
 /* ── Pagination ── */
 const CHIP_PAGE_STATE = { page: 1, limit: 18, params: '', count: 0 };
 const MODEL_PAGE_STATE = { page: 1, limit: 18, params: '', count: 0 };
+const COMPAT_PAGE_STATE = { page: 1, limit: 10, params: '', count: 0 };
 let _pager_click = false; // flag: avoid resetting page when pager clicks
 
 function searchByState(){
@@ -861,6 +867,7 @@ function searchByState(){
   _pager_click = true;
   const tab = document.querySelector('.tab-panel.active');
   if(tab && tab.id === 'tab-models') { searchModels(); }
+  else if(tab && tab.id === 'tab-compat') { searchCompat(); }
   else { searchChips(); }
 }
 
@@ -1386,6 +1393,8 @@ async function searchCompatInit(){
 }
 
 async function searchCompat(){
+  if(!_pager_click){COMPAT_PAGE_STATE.page=1;}
+  _pager_click = false;
   const loading=$('compat-loading'), results=$('compat-results'), sum=$('compat-summary');
   show(loading);results.innerHTML='';sum.textContent='';
 
@@ -1394,16 +1403,20 @@ async function searchCompat(){
   const model=($('compat-model')||{}).value;if(model&&model.trim())params.set('model',model.trim());
   const st=($('compat-status')||{}).value;if(st)params.set('status',st);
   if($('compat-has-bench').classList.contains('on')) params.set('has_benchmark','true');
-  params.set('limit','18');
+  params.set('limit', String(COMPAT_PAGE_STATE.limit));
+  params.set('offset', String((COMPAT_PAGE_STATE.page - 1) * COMPAT_PAGE_STATE.limit));
 
   const data = await fetchJSON(`${API}/compat?${params}`);
   hide(loading);
   if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
 
-  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 条兼容记录</span>`;
+  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 条兼容记录`+
+    (data.count > COMPAT_PAGE_STATE.limit ? ` · 第 <b>${COMPAT_PAGE_STATE.page}</b> / <b>${Math.ceil(data.count/COMPAT_PAGE_STATE.limit)}</b> 页` : '')+
+    `</span>`;
   if(!data.compatibilities||!data.compatibilities.length){results.innerHTML='<div class="empty">未找到匹配的兼容记录</div>';return}
 
   results.innerHTML = data.compatibilities.map((c,i)=>renderCompatCard(c,i)).join('');
+  results.innerHTML += buildPager(COMPAT_PAGE_STATE.page, COMPAT_PAGE_STATE.limit, data.count, 'COMPAT_PAGE_STATE.page');
 
   // Add delegated click handlers for expand/collapse
   setTimeout(function(){

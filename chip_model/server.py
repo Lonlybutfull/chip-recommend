@@ -160,7 +160,7 @@ def api_chip_search(
     min_maturity: Optional[int] = Query(None, description="Min ecosystem maturity (0-5)"),
     for_model: Optional[str] = Query(None, description="Auto-estimate VRAM for this model"),
     scenario: Optional[str] = Query(None, description="train | inference (with for_model)"),
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, le=2000),
     offset: int = Query(0),
     include_provenance: bool = Query(False, description="Include per-chip field provenance summary"),
 ):
@@ -230,10 +230,11 @@ def api_chip_recommend(
             effective_params = moe_activated
             print(f"[INFO] MoE model detected: {total_params}B total, {moe_activated}B activated → using activated for VRAM")
         else:
-            # Training: all params need to be loaded + optimizer states, use activated for forward only
-            # Realistically need total_params but activated matters less for VRAM bound
-            # Use total_params still but mark model as MoE
-            effective_params = total_params
+            # Training: use activated params for forward + backward,
+            # but expert routing means not all params participate in every step.
+            # Use a compromise: 2× activated as effective training footprint.
+            effective_params = min(total_params, moe_activated * 2.0)
+            print(f"[INFO] MoE model detected: {total_params}B total, {moe_activated}B activated → effective training params {effective_params:.0f}B")
     else:
         effective_params = total_params
 
@@ -296,6 +297,9 @@ def api_chip_recommend(
     # 5. Scoring loop
     weights = TRAIN_WEIGHTS if scenario == "train" else INFERENCE_WEIGHTS
     scored: list[dict] = []
+    # One-liner to round up and cap for sane display
+    _card = lambda n, cap=64: min(round_up_pow2(n), cap)
+
     for chip in candidates:
         chip_dict = dict(chip)
         vram = float(chip_dict.get("vram_gb", 1))
@@ -304,8 +308,8 @@ def api_chip_recommend(
         chip_model_name = str(chip_dict.get("chip_model", "") or "")
 
         # ── Card estimation ──
-        vram_cards = max(1, int(min_vram_total / vram) + 1)
-        vram_cards = round_up_pow2(vram_cards)
+        vram_cards_raw = max(1, int(min_vram_total / vram) + 1)
+        vram_cards = _card(vram_cards_raw)
         compute_cards = vram_cards
         deadline_cards = vram_cards
         estimated_days = None
@@ -319,7 +323,7 @@ def api_chip_recommend(
             effective_per_card_day = fp16_val * 1e12 * mfu_target * 86400
             if effective_per_card_day > 0 and training_days:
                 raw_compute = int(total_flops / (effective_per_card_day * training_days)) + 1
-                compute_cards = round_up_pow2(max(vram_cards, raw_compute))
+                compute_cards = _card(max(vram_cards_raw, raw_compute))
                 deadline_cards = compute_cards
                 estimated_days = round(
                     total_flops / (effective_per_card_day * deadline_cards), 1
@@ -329,9 +333,9 @@ def api_chip_recommend(
 
         # Min cards floor
         if min_cards:
-            min_cards_pow2 = round_up_pow2(min_cards)
+            min_cards_pow2 = _card(min_cards)
             if recommended_cards < min_cards_pow2:
-                recommended_cards = round_up_pow2(min_cards_pow2)
+                recommended_cards = _card(min_cards_pow2)
 
         # Hard exclude
         if max_cards and recommended_cards > max_cards:
@@ -523,7 +527,7 @@ def api_model_search(
     params_min: Optional[float] = Query(None, description="Min params (B)"),
     params_max: Optional[float] = Query(None, description="Max params (B)"),
     for_chip: Optional[str] = Query(None, description="Find models compatible with this chip"),
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, le=2000),
     offset: int = Query(0),
     include_provenance: bool = Query(False, description="Include per-model field provenance summary"),
 ):
@@ -569,7 +573,7 @@ def api_benchmark_search(
     model: Optional[str] = Query(None),
     workload: Optional[str] = Query(None, description="inference | training"),
     suite: Optional[str] = Query(None, description="MLPerf | vendor_doc | community"),
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, le=2000),
     offset: int = Query(0),
     include_provenance: bool = Query(False, description="Include per-benchmark field provenance summary"),
 ):
@@ -591,7 +595,7 @@ def api_compat_search(
     model: Optional[str] = Query(None),
     status: Optional[str] = Query(None, description="verified | vendor_claimed | community | unsupported"),
     has_benchmark: bool = Query(False, description="Only return records that have benchmark evidence"),
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, le=2000),
     offset: int = Query(0),
     include_provenance: bool = Query(False, description="Include per-compat field provenance summary"),
 ):
@@ -615,7 +619,7 @@ def api_provenance_search(
     source_type: Optional[str] = Query(None),
     confidence: Optional[str] = Query(None, description="high | medium | low"),
     is_official: Optional[str] = Query(None, description="0 | 1"),
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, le=2000),
     offset: int = Query(0),
 ):
     """Search field-level provenance records."""
