@@ -2,7 +2,7 @@
 AISHPerf Chat Agent — DeepSeek-powered chip selection advisor.
 
 Streaming chat endpoint with tool calling support.
-Tools are auto-discovered from the chip-recommend-cli skill.
+System prompt built dynamically from .claude/skills/ directory.
 """
 
 from __future__ import annotations
@@ -26,6 +26,71 @@ load_dotenv(_project_root / ".env")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+
+# ═══════════════════════════════════
+# Skill loading — read .claude/skills/ directory
+# ═══════════════════════════════════
+
+def load_skills() -> list[dict]:
+    """Scan .claude/skills/ for SKILL.md files and extract metadata."""
+    skills = []
+    skills_dir = _project_root / ".claude" / "skills"
+    if not skills_dir.exists():
+        return skills
+
+    for skill_path in sorted(skills_dir.iterdir()):
+        if not skill_path.is_dir():
+            continue
+        md_path = skill_path / "SKILL.md"
+        if not md_path.exists():
+            continue
+
+        try:
+            content = md_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+        name = skill_path.name
+        description = ""
+        body = content
+
+        # Parse YAML frontmatter if present
+        if content.startswith("---"):
+            end = content.find("---", 3)
+            if end > 0:
+                for line in content[3:end].strip().split("\n"):
+                    line = line.strip()
+                    if ":" in line:
+                        k, v = line.split(":", 1)
+                        k, v = k.strip(), v.strip()
+                        if k == "name":
+                            name = v
+                        elif k == "description":
+                            description = v
+                body = content[end + 3:]
+
+        # If no frontmatter description, take first meaningful line
+        if not description:
+            for line in body.strip().split("\n"):
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    description = line[:200]
+                    break
+
+        skills.append({"name": name, "description": description, "path": str(md_path)})
+
+    return skills
+
+
+def build_skill_summary(skills: list[dict]) -> str:
+    """Build a human-readable skill listing for the system prompt."""
+    lines = []
+    for i, s in enumerate(skills, 1):
+        name = s["name"]
+        desc = s.get("description", "")
+        lines.append(f"{i}. **{name}** — {desc}")
+    return "\n".join(lines)
+
 
 # ═══════════════════════════════════
 # Tool definitions for the LLM
@@ -61,9 +126,28 @@ TOOLS = [
     }
 ]
 
-SYSTEM_PROMPT = """You are an AI chip selection advisor for AISHPerf, a knowledge graph of AI accelerators and models.
+# ── Build system prompt dynamically ──
+
+_skills = load_skills()
+_skill_summary = build_skill_summary(_skills)
+
+SYSTEM_PROMPT = f"""You are an AI chip selection advisor for AISHPerf, a knowledge graph of AI accelerators and models.
 
 Your job is to help users find the best chips for their AI workloads. You have access to a CLI tool that queries a database of 1098 chips, 1370 models, and 2103 benchmark records.
+
+## Your Installed Skills
+
+The project `.claude/skills/` directory contains exactly {len(_skills)} skills. These are the ONLY skills you have:
+
+{_skill_summary}
+
+**CRITICAL RULE — READ CAREFULLY**:
+When a user asks "你有什么skill" or "what skills do you have", your answer MUST:
+1. List exactly these {len(_skills)} skills by name and description — nothing more, nothing less
+2. NEVER fabricate skills like "芯片对比分析", "应用场景方案生成", "数据统计与趋势分析", "厂商与生态查询", "SQL执行能力" etc. — these DO NOT exist
+3. NEVER group them into categories like "核心技能" vs "辅助技能"
+4. NEVER claim you have 6, 7, or any other number of skills
+5. If you're unsure, say "I have {len(_skills)} skills loaded from the project" and list them
 
 ## Your Process
 
