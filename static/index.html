@@ -98,6 +98,8 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 .card-stat .value{font-weight:600;font-variant-numeric:tabular-nums}
 
 .card-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.card-meta{display:flex;gap:12px;font-size:0.7rem;color:var(--text3);margin-top:6px;padding-top:6px;border-top:1px solid var(--bg4)}
+.card-meta span{display:flex;align-items:center;gap:3px}
 .tag{
   font-size:0.68rem;padding:2px 8px;border-radius:4px;
   background:var(--bg3);color:var(--text2);
@@ -146,9 +148,20 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 .group.collapsed .group-header::after{content:'+'}
 .group-body{padding:10px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:5px}
 .group.collapsed .group-body{display:none}
-.group-field{display:flex;justify-content:space-between;font-size:0.78rem;gap:6px}
-.group-field .key{color:var(--text3);white-space:nowrap}
-.group-field .val{font-weight:500;text-align:right;word-break:break-all}
+.group-field{display:flex;justify-content:space-between;font-size:0.78rem;gap:6px;padding:4px 6px;border-bottom:1px solid var(--bg4);border-radius:2px}
+.group-field:nth-child(even){background:var(--bg4)}
+.group-field .key{color:var(--text3);white-space:nowrap;min-width:120px}
+.group-field .val{font-weight:500;text-align:right;word-break:break-all;position:relative;cursor:help}
+.group-field .val:hover{color:var(--accent)}
+
+/* Provenance tooltip */
+.prov-tooltip{display:none;position:absolute;bottom:calc(100% + 6px);right:0;z-index:999;
+  background:var(--bg2);border:1px solid var(--accent);border-radius:var(--radius-sm);
+  padding:8px 10px;min-width:240px;max-width:380px;box-shadow:0 8px 24px rgba(0,0,0,0.5);
+  font-size:0.68rem;text-align:left;pointer-events:none}
+.prov-tooltip .pt-src{color:var(--accent);word-break:break-all;margin-bottom:3px}
+.prov-tooltip .pt-meta{color:var(--text3)}
+.val-has-provenance:hover .prov-tooltip{display:block}
 
 /* Provenance row */
 .prov-row{
@@ -321,6 +334,79 @@ function $(id){return document.getElementById(id)}
 function show(el,disp=''){el.style.display=disp}
 function hide(el){el.style.display='none'}
 
+/* ═══ Model multi-select ═══ */
+const SELECTED_MODELS = [];
+let MODEL_LIST = [];
+
+async function loadModelList(){
+  const data = await fetchJSON(`${API}/models?limit=250`);
+  if(!data._error && data.models){
+    MODEL_LIST = data.models.map(m=>({
+      id: m.model_id || m.id || '',
+      author: m.author||'',
+      params: m.total_params_b||'?',
+      arch: m.architecture_family||'',
+      tag: m.pipeline_tag||'',
+      downloads: parseInt(m.downloads)||0,
+    })).filter(m=>m.id).sort((a,b)=>{
+      const pa=parseFloat(a.params)||0, pb=parseFloat(b.params)||0;
+      return pb-pa||(b.downloads||0)-(a.downloads||0);
+    });
+  }
+}
+
+function handleModelInput(e){
+  if(e.key==='Enter'){
+    e.preventDefault();
+    const input=$('rec-model-input'), val=(input.value||'').trim();
+    if(val && !SELECTED_MODELS.includes(val)){
+      SELECTED_MODELS.push(val);
+      renderModelTags();
+    }
+    input.value='';
+    hide($('model-suggestions'));
+  }else if(e.key==='Backspace' && !$('rec-model-input').value && SELECTED_MODELS.length){
+    SELECTED_MODELS.pop();
+    renderModelTags();
+  }
+}
+
+function renderModelTags(){
+  $('model-tags').innerHTML = SELECTED_MODELS.map((m,i)=>`<span style=\"background:var(--accent2);color:#fff;padding:2px 8px;border-radius:4px;font-size:0.73rem;display:flex;align-items:center;gap:4px;cursor:pointer\" onclick=\"SELECTED_MODELS.splice(${i},1);renderModelTags()\">${esc(m)} ✕</span>`).join('');
+  $('rec-model').value = SELECTED_MODELS.join(',');
+}
+
+function suggestModels(){
+  const input=$('rec-model-input'), q=(input.value||'').toLowerCase().trim();
+  const sug=$('model-suggestions');
+  if(!q || q.length<2){hide(sug);return}
+  const matches = MODEL_LIST.filter(m=>
+    m.id.toLowerCase().includes(q) || m.author.toLowerCase().includes(q)
+  ).slice(0,15);
+  if(!matches.length){hide(sug);return}
+  sug.innerHTML = matches.map(m=>{
+    const mid = esc(m.id);
+    const safeId = mid.replace(/'/g, "\\'");
+    return `<div style="padding:6px 10px;cursor:pointer;font-size:0.78rem;border-bottom:1px solid var(--bg4)" onmousedown="event.preventDefault();addModel('${safeId}')" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">${mid} <span style="color:var(--text3);font-size:0.68rem">${esc(m.params)}B ${esc(m.arch)}</span></div>`;
+  }).join('');
+  show(sug,'block');
+}
+function addModel(id){
+  if(!SELECTED_MODELS.includes(id)){
+    SELECTED_MODELS.push(id);
+    renderModelTags();
+  }
+  $('rec-model-input').value='';
+  hide($('model-suggestions'));
+}
+
+// Close suggestions on click outside
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#model-suggestions') && !e.target.closest('#rec-model-input')){
+    hide($('model-suggestions'));
+  }
+});
+
 function esc(s){
   if(!s&&s!==0)return'';
   const d=document.createElement('div');d.textContent=String(s);return d.innerHTML;
@@ -446,6 +532,10 @@ async function searchChips(){
         ${c.production_status?`<span class="tag ${isUndisclosed?'undisclosed':''}">${esc(c.production_status)}</span>`:''}
         ${c.process_node_nm?`<span class="tag">${esc(c.process_node_nm)}nm</span>`:''}
       </div>
+      ${(c._benchmark_count||c._compat_count)?`<div class="card-meta">
+        ${c._benchmark_count?`<span title="评测数据">📊 ${c._benchmark_count}条实测</span>`:''}
+        ${c._compat_count?`<span title="兼容模型">🔗 ${c._compat_count}个兼容</span>`:''}
+      </div>`:''}
     </div>
   `}).join('');
 }
@@ -471,9 +561,23 @@ async function openChipProfile(id){
   const groupsHtml = CHIP_GROUPS.map(([key,label])=>{
     const g = chip[key];
     if(!g||Object.keys(g).length===0)return'';
+    const fp = data.field_provenance || {};
     const fields = Object.entries(g)
       .filter(([k])=>k!=='id'&&!k.startsWith('_'))
-      .map(([k,v])=>`<div class="group-field"><span class="key">${esc(k)}</span><span class="val">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}</span></div>`)
+      .map(([k,v])=>{
+        const prov = fp[k];
+        const hasProv = prov && prov.history && prov.history.length > 0;
+        let tooltipHtml = '';
+        if(hasProv){
+          const latest = prov.history[0];
+          tooltipHtml = `<div class="prov-tooltip">
+            <div class="pt-src">${esc((latest.source_url||'').slice(0,120))}</div>
+            <div class="pt-meta">${esc(latest.source_type||'?')} · ${esc(latest.confidence||'?')} · ${esc((latest.updated_at||'').slice(0,16))}${latest.is_official==='1'?' · ✓官方':''}</div>
+            ${prov.update_count>1?`<div class="pt-meta" style="margin-top:2px">${prov.update_count}次变更</div>`:''}
+          </div>`;
+        }
+        return `<div class="group-field"><span class="key">${esc(k)}</span><span class="val${hasProv?' val-has-provenance':''}">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}${tooltipHtml}</span></div>`;
+      })
       .join('');
     return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${label}</div><div class="group-body">${fields}</div></div>`:'';
   }).join('');
@@ -654,13 +758,21 @@ function renderFieldProvenance(fp) {
 /* ═══════════════════ RECOMMEND ═══════════════════ */
 function initRecommend(){
   STATE.vendors = STATE.vendors || [];
+  loadModelList(); // Preload model list for suggestions
   $('rec-form').innerHTML = `
     <div class="recommend-form">
-      <div class="form-group"><label>模型名称 *</label><input type="text" id="rec-model" placeholder="Qwen2.5-7B / Llama-3.1-8B …"></div>
+      <div class="form-group" style="grid-column:1/-1"><label>模型名称 * (多选，逗号分隔或逐个回车添加)</label>
+        <div id="model-tags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px"></div>
+        <input type="text" id="rec-model-input" placeholder="输入模型名模糊搜索… (如 Qwen2.5-7B)" onkeydown="handleModelInput(event)" oninput="suggestModels()" autocomplete="off">
+        <div id="model-suggestions" style="display:none;max-height:200px;overflow-y:auto;background:var(--bg3);border:1px solid var(--bg4);border-radius:4px;margin-top:2px"></div>
+        <input type="hidden" id="rec-model" value="">
+      </div>
       <div class="form-group"><label>场景</label><select id="rec-scenario"><option value="train">训练</option><option value="inference">推理</option></select></div>
       <div class="form-group"><label>期望训练天数</label><input type="number" id="rec-days" placeholder="3" min="0.1" step="0.5"></div>
+      <div class="form-group"><label>训练数据量 (T tokens)</label><input type="number" id="rec-tokens" placeholder="自动推算" min="0.1" max="1000" step="0.5"></div>
       <div class="form-group"><label>目标推理吞吐 (tok/s)</label><input type="number" id="rec-tps" placeholder="可选" min="0"></div>
       <div class="form-group"><label>最大卡数</label><input type="number" id="rec-max-cards" placeholder="可选" min="1"></div>
+      <div class="form-group"><label>最小卡数</label><input type="number" id="rec-min-cards" placeholder="可选" min="1"></div>
       <div class="form-group"><label>最高单价 (万元/片)</label><input type="number" id="rec-max-price" placeholder="可选" min="0"></div>
       <div class="form-group"><label>最低成熟度</label><select id="rec-maturity"><option value="">不限</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
       <div class="form-group"><label>优先国产</label><div class="toggle-row"><div class="toggle" id="rec-domestic" onclick="this.classList.toggle('on')"></div></div></div>
@@ -680,9 +792,11 @@ async function runRecommend(){
   const params = new URLSearchParams();
   params.set('model',model);
   params.set('scenario',$('rec-scenario').value);
+  const tokens=$('rec-tokens').value;if(tokens)params.set('training_tokens',tokens);
   const days=$('rec-days').value;if(days)params.set('training_days',days);
   const tps=$('rec-tps').value;if(tps)params.set('sla_tps',tps);
   const mc=$('rec-max-cards').value;if(mc)params.set('max_cards',mc);
+  const mnc=$('rec-min-cards').value;if(mnc)params.set('min_cards',mnc);
   const mp=$('rec-max-price').value;if(mp)params.set('max_price',mp);
   const mm=$('rec-maturity').value;if(mm)params.set('min_maturity',mm);
   if($('rec-domestic').classList.contains('on'))params.set('prefer_domestic','true');
@@ -694,22 +808,30 @@ async function runRecommend(){
   if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
 
   const req = data.requirements||{};
-  const dims = data.scoring_dimensions||[];
+  const scoringMeta = data.scoring_meta||{};
+  const dimMeta = scoringMeta.dimensions||[];
 
   results.innerHTML = `
-    <div class="info">
-      模型: <b>${esc(data.model||'')}</b> · 场景: <b>${req.scenario==='train'?'训练':'推理'}</b>
+    <div class="info" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <span>模型: <b>${esc(data.model||'')}</b> · 场景: <b>${req.scenario==='train'?'训练':'推理'}</b>
       · 最低显存: <b>${req.min_vram_gb} GB</b>
-      · 候选: <b>${data.candidates?.length||0}</b> · 排除: <b>${data.rejected||0}</b>
+      · 训练数据量: <b>${req.training_tokens_T!=null?req.training_tokens_T+'T tokens':'—'}</b>
+      · 候选: <b>${data.candidates?.length||0}</b> · 排除: <b>${data.rejected||0}</b></span>
+      <button class="btn" onclick="showMethodology()" style="font-size:0.75rem;padding:4px 12px">📖 算法说明</button>
     </div>
     ${(data.candidates||[]).map((c,i)=>{
       const rec = c.recommend||{};
+      const scoring = c.scoring||{};
+      const scoreBarPct = Math.min(100, (scoring.total||rec.score)/100*100);
+      // Map dimension meta for display
+      const dimNameMap = {};
+      dimMeta.forEach(m=>{ dimNameMap[m.id]=m; });
       return `
         <div class="rec-card ${i===0?'best':''}">
-          <div class="rec-rank">#${i+1} · 综合评分 ${rec.score}</div>
+          <div class="rec-rank">#${i+1} · 综合评分 ${scoring.total!=null?scoring.total:rec.score} / 100</div>
           <div class="rec-header">
             <h3>${esc(c.chip_model)} <small style="color:var(--text2);font-size:0.75rem">${esc(c.vendor_display||'')}</small></h3>
-            <div class="rec-score">${rec.score}</div>
+            <div class="rec-score">${scoring.total!=null?scoring.total:rec.score}</div>
           </div>
           <div class="rec-stats">
             <div class="rec-stat"><div class="label">推荐卡数</div><div class="value">${rec.recommended_cards} 卡</div></div>
@@ -720,12 +842,72 @@ async function runRecommend(){
             <div class="rec-stat"><div class="label">显存</div><div class="value">${c.vram_gb||'?'} GB</div></div>
           </div>
           <div class="rec-rationale">${esc(rec.rationale||'')}</div>
-          <div class="score-bar"><div class="score-bar-fill" style="width:${Math.min(100,rec.score/50*100)}%"></div></div>
-          <div class="scoring-dim">评分维度: ${dims.join(' · ')}</div>
+          <div class="score-bar"><div class="score-bar-fill" style="width:${scoreBarPct}%"></div></div>
+          ${renderDimensionBreakdown(scoring, dimNameMap)}
         </div>
       `;
     }).join('')}
   `;
+}
+
+function renderDimensionBreakdown(scoring, dimNameMap) {
+  if (!scoring || !scoring.dimensions) return '';
+  const dims = scoring.dimensions;
+  const entries = Object.entries(dims).filter(([,v])=>v.score>0||v.weight>0);
+  if (!entries.length) return '';
+  // Color gradient: 0-3 red, 3-6 yellow, 6-8 green, 8-10 blue
+  function barColor(s) {
+    if (s>=8) return 'linear-gradient(90deg, var(--accent2), var(--accent))';
+    if (s>=6) return 'linear-gradient(90deg, var(--green), var(--accent))';
+    if (s>=3) return 'linear-gradient(90deg, var(--orange), var(--green))';
+    return 'linear-gradient(90deg, var(--red), var(--orange))';
+  }
+  return `<div class="dim-breakdown" style="margin-top:10px;border-top:1px solid var(--bg4);padding-top:8px">
+    <div style="font-size:0.7rem;color:var(--text3);margin-bottom:6px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">📊 评分明细 ▼</div>
+    <div style="display:block">${entries.map(([id,v])=>{
+      const meta = dimNameMap[id] || {};
+      const name = meta.name_cn || id;
+      const pct = Math.min(100, v.score*10);
+      return `<div class="dim-row" style="display:flex;align-items:center;gap:6px;font-size:0.7rem;padding:2px 0">
+        <span style="width:72px;color:var(--text2);white-space:nowrap;text-align:right;flex-shrink:0" title="${esc(v.detail||'')}">${esc(name)}</span>
+        <span style="flex:1;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:${pct}%;background:${barColor(v.score)};border-radius:3px"></span></span>
+        <span style="width:28px;text-align:right;font-weight:600;color:var(--text);flex-shrink:0">${v.score}</span>
+        <span style="width:64px;text-align:right;color:var(--text3);font-size:0.65rem;flex-shrink:0">×${v.weight.toFixed(2)}=${v.weighted.toFixed(2)}</span>
+      </div>`;
+    }).join('')}</div>
+  </div>`;
+}
+
+async function showMethodology() {
+  const overlay = document.getElementById('detail-overlay');
+  const panel = document.getElementById('detail-panel');
+  panel.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  overlay.classList.add('open');
+  try {
+    const data = await fetchJSON(`${API}/methodology`);
+    if (data._error) { panel.innerHTML = `<div class="error">${esc(data._error)}</div>`; return; }
+    const dims = data.scoring_dimensions || [];
+    panel.innerHTML = `
+      <div class="detail-header"><h2>📖 推荐算法说明 v${data.version||'2.0'}</h2>
+        <button class="detail-close" onclick="closeDetail()">✕</button>
+      </div>
+      <div class="detail-body">
+        <div class="group"><div class="group-header">卡数估算方法</div><div class="group-body" style="display:grid;grid-template-columns:1fr;gap:6px">
+          ${Object.entries(data.card_estimation||{}).map(([k,v])=>`<div class="group-field"><span class="key">${k}</span><span class="val">${esc(String(v))}</span></div>`).join('')}
+          <div class="group-field"><span class="key">total_score_formula</span><span class="val">${esc(data.total_score_formula||'')}</span></div>
+        </div></div>
+        <div class="group"><div class="group-header">硬约束条件</div><div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px">
+          ${(data.hard_constraints||[]).map(c=>`<div class="group-field"><span class="val">${esc(c)}</span></div>`).join('')}
+        </div></div>
+        <div class="group"><div class="group-header">评分维度 (10维)</div>
+        <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:6px">
+          ${dims.map(d=>`<div class="group-field" style="flex-direction:column;align-items:flex-start;gap:2px">
+            <span style="font-weight:600;color:var(--accent)">${esc(d.name_cn)} (${esc(d.name_en)}) — 训练权重${d.train_weight||0} / 推理权重${d.infer_weight||0}</span>
+            <span style="color:var(--text2);font-size:0.73rem">${esc(d.desc||'')} · 单位: ${esc(d.unit||'')}</span>
+          </div>`).join('')}
+        </div></div>
+      </div>`;
+  } catch(e) { panel.innerHTML = `<div class="error">加载失败: ${esc(e.message)}</div>`; }
 }
 
 /* ═══════════════════ COMPAT ═══════════════════ */
@@ -756,23 +938,27 @@ async function searchCompat(){
   sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 条兼容记录</span>`;
   if(!data.compatibilities||!data.compatibilities.length){results.innerHTML='<div class="empty">未找到匹配的兼容记录</div>';return}
 
-  results.innerHTML = data.compatibilities.map(c=>`
+  results.innerHTML = data.compatibilities.map(c=>{
+    const iden = c.identity || c;
+    const det = c.compat_details || c;
+    return `
     <div style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius-sm);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div>
-        <div style="font-weight:600;font-size:0.85rem">${esc(c.chip_model)} ↔ ${esc(c.model_id)}</div>
+        <div style="font-weight:600;font-size:0.85rem">${esc(iden.chip_model)} ↔ ${esc(iden.model_id)}</div>
         <div style="font-size:0.73rem;color:var(--text2);margin-top:2px">
-          ${esc(c.framework||'')} · ${esc(c.precision||'')}
-          ${c.notes?`<br>${esc(c.notes)}`:''}
-          ${c.verified_at?`<br><span style="color:var(--text3)">验证于: ${esc(c.verified_at)}</span>`:''}
+          ${esc(det.framework||'')} · ${esc(det.precision||'')}
+          ${det.notes?`<br>${esc(det.notes)}`:''}
+          ${det.verified_at?`<br><span style="color:var(--text3)">验证于: ${esc(det.verified_at)}</span>`:''}
         </div>
       </div>
       <span style="font-size:0.75rem;padding:4px 10px;border-radius:4px;font-weight:600;
-        background:${c.compat_status==='verified'?'rgba(52,211,153,0.15)':c.compat_status==='vendor_claimed'?'rgba(251,146,60,0.15)':'rgba(96,165,250,0.15)'};
-        color:${c.compat_status==='verified'?'var(--green)':c.compat_status==='vendor_claimed'?'var(--orange)':'var(--blue)'}">
-        ${esc(c.compat_status)}
+        background:${det.compat_status==='verified'?'rgba(52,211,153,0.15)':det.compat_status==='vendor_claimed'?'rgba(251,146,60,0.15)':'rgba(96,165,250,0.15)'};
+        color:${det.compat_status==='verified'?'var(--green)':det.compat_status==='vendor_claimed'?'var(--orange)':'var(--blue)'}">
+        ${esc(det.compat_status)}
       </span>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 /* ═══════════════════ DB STATUS ═══════════════════ */

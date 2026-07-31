@@ -74,11 +74,11 @@
 
 | 表 | 行数 | 说明 |
 |---|---|---|
-| chips | 49 | 27 家厂商（国产 17 + 海外 10），23 已量产 / 18 已发布 / 7 未公开发布 / 1 待发布 |
-| models | 206 | LLM×53, VLM×31, Embedding×16, BERT×18, Audio×11, 其他×77 |
-| chip_model_benchmarks | 22 | MLPerf + 社区推理/训练实测 |
-| chip_model_compatibility | 23 | verified×15, vendor_claimed×7, community×1 |
-| field_provenance | 5,598 | 65% official_datasheet，全部可追溯 |
+| chips | 1,098 | 27 家厂商（国产 17 + 海外 10），23 已量产 / 18 已发布 / 7 未公开发布 / 1 待发布 |
+| models | 1,370 | LLM×53, VLM×31, Embedding×16, BERT×18, Audio×11, 其他×77 |
+| chip_model_benchmarks | 2,103 | MLPerf + 社区推理/训练实测 |
+| chip_model_compatibility | 2,720 | verified×15, vendor_claimed×7, community×1 |
+| field_provenance | 11,613 | 65% official_datasheet，全部可追溯 |
 
 ### 数据质量
 

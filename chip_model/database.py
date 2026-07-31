@@ -310,9 +310,28 @@ def search_chips(
             for rid, recs in grouped.items():
                 summaries[rid] = _build_provenance_summary(recs)
 
+        # ── Benchmark & compatibility counts ──
+        bm_counts: dict[str, int] = {}
+        comp_counts: dict[str, int] = {}
+        if rows:
+            for r in rows:
+                cm = r.get("chip_model", "")
+                if cm:
+                    bm_counts[cm] = db.execute(
+                        "SELECT COUNT(*) FROM chip_model_benchmarks WHERE chip_model LIKE ?",
+                        (f"%{cm}%",),
+                    ).fetchone()[0]
+                    comp_counts[cm] = db.execute(
+                        "SELECT COUNT(*) FROM chip_model_compatibility WHERE chip_model LIKE ?",
+                        (f"%{cm}%",),
+                    ).fetchone()[0]
+
         result_chips = []
         for r in rows:
             c = chip_summary(r)
+            cm = r.get("chip_model", "")
+            c["_benchmark_count"] = bm_counts.get(cm, 0)
+            c["_compat_count"] = comp_counts.get(cm, 0)
             if include_provenance:
                 c["_provenance"] = summaries.get(str(r["id"]), {
                     "field_count": 0, "record_count": 0, "sources": [],
@@ -1773,3 +1792,82 @@ def add_compat(db, fields: dict, source: dict) -> int:
     source["updated_at"] = source.get("updated_at", now)
     _provenance_for_fields(db, "chip_model_compatibility", row_id, inserts, source)
     return row_id
+
+
+# ═══════════════════════════════════════════════════════════
+# Benchmark query helpers for scoring engine v2.0
+# ═══════════════════════════════════════════════════════════
+
+def get_chip_benchmarks_for_model(
+    chip_model_name: str,
+    model_id: str,
+    params_B: float,
+    db_path: str | Path | None = None,
+) -> list[dict]:
+    """Get all relevant benchmark rows for a chip+model combination.
+
+    Tries exact chip+model match first, then falls back to same-scale models
+    (params within 0.5×–2× of target).
+    """
+    with get_db(db_path, readonly=True) as db:
+        # Exact match on chip_model and model_id
+        rows = db.execute(
+            "SELECT * FROM chip_model_benchmarks "
+            "WHERE chip_model LIKE ? AND model_id LIKE ?",
+            (f"%{chip_model_name}%", f"%{model_id}%"),
+        ).fetchall()
+        if rows:
+            return [dict(r) for r in rows]
+
+        # Fallback: same-scale models on the same chip
+        lo, hi = params_B * 0.5, params_B * 2.0
+        rows = db.execute(
+            "SELECT b.* FROM chip_model_benchmarks b "
+            "JOIN models m ON b.model_id = m.model_id "
+            "WHERE b.chip_model LIKE ? "
+            "AND CAST(m.total_params_b AS REAL) BETWEEN ? AND ?",
+            (f"%{chip_model_name}%", lo, hi),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_chip_benchmark_mfu(chip_model_name: str,
+                            db_path: str | Path | None = None) -> float | None:
+    """Get best training MFU (%) for a chip from any model benchmark."""
+    with get_db(db_path, readonly=True) as db:
+        row = db.execute(
+            "SELECT MAX(CAST(mfu_pct AS REAL)) as max_mfu "
+            "FROM chip_model_benchmarks "
+            "WHERE chip_model LIKE ? AND workload_type='training' AND mfu_pct != ''",
+            (f"%{chip_model_name}%",),
+        ).fetchone()
+        if row and row["max_mfu"] is not None:
+            return float(row["max_mfu"])
+    return None
+
+
+def get_chip_benchmark_tps(chip_model_name: str,
+                            db_path: str | Path | None = None) -> float | None:
+    """Get best inference throughput (tok/s) for a chip from any model benchmark."""
+    with get_db(db_path, readonly=True) as db:
+        row = db.execute(
+            "SELECT MAX(CAST(throughput_tok_s AS REAL)) as max_tps "
+            "FROM chip_model_benchmarks "
+            "WHERE chip_model LIKE ? AND workload_type='inference' AND throughput_tok_s != ''",
+            (f"%{chip_model_name}%",),
+        ).fetchone()
+        if row and row["max_tps"] is not None:
+            return float(row["max_tps"])
+    return None
+
+
+def get_chip_model_compat_count(chip_model_name: str,
+                                 db_path: str | Path | None = None) -> int:
+    """Count verified + vendor_claimed compat records for a chip."""
+    with get_db(db_path, readonly=True) as db:
+        row = db.execute(
+            "SELECT COUNT(*) as cnt FROM chip_model_compatibility "
+            "WHERE chip_model LIKE ? AND compat_status IN ('verified', 'vendor_claimed')",
+            (f"%{chip_model_name}%",),
+        ).fetchone()
+        return row["cnt"] if row else 0

@@ -56,6 +56,24 @@ from chip_model.database import (
     add_model,
     update_model_fields,
     add_benchmark,
+    update_benchmark_fields,
+    add_compatibility,
+    update_compatibility_fields,
+    get_chip_benchmarks_for_model,
+    get_chip_benchmark_mfu,
+    get_chip_benchmark_tps,
+    get_chip_model_compat_count,
+)
+from chip_model.scoring import (  # v2.0 scoring engine
+    parse_fp16,
+    round_up_pow2,
+    RecommendContext,
+    TRAIN_WEIGHTS,
+    INFERENCE_WEIGHTS,
+    aggregate_score,
+    scoring_result_to_dict,
+)
+    add_benchmark,
     add_compat,
     search_links,
     LinkFilters,
@@ -341,8 +359,14 @@ def chip_recommend(
     tier: Optional[str] = typer.Option(
         "datacenter", "--tier", help="芯片级别: datacenter | all"
     ),
+    training_tokens: Optional[float] = typer.Option(
+        None, "--training-tokens", help="训练数据量 (T tokens)，不设则自动推算"
+    ),
     max_cards: Optional[int] = typer.Option(
         None, "--max-cards", help="最大允许卡数（硬排除）"
+    ),
+    min_cards: Optional[int] = typer.Option(
+        None, "--min-cards", help="最小允许卡数（硬下限，自动取2的幂次方）"
     ),
     max_price: Optional[float] = typer.Option(
         None, "--max-price", help="最高单价 万元/片（硬排除）"
@@ -405,6 +429,7 @@ def chip_recommend(
         cloud = int(float(chip_dict.get("cloud_available", 0) or 0))
 
         vram_cards = max(1, int(min_vram_total / vram) + 1)
+        vram_cards = _round_up_pow2(vram_cards)
         deadline_cards = vram_cards
         estimated_days = None
 
@@ -417,11 +442,18 @@ def chip_recommend(
                     vram_cards,
                     int(total_flops / (effective_per_card_day * training_days)) + 1,
                 )
+                deadline_cards = _round_up_pow2(deadline_cards)
                 estimated_days = round(
                     total_flops / (effective_per_card_day * deadline_cards), 1
                 )
 
         recommended_cards = deadline_cards
+
+        # Min cards floor (round up min_cards to pow2, then enforce)
+        if min_cards:
+            min_cards_pow2 = _round_up_pow2(min_cards)
+            if recommended_cards < min_cards_pow2:
+                recommended_cards = _round_up_pow2(min_cards_pow2)
 
         # Hard exclude
         if max_cards and recommended_cards > max_cards:
@@ -468,6 +500,7 @@ def chip_recommend(
             "target_training_days": training_days,
             "target_tokens_per_sec": sla_tps,
             "max_cards": max_cards,
+            "min_cards": min_cards,
             "max_price_wan": max_price,
             "min_maturity": min_maturity,
         },
@@ -498,6 +531,21 @@ def chip_recommend(
 
 
 # ── Scoring helpers ──
+
+def _next_pow2(n: int) -> int:
+    """Return the smallest power of 2 >= n."""
+    if n <= 1:
+        return 1
+    p = 1
+    while p < n:
+        p <<= 1
+    return p
+
+
+def _round_up_pow2(n: int) -> int:
+    """Round n up to nearest power of 2 (for GPU cluster sizing)."""
+    return _next_pow2(n)
+
 
 def _parse_fp16(perf_str: str) -> float:
     """Extract BF16/FP16 TFLOPS from precision_perf string."""
