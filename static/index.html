@@ -349,14 +349,14 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 	</div>
 	<div class="agent-quick-panel" id="agent-quick-panel">
 	  <h3>💡 快捷提问</h3>
-	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">🔍 训练 Qwen2.5-7B，3天完成，国产优先</span><span class="qc-desc">推荐最适合的国产芯片方案</span></button>
-	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">🧠 推理 Llama-3-70B，需要什么配置？</span><span class="qc-desc">显存估算 + 芯片推荐</span></button>
-	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">💰 预算有限，训练 7B 模型最便宜的方案</span><span class="qc-desc">性价比优先排序</span></button>
-	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">📊 H100 和 昇腾910C 对比</span><span class="qc-desc">规格 + 性能 + 生态对比</span></button>
-	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">🖥️ 当前数据库中有多少芯片和模型？</span><span class="qc-desc">数据库概览统计</span></button>
-	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">🛠️ 你有哪些技能？列出所有skill</span><span class="qc-desc">查看项目安装的全部 skill</span></button>
-	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">🎯 我想训练 DeepSeek-R1 满血版，有什么方案？</span><span class="qc-desc">MoE大模型训练可行性分析</span></button>
-	  <button class="quick-chip" onclick="$('chat-input').value=this.textContent.trim();sendChat()"><span class="qc-title">📈 国产芯片中，谁的单卡算力最强？</span><span class="qc-desc">国产芯片算力排行</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🔍 训练 Qwen2.5-7B，3天完成，国产优先</span><span class="qc-desc">推荐最适合的国产芯片方案</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🧠 推理 Llama-3-70B，需要什么配置？</span><span class="qc-desc">显存估算 + 芯片推荐</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">💰 预算有限，训练 7B 模型最便宜的方案</span><span class="qc-desc">性价比优先排序</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">📊 H100 和 昇腾910C 对比</span><span class="qc-desc">规格 + 性能 + 生态对比</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🖥️ 当前数据库中有多少芯片和模型？</span><span class="qc-desc">数据库概览统计</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🛠️ 你有哪些技能？列出所有skill</span><span class="qc-desc">查看项目安装的全部 skill</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🎯 我想训练 DeepSeek-R1 满血版，有什么方案？</span><span class="qc-desc">MoE大模型训练可行性分析</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">📈 国产芯片中，谁的单卡算力最强？</span><span class="qc-desc">国产芯片算力排行</span></button>
 	</div>
   </div>
 </section>
@@ -443,18 +443,19 @@ async function sendChat(){
 
     let assistantText='';
     let currentAssistantEl=null;
-    let toolResults=[];
 
     const reader=resp.body.getReader();
-    const decoder=new TextDecoder();
+    const decoder=new TextDecoder('utf-8');
     let buffer='';
 
     while(true){
       const {done,value}=await reader.read();
       if(done)break;
-      buffer+=decoder.decode(value,{stream:true});
+      // Use stream:true so incomplete multi-byte characters at chunk boundary
+      // are held back and completed by the next chunk
+      buffer += decoder.decode(value, {stream: !done});
       const lines=buffer.split('\n');
-      buffer=lines.pop()||'';
+      buffer=(done ? '' : lines.pop())||'';
 
       for(const line of lines){
         if(!line.startsWith('data: '))continue;
@@ -471,27 +472,22 @@ async function sendChat(){
             currentAssistantEl.innerHTML=renderMarkdown(assistantText);
             $('chat-messages').scrollTop=$('chat-messages').scrollHeight;
           }else if(d.type==='tool_call'){
-            const toolMsg=`🔧 调用工具: <b>${d.name}</b><br><code>${esc(d.arguments||'')}</code>`;
-            appendChatMsg('tool',toolMsg);
+            // Skip — tool process is invisible to user
           }else if(d.type==='tool_start'){
-            const ts=`⏳ 执行命令: <code>${esc(d.command||'')}</code>`;
-            appendChatMsg('tool',ts);
+            // Skip — tool process is invisible to user
           }else if(d.type==='tool_result'){
-            toolResults.push(d.result);
-            const trEl=appendChatMsg('tool','📊 获取到数据');
-            try{
-              const parsed=JSON.parse(d.result);
-              const summary=summarizeResult(parsed,d.result);
-              trEl.innerHTML='📊 '+summary;
-            }catch(e){
-              trEl.innerHTML='📊 获取到数据 ('+d.result.length+' 字符)';
-            }
+            // Skip — tool process is invisible to user
           }
         }catch(e){}
       }
     }
 
+    // Cleanup on completion
     if(assistantText){
+      // Final sanitize pass: remove any XML tags that slipped through
+      assistantText = assistantText.replace(/<[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*\/?\s*>/gi,'');
+      // Also remove full <tag>...</tag> blocks that might have snuck in
+      assistantText = assistantText.replace(/<[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>[\s\S]*?<\/[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>/gi,'');
       CHAT_HISTORY.push({role:'assistant',content:assistantText});
     }
   }catch(e){
@@ -525,20 +521,21 @@ function appendTyping(){
 }
 
 function renderMarkdown(text){
-  let html=esc(text);
+  // Safety net: strip all XML/DSML tool-call tags and their content
+  // Matches <function_calls>, <DSML|function_calls>, <invoke>, <parameter>, <tool_calls> etc.
+  let html=text.replace(/<[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>[\s\S]*?<\/[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>/gi,'');
+  html=html.replace(/<\/?[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*\/?>/gi,'');
+
+  // STRIP <__SYS-... and other hallucinated OpenAI tool call markers
+  html=html.replace(/<\s*__+[a-zA-Z_][^>]*\/?\s*>/g,'');
+
+  html=esc(html);
   html=html.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
   html=html.replace(/\*(.+?)\*/g,'<i>$1</i>');
   html=html.replace(/`(.+?)`/g,'<code>$1</code>');
+  html=html.replace(/\\n/g,'<br>');
   html=html.replace(/\n/g,'<br>');
   return html;
-}
-
-function summarizeResult(parsed,raw){
-  if(parsed.candidates) return `推荐结果: ${parsed.candidates.length} 颗候选芯片`;
-  if(parsed.count!==undefined) return `查询结果: ${parsed.count} 条记录`;
-  if(parsed.chip) return `芯片画像: ${parsed.chip.identity?.chip_model||'?'}`;
-  if(parsed.error) return `错误: ${esc(parsed.error)}`;
-  return '获取到数据 ('+Math.round(raw.length/1024)+'KB)';
 }
 
 /* ═══ Generic Autocomplete (used by chip/model search + recommend) ═══ */

@@ -13,9 +13,7 @@ import re
 import shlex
 import subprocess
 import sys
-import time
 from pathlib import Path
-from typing import Optional
 
 import httpx
 from dotenv import load_dotenv
@@ -106,16 +104,6 @@ def load_skills_cached() -> list[dict]:
     return _skills_cache
 
 
-def build_skill_summary(skills: list[dict]) -> str:
-    """Build a human-readable skill listing for the system prompt."""
-    lines = []
-    for i, s in enumerate(skills, 1):
-        name = s["name"]
-        desc = s.get("description", "")
-        lines.append(f"{i}. **{name}** — {desc}")
-    return "\n".join(lines)
-
-
 # ═══════════════════════════════════
 # Tool definitions for the LLM
 # ═══════════════════════════════════
@@ -196,63 +184,11 @@ def _build_tools() -> list[dict]:
 
 def _build_system_prompt() -> str:
     skills = load_skills_cached()
-    skill_list_str = "\n".join(
-        f"- **{s['name']}**: {s.get('description', 'no description')}"
-        for s in skills
-    )
-    count = len(skills)
-    return f"""You are an AI chip selection advisor for AISHPerf, a knowledge graph of AI accelerators and models.
-
-Your job is to help users find the best chips for their AI workloads. You have access to a CLI tool that queries a database of 1098 chips, 1370 models, and 2103+ benchmark records.
-
-## Your Tools
-
-You have THREE tools. Use them:
-
-1. **run_cli_command** — Query the chips/models/benchmarks database via CLI. Always use this to get real data.
-2. **list_skills** — List all installed project skills ({count} currently: {', '.join(s['name'] for s in skills)}). **MUST call this tool** when the user asks what skills/技能 you have. NEVER answer skill questions from memory — the tool IS the source of truth.
-3. **load_skill** — Load a specific skill's full instructions by name
-
-## Your Process
-
-1. **Understand requirements**: Ask the user about their model (name/size), scenario (train/inference), constraints (budget, power, vendor preference, domestic priority, timeline).
-
-2. **Query the database**: Use `run_cli_command` to get real data. Key commands:
-   - `chip recommend` — the v2.0 recommendation engine with 10-dimension scoring (0-100)
-   - `chip search` — fuzzy search with filters
-   - `chip profile <name>` — full details on a specific chip
-   - `model search` — find models by name/architecture/params
-   - `benchmark search` — real benchmark data
-   - `db status` — database overview
-
-3. **Present results**: Show top candidates with scores, explain WHY each chip scores well/poorly for their use case, mention card count and estimated training days.
-
-## Scoring System (v2.0)
-
-The recommendation engine scores chips on 10 dimensions (each 0-10, weighted total 0-100):
-- compute_perf (15-20%): Raw FP16 TFLOPS
-- vram_sufficiency (15-20%): VRAM headroom per card
-- cost_efficiency (12-15%): TFLOPS per 万元
-- power_efficiency (8%): GFLOPS per Watt
-- interconnect_quality (8-12%): Multi-card scaling
-- ecosystem_maturity (10-12%): Software stack + cloud + community
-- sla_satisfaction (10%): Meeting timeline/throughput targets
-- production_readiness (5%): 量产/已发布 status
-- benchmark_evidence (7-8%): Real benchmark data bonus
-- domestic_priority (bonus): Region/vendor preference
-
-## Important Notes
-
-- Speak in Chinese (中文) unless the user uses English
-- Be conversational and helpful, not robotic
-- When showing chip comparisons, use tables
-- Explain the "why" behind scores, not just numbers
-- Always offer to refine or adjust constraints
-- The DB has 702 datacenter + 395 consumer chips
-- Consumer chips (RTX 4090 etc) are available with `--tier all`
-- Quantized models (GGUF/GPTQ/AWQ) are inference-only
-- Training auto-estimates tokens as params_B × 10 if not specified
-"""
+    return f"""You are a chip selection assistant. Use run_cli_command to query data from the chip-model database.
+- When user says "训练 Qwen2.5-7B" → call: chip recommend --model Qwen2.5-7B --scenario train [--training-days N] [--domestic] [--limit N]
+- When user says "推荐芯片" or "对比" → call run_cli_command first
+- Always call the tool BEFORE writing any text response
+- Respond in Chinese with tables"""
 
 
 # ═══════════════════════════════════
@@ -321,6 +257,33 @@ def execute_load_skill(name: str) -> str:
 
 
 # ═══════════════════════════════════
+# Sanitization — strip DSML/XML tool-call artifacts from LLM output
+# ═══════════════════════════════════
+
+_SANITIZE_PATTERNS = [
+    # Full block tags with content: <function_calls>...</function_calls>, <invoke>...</invoke>, etc.
+    re.compile(
+        r'<\s*/?\s*(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>[\s\S]*?<\s*/?\s*(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>',
+        re.IGNORECASE,
+    ),
+    # Self-closing / single-line tags: <invoke name="...">, <parameter ... />
+    re.compile(
+        r'<\s*/?\s*(?:function_calls|tool_calls|invoke|parameter)\b[^>]*/?\s*>',
+        re.IGNORECASE,
+    ),
+    # Hallucinated OpenAI-style markers like <__SYS_...>, <__TOOL_...>
+    re.compile(r'<\s*__+[a-zA-Z_][^>]*/?\s*>'),
+]
+
+
+def _sanitize_text(text: str) -> str:
+    """Strip DSML/XML tool-call artifacts the LLM sometimes hallucinates into output."""
+    for pat in _SANITIZE_PATTERNS:
+        text = pat.sub('', text)
+    return text
+
+
+# ═══════════════════════════════════
 # DeepSeek Chat (streaming)
 # ═══════════════════════════════════
 
@@ -347,17 +310,15 @@ async def chat_stream(
         "model": model,
         "messages": messages,
         "tools": _build_tools(),
-        "tool_choice": "auto",
         "stream": True,
         "temperature": 0.7,
-        "max_tokens": 4096,
     }
 
     full_text = ""
     tool_calls_buffer: list[dict] = []
     current_tool_call = {"id": "", "function": {"name": "", "arguments": ""}}
 
-    async with httpx.AsyncClient(timeout=120.0, proxy="http://127.0.0.1:7897") as client:
+    async with httpx.AsyncClient(timeout=120.0) as client:
         async with client.stream("POST", url, headers=headers, json=payload) as response:
             async for line in response.aiter_lines():
                 if not line.startswith("data: "):
@@ -372,6 +333,7 @@ async def chat_stream(
                     # Handle text content
                     content = delta.get("content", "")
                     if content:
+                        content = _sanitize_text(content)
                         full_text += content
                         yield f"data: {json.dumps({'type': 'text', 'content': content}, ensure_ascii=False)}\n\n"
 
@@ -407,59 +369,23 @@ async def chat_stream(
             fn_name = tc["function"]["name"]
             fn_args_str = tc["function"]["arguments"]
 
-            yield f"data: {json.dumps({'type': 'tool_call', 'name': fn_name, 'arguments': fn_args_str}, ensure_ascii=False)}\n\n"
-
             if fn_name == "run_cli_command":
-                try:
-                    args = json.loads(fn_args_str)
-                    cmd = args.get("command", "")
-                except json.JSONDecodeError:
-                    cmd = fn_args_str
-
-                yield f"data: {json.dumps({'type': 'tool_start', 'command': cmd}, ensure_ascii=False)}\n\n"
-
+                try:    args = json.loads(fn_args_str); cmd = args.get("command", "")
+                except json.JSONDecodeError: cmd = fn_args_str
                 result = execute_cli(cmd)
-                # Truncate very long results
-                if len(result) > 4000:
-                    result = result[:4000] + f"...(truncated, total {len(result)} chars)"
-
-                yield f"data: {json.dumps({'type': 'tool_result', 'result': result}, ensure_ascii=False)}\n\n"
-
+                if len(result) > 8000: result = result[:8000] + f"...(truncated)"
             elif fn_name == "list_skills":
                 result = execute_list_skills()
-                yield f"data: {json.dumps({'type': 'tool_result', 'result': result}, ensure_ascii=False)}\n\n"
-
             elif fn_name == "load_skill":
-                try:
-                    args = json.loads(fn_args_str)
-                    name = args.get("name", "")
-                except json.JSONDecodeError:
-                    name = fn_args_str
+                try:    args = json.loads(fn_args_str); name = args.get("name", "")
+                except json.JSONDecodeError: name = fn_args_str
                 result = execute_load_skill(name)
-                yield f"data: {json.dumps({'type': 'tool_result', 'result': result}, ensure_ascii=False)}\n\n"
-
             else:
-                result = json.dumps({"error": f"Unknown tool: {fn_name}"}, ensure_ascii=False)
-                yield f"data: {json.dumps({'type': 'tool_result', 'result': result}, ensure_ascii=False)}\n\n"
+                result = json.dumps({"error": f"Unknown: {fn_name}"}, ensure_ascii=False)
 
-            # Add to messages for follow-up (all tools share this pattern)
-            messages.append({
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [{
-                    "id": tc["id"],
-                    "type": "function",
-                    "function": {
-                        "name": fn_name,
-                        "arguments": fn_args_str,
-                    }
-                }]
-            })
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc["id"],
-                "content": result,
-            })
+            # Build messages for follow-up, don't emit tool UI events
+            messages.append({"role":"assistant","content":None,"tool_calls":[{"id":tc["id"],"type":"function","function":{"name":fn_name,"arguments":fn_args_str}}]})
+            messages.append({"role":"tool","tool_call_id":tc["id"],"content":result})
 
         # Continue conversation with tool results
         yield f"data: {json.dumps({'type': 'thinking'}, ensure_ascii=False)}\n\n"
@@ -482,10 +408,9 @@ async def _continue_chat(messages: list[dict], model: str):
         "messages": messages,
         "stream": True,
         "temperature": 0.7,
-        "max_tokens": 4096,
     }
 
-    async with httpx.AsyncClient(timeout=120.0, proxy="http://127.0.0.1:7897") as client:
+    async with httpx.AsyncClient(timeout=120.0) as client:
         async with client.stream("POST", url, headers=headers, json=payload) as response:
             async for line in response.aiter_lines():
                 if not line.startswith("data: "):
@@ -497,6 +422,7 @@ async def _continue_chat(messages: list[dict], model: str):
                     chunk = json.loads(data)
                     content = chunk.get("choices", [{}])[0].get("delta", {}).get("content", "")
                     if content:
+                        content = _sanitize_text(content)
                         yield f"data: {json.dumps({'type': 'text', 'content': content}, ensure_ascii=False)}\n\n"
                 except json.JSONDecodeError:
                     continue
