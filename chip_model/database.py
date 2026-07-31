@@ -54,6 +54,7 @@ class CompatFilters:
     chip: str | None = None
     model: str | None = None
     status: str | None = None
+    has_benchmark: bool = False
 
 
 @dataclass
@@ -797,6 +798,9 @@ def search_compat(
     """Search compatibility records by chip/model/status.
 
     When ``include_provenance=True``, each record gets a ``_provenance`` key.
+    When ``filters.has_benchmark=True``, only records with matching benchmark
+    data are returned.  Every record also gets a ``benchmark_evidence`` group
+    with aggregated benchmark metadata (sources, evidence levels, URLs).
     """
     with get_db(db_path, readonly=True) as db:
         conditions: list[str] = []
@@ -814,12 +818,55 @@ def search_compat(
             conditions.append("compat_status = ?")
             params.append(filters.status)
 
+        if filters.has_benchmark:
+            conditions.append(
+                "EXISTS (SELECT 1 FROM chip_model_benchmarks b "
+                "WHERE b.chip_model = chip_model_compatibility.chip_model "
+                "AND b.model_id = chip_model_compatibility.model_id)"
+            )
+
         where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
         count = _count(db, "chip_model_compatibility", conditions, params[:])
 
         sql = f"SELECT * FROM chip_model_compatibility {where} ORDER BY verified_at DESC LIMIT ? OFFSET ?"
         rows = [dict(r) for r in db.execute(sql, params + [limit, offset]).fetchall()]
+
+        # ── Benchmark evidence lookup (batch) ──
+        bm_evidence: dict[str, dict] = {}
+        if rows:
+            # Build unique (chip_model, model_id) pairs
+            pairs = list({(r["chip_model"] or "", r["model_id"] or "") for r in rows})
+            for chip_m, model_m in pairs:
+                key = f"{chip_m}|||{model_m}"
+                bm_rows = db.execute(
+                    "SELECT suite_name, source_type, source_url, evidence_level, "
+                    "confidence, test_date, throughput_tok_s, mfu_pct, precision, "
+                    "framework, batch_size, notes "
+                    "FROM chip_model_benchmarks "
+                    "WHERE chip_model = ? AND model_id = ?",
+                    [chip_m, model_m],
+                ).fetchall()
+                if bm_rows:
+                    bm_dicts = [dict(r) for r in bm_rows]
+                    sources = list({r["source_type"] for r in bm_dicts if r["source_type"]})
+                    source_urls = list({r["source_url"] for r in bm_dicts if r["source_url"]})
+                    evidence_levels = [r["evidence_level"] for r in bm_dicts if r["evidence_level"]]
+                    bm_evidence[key] = {
+                        "count": len(bm_dicts),
+                        "sources": sources[:10],
+                        "source_urls": source_urls[:5],
+                        "top_evidence": evidence_levels[0] if evidence_levels else None,
+                        "max_throughput_tok_s": max(
+                            (r["throughput_tok_s"] for r in bm_dicts if r.get("throughput_tok_s")),
+                            default=None,
+                        ),
+                        "max_mfu_pct": max(
+                            (r["mfu_pct"] for r in bm_dicts if r.get("mfu_pct")),
+                            default=None,
+                        ),
+                        "benchmarks": bm_dicts[:10],  # keep first 10 for detail view
+                    }
 
         # ── Provenance enrichment ──
         summaries: dict[str, dict] = {}
@@ -841,6 +888,18 @@ def search_compat(
         result = []
         for r in rows:
             c = group_compat(r)
+            bm_key = f"{r.get('chip_model', '')}|||{r.get('model_id', '')}"
+            bm_ev = bm_evidence.get(bm_key, {
+                "count": 0,
+                "sources": [],
+                "source_urls": [],
+                "top_evidence": None,
+                "max_throughput_tok_s": None,
+                "max_mfu_pct": None,
+                "benchmarks": [],
+            })
+            # Attach benchmark_evidence on the grouped result
+            c["benchmark_evidence"] = bm_ev
             if include_provenance:
                 c["_provenance"] = summaries.get(str(r["id"]), {
                     "field_count": 0, "record_count": 0, "sources": [],

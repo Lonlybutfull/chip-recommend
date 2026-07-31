@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -82,6 +83,29 @@ def load_skills() -> list[dict]:
     return skills
 
 
+_skills_cache: list[dict] | None = None  # cached skill list
+_skills_cache_mtime: float = 0.0        # last mtime of skills dir
+
+
+def load_skills_cached() -> list[dict]:
+    """Load skills with caching — only re-reads when .claude/skills/ changes."""
+    global _skills_cache, _skills_cache_mtime
+    skills_dir = _project_root / ".claude" / "skills"
+    if not skills_dir.exists():
+        _skills_cache = []
+        _skills_cache_mtime = 0.0
+        return []
+    try:
+        mtime = skills_dir.stat().st_mtime
+    except OSError:
+        mtime = 0.0
+    if _skills_cache is not None and mtime == _skills_cache_mtime:
+        return _skills_cache
+    _skills_cache = load_skills()
+    _skills_cache_mtime = mtime
+    return _skills_cache
+
+
 def build_skill_summary(skills: list[dict]) -> str:
     """Build a human-readable skill listing for the system prompt."""
     lines = []
@@ -96,58 +120,98 @@ def build_skill_summary(skills: list[dict]) -> str:
 # Tool definitions for the LLM
 # ═══════════════════════════════════
 
-TOOLS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "run_cli_command",
-            "description": "Run an AISHPerf CLI command to query chip/model/benchmark data. "
-                           "Available groups: chip (search/profile/recommend), model (search/profile), "
-                           "benchmark (search), compat (search), provenance (show/stats), db (status). "
-                           "All output is JSON. Use this to get real data about chips, models, benchmarks, "
-                           "compatibility, and to run the recommendation engine.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "command": {
-                        "type": "string",
-                        "description": "The CLI command to run, WITHOUT the 'python scripts/run_cli.py' prefix. "
-                                       "Examples: 'chip search --search H100 --tier datacenter --limit 5', "
-                                       "'chip recommend --model Qwen2.5-7B --scenario train --training-days 7 --domestic --limit 5', "
-                                       "'chip profile Ascend 910C', "
-                                       "'model search --search Qwen2.5 --limit 10', "
-                                       "'benchmark search --chip H100 --workload training', "
-                                       "'db status'"
-                    }
-                },
-                "required": ["command"]
+def _build_tools() -> list[dict]:
+    """Build the tool list with current skill data baked in."""
+    skills = load_skills_cached()
+    skill_names = [s["name"] for s in skills]
+    skill_desc_lines = []
+    for s in skills:
+        skill_desc_lines.append(f"- **{s['name']}**: {s.get('description', 'no description')}")
+
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "run_cli_command",
+                "description": "Run an AISHPerf CLI command to query chip/model/benchmark data. "
+                               "Available groups: chip (search/profile/recommend), model (search/profile), "
+                               "benchmark (search), compat (search), provenance (show/stats), db (status). "
+                               "All output is JSON. Use this to get real data about chips, models, benchmarks, "
+                               "compatibility, and to run the recommendation engine.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "The CLI command to run, WITHOUT the 'python scripts/run_cli.py' prefix. "
+                                           "Examples: 'chip search --search H100 --tier datacenter --limit 5', "
+                                           "'chip recommend --model Qwen2.5-7B --scenario train --training-days 7 --domestic --limit 5', "
+                                           "'chip profile Ascend 910C', "
+                                           "'model search --search Qwen2.5 --limit 10', "
+                                           "'benchmark search --chip H100 --workload training', "
+                                           "'db status'"
+                        }
+                    },
+                    "required": ["command"]
+                }
             }
-        }
-    }
-]
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "list_skills",
+                "description": "List ALL skills installed in this project. "
+                               "MUST call this tool when the user asks what skills/技能/能力 you have, "
+                               "or asks about available tools/capabilities. "
+                               "NEVER answer skill questions from memory — always call this tool first.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {},
+                    "required": []
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "load_skill",
+                "description": "Load the full content of a specific skill by name. "
+                               "Use this when the user wants to know what a specific skill does in detail, "
+                               "or when you need to follow a skill's instructions precisely.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": f"The skill name to load. Available skills: {', '.join(skill_names)}"
+                        }
+                    },
+                    "required": ["name"]
+                }
+            }
+        },
+    ]
 
 # ── Build system prompt dynamically ──
 
-_skills = load_skills()
-_skill_summary = build_skill_summary(_skills)
+def _build_system_prompt() -> str:
+    skills = load_skills_cached()
+    skill_list_str = "\n".join(
+        f"- **{s['name']}**: {s.get('description', 'no description')}"
+        for s in skills
+    )
+    count = len(skills)
+    return f"""You are an AI chip selection advisor for AISHPerf, a knowledge graph of AI accelerators and models.
 
-SYSTEM_PROMPT = f"""You are an AI chip selection advisor for AISHPerf, a knowledge graph of AI accelerators and models.
+Your job is to help users find the best chips for their AI workloads. You have access to a CLI tool that queries a database of 1098 chips, 1370 models, and 2103+ benchmark records.
 
-Your job is to help users find the best chips for their AI workloads. You have access to a CLI tool that queries a database of 1098 chips, 1370 models, and 2103 benchmark records.
+## Your Tools
 
-## Your Installed Skills
+You have THREE tools. Use them:
 
-The project `.claude/skills/` directory contains exactly {len(_skills)} skills. These are the ONLY skills you have:
-
-{_skill_summary}
-
-**CRITICAL RULE — READ CAREFULLY**:
-When a user asks "你有什么skill" or "what skills do you have", your answer MUST:
-1. List exactly these {len(_skills)} skills by name and description — nothing more, nothing less
-2. NEVER fabricate skills like "芯片对比分析", "应用场景方案生成", "数据统计与趋势分析", "厂商与生态查询", "SQL执行能力" etc. — these DO NOT exist
-3. NEVER group them into categories like "核心技能" vs "辅助技能"
-4. NEVER claim you have 6, 7, or any other number of skills
-5. If you're unsure, say "I have {len(_skills)} skills loaded from the project" and list them
+1. **run_cli_command** — Query the chips/models/benchmarks database via CLI. Always use this to get real data.
+2. **list_skills** — List all installed project skills ({count} currently: {', '.join(s['name'] for s in skills)}). **MUST call this tool** when the user asks what skills/技能 you have. NEVER answer skill questions from memory — the tool IS the source of truth.
+3. **load_skill** — Load a specific skill's full instructions by name
 
 ## Your Process
 
@@ -198,7 +262,7 @@ The recommendation engine scores chips on 10 dimensions (each 0-10, weighted tot
 def execute_cli(command: str) -> str:
     """Execute a CLI command and return the output."""
     cli_script = _project_root / "scripts" / "run_cli.py"
-    full_cmd = [sys.executable, str(cli_script)] + command.split()
+    full_cmd = [sys.executable, str(cli_script)] + shlex.split(command)
     try:
         result = subprocess.run(
             full_cmd,
@@ -223,6 +287,39 @@ def execute_cli(command: str) -> str:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
+def execute_list_skills() -> str:
+    """Return the list of installed skills as JSON."""
+    skills = load_skills_cached()
+    return json.dumps({
+        "count": len(skills),
+        "skills": [{"name": s["name"], "description": s["description"]} for s in skills],
+    }, ensure_ascii=False)
+
+
+def execute_load_skill(name: str) -> str:
+    """Load and return the full content of a skill's SKILL.md."""
+    skills = load_skills_cached()
+    for s in skills:
+        if s["name"].lower() == name.lower():
+            try:
+                content = Path(s["path"]).read_text(encoding="utf-8")
+                # Limit to avoid blowing context
+                if len(content) > 8000:
+                    content = content[:8000] + "\n\n...(truncated)"
+                return json.dumps({
+                    "name": s["name"],
+                    "description": s["description"],
+                    "content": content,
+                }, ensure_ascii=False)
+            except Exception as e:
+                return json.dumps({"error": f"Failed to read skill: {e}"}, ensure_ascii=False)
+    # Use cached skill names for the error message
+    skill_names = [s["name"] for s in skills]
+    return json.dumps({
+        "error": f"Skill '{name}' not found. Available: {', '.join(skill_names)}"
+    }, ensure_ascii=False)
+
+
 # ═══════════════════════════════════
 # DeepSeek Chat (streaming)
 # ═══════════════════════════════════
@@ -235,6 +332,10 @@ async def chat_stream(
 
     Returns the full concatenated response text.
     """
+    # Prepend system prompt if not already present
+    if not messages or messages[0].get("role") != "system":
+        messages = [{"role": "system", "content": _build_system_prompt()}] + messages
+
     url = f"{DEEPSEEK_BASE_URL}/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
@@ -245,7 +346,7 @@ async def chat_stream(
     payload = {
         "model": model,
         "messages": messages,
-        "tools": TOOLS,
+        "tools": _build_tools(),
         "tool_choice": "auto",
         "stream": True,
         "temperature": 0.7,
@@ -256,7 +357,7 @@ async def chat_stream(
     tool_calls_buffer: list[dict] = []
     current_tool_call = {"id": "", "function": {"name": "", "arguments": ""}}
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=120.0, proxy="http://127.0.0.1:7897") as client:
         async with client.stream("POST", url, headers=headers, json=payload) as response:
             async for line in response.aiter_lines():
                 if not line.startswith("data: "):
@@ -324,24 +425,41 @@ async def chat_stream(
 
                 yield f"data: {json.dumps({'type': 'tool_result', 'result': result}, ensure_ascii=False)}\n\n"
 
-                # Add to messages for follow-up
-                messages.append({
-                    "role": "assistant",
-                    "content": None,
-                    "tool_calls": [{
-                        "id": tc["id"],
-                        "type": "function",
-                        "function": {
-                            "name": fn_name,
-                            "arguments": fn_args_str,
-                        }
-                    }]
-                })
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc["id"],
-                    "content": result,
-                })
+            elif fn_name == "list_skills":
+                result = execute_list_skills()
+                yield f"data: {json.dumps({'type': 'tool_result', 'result': result}, ensure_ascii=False)}\n\n"
+
+            elif fn_name == "load_skill":
+                try:
+                    args = json.loads(fn_args_str)
+                    name = args.get("name", "")
+                except json.JSONDecodeError:
+                    name = fn_args_str
+                result = execute_load_skill(name)
+                yield f"data: {json.dumps({'type': 'tool_result', 'result': result}, ensure_ascii=False)}\n\n"
+
+            else:
+                result = json.dumps({"error": f"Unknown tool: {fn_name}"}, ensure_ascii=False)
+                yield f"data: {json.dumps({'type': 'tool_result', 'result': result}, ensure_ascii=False)}\n\n"
+
+            # Add to messages for follow-up (all tools share this pattern)
+            messages.append({
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [{
+                    "id": tc["id"],
+                    "type": "function",
+                    "function": {
+                        "name": fn_name,
+                        "arguments": fn_args_str,
+                    }
+                }]
+            })
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc["id"],
+                "content": result,
+            })
 
         # Continue conversation with tool results
         yield f"data: {json.dumps({'type': 'thinking'}, ensure_ascii=False)}\n\n"
@@ -367,7 +485,7 @@ async def _continue_chat(messages: list[dict], model: str):
         "max_tokens": 4096,
     }
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=120.0, proxy="http://127.0.0.1:7897") as client:
         async with client.stream("POST", url, headers=headers, json=payload) as response:
             async for line in response.aiter_lines():
                 if not line.startswith("data: "):

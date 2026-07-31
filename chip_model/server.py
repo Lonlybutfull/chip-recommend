@@ -206,6 +206,37 @@ def api_chip_recommend(
     model_id = str(model_data.get("model_id", "") or "")
     arch_family = str(model_data.get("architecture_family", "") or "")
 
+    # 2a. Detect MoE models and use activated parameters for VRAM estimation
+    # e.g. Qwen/Qwen3.5-397B-A17B → 397B total, 17B activated
+    #       deepseek-ai/DeepSeek-V3 → 671B total, 37B activated
+    import re as _re
+    moe_activated = None
+    # Pattern 1: model_id contains "-A{activated}B" or "A{activated}B" (Qwen naming)
+    m = _re.search(r'-A(\d+(?:\.\d+)?)\s*B', model_id)
+    # Pattern 2: model_id contains "{total}B-A{activated}B"
+    if not m:
+        m = _re.search(r'A(\d+(?:\.\d+)?)\s*B', model_id)
+    # Pattern 3: architecture_family is MoE and model_id has "/some-{activated}B"
+    if not m and arch_family.lower().startswith('moe'):
+        # Try to find the lower number after a dash
+        nums = _re.findall(r'[-/](\d+(?:\.\d+)?)\s*B', model_id)
+        if len(nums) >= 2:
+            lower = min(float(n) for n in nums)
+            m = _re.match(rf'{lower}', str(lower))
+    if m:
+        moe_activated = float(m.group(1))
+        if scenario == "inference":
+            # Inference: use activated params for VRAM (but total for throughput estimation)
+            effective_params = moe_activated
+            print(f"[INFO] MoE model detected: {total_params}B total, {moe_activated}B activated → using activated for VRAM")
+        else:
+            # Training: all params need to be loaded + optimizer states, use activated for forward only
+            # Realistically need total_params but activated matters less for VRAM bound
+            # Use total_params still but mark model as MoE
+            effective_params = total_params
+    else:
+        effective_params = total_params
+
     # 2. Auto-estimate training tokens if unset (Chinchilla: tokens ≈ 20×params, use 50% = 10×params)
     if training_tokens is None:
         training_tokens_val = max(0.1, min(100.0, total_params * 10.0))
@@ -232,15 +263,15 @@ def api_chip_recommend(
         raise HTTPException(400, f"量化模型 {model_id} 只能用于推理场景，不支持训练")
 
     if scenario == "train":
-        min_vram_total = total_params * 12 * 1.3
-        total_flops = 6 * (total_params * 1e9) * (training_tokens_val * 1e12)
+        min_vram_total = effective_params * 12 * 1.3
+        total_flops = 6 * (effective_params * 1e9) * (training_tokens_val * 1e12)
     else:
         # Inference: adjust VRAM for quantized models
         if is_quantized and quant_bits:
             bytes_per_param = quant_bits / 8.0
         else:
             bytes_per_param = 2.0  # FP16 default
-        min_vram_total = total_params * bytes_per_param * 1.25
+        min_vram_total = effective_params * bytes_per_param * 1.25
         total_flops = 0.0
 
     # 4. Get candidates
@@ -250,6 +281,16 @@ def api_chip_recommend(
     )
 
     if not candidates:
+        if scenario == "train" and moe_activated and moe_activated < total_params:
+            raise HTTPException(
+                404,
+                f"MoE模型 {model_id} 训练需加载全部 {total_params:.0f}B 参数 (非仅激活参数 {moe_activated:.0f}B)，"
+                f"VRAM 估算 ≥{min_vram_total:.0f}GB。当前数据库无单卡满足需求的芯片。\n"
+                f"建议：\n"
+                f"1. 使用推理模式 (scenario=inference) — MoE 推理仅需激活参数 {moe_activated:.0f}B\n"
+                f"2. 如坚持训练，需多卡集群（如 8×H100 80GB = 640GB、16×MI300X 192GB = 3072GB）\n"
+                f"3. 考虑蒸馏为更小的 dense 模型进行训练"
+            )
         raise HTTPException(404, f"没有芯片满足 {model} 的VRAM需求 (≥{min_vram_total:.0f}GB)，请尝试其他模型或放宽约束")
 
     # 5. Scoring loop
@@ -549,13 +590,15 @@ def api_compat_search(
     chip_model: Optional[str] = Query(None, description="Alias for 'chip' parameter"),
     model: Optional[str] = Query(None),
     status: Optional[str] = Query(None, description="verified | vendor_claimed | community | unsupported"),
+    has_benchmark: bool = Query(False, description="Only return records that have benchmark evidence"),
     limit: int = Query(50, le=200),
     offset: int = Query(0),
     include_provenance: bool = Query(False, description="Include per-compat field provenance summary"),
 ):
     """Search compatibility records."""
     effective_chip = chip or chip_model
-    filters = CompatFilters(chip=effective_chip, model=model, status=status)
+    filters = CompatFilters(chip=effective_chip, model=model, status=status,
+                            has_benchmark=has_benchmark)
     return search_compat(filters, limit=limit, offset=offset,
                          include_provenance=include_provenance)
 
