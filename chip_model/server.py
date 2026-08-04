@@ -7,9 +7,9 @@ Usage:
 
 import re
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Annotated, Optional
 
-from fastapi import FastAPI, Query, HTTPException, Response
+from fastapi import FastAPI, Query, Path, Body, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
@@ -95,10 +95,15 @@ from scalar_fastapi import get_scalar_api_reference, Theme
 async def scalar_docs():
     return get_scalar_api_reference(
         openapi_url=app.openapi_url,
-        title="AISHPerf API",
+        title="AISHPerf API 测试 — 算力选型知识图谱",
         theme=Theme.DEEP_SPACE,
         show_sidebar=True,
         hide_download_button=False,
+        # 中文界面 + 预填可用的示例值（default_open_all_tags 便于快速定位端点）
+        overrides={
+            "localization": {"locale": "zh-CN"},
+            "defaultOpenAllTags": True,
+        },
     )
 
 
@@ -120,7 +125,11 @@ class ChatRequest(BaseModel):
 # ═══════════════════════════════════════════════════════════════
 
 @app.post("/api/v1/chat")
-async def api_chat(body: ChatRequest):
+async def api_chat(
+    body: Annotated[ChatRequest, Body(examples=[{"messages": [
+        {"role": "user", "content": "我想训练 Qwen2.5-7B，3 天完成，国产优先，给出方案"},
+    ]}])],
+):
     """Streaming chat with DeepSeek + AISHPerf tool calling."""
     from chip_model.chat_agent import chat_stream, DEEPSEEK_MODEL
 
@@ -180,7 +189,8 @@ def api_chip_search(
 
 @app.get("/api/v1/chips/recommend")
 def api_chip_recommend(
-    model: str = Query(..., description="Model name (fuzzy match)"),
+    model: str = Query(..., description="Model name (fuzzy match)",
+                       examples=["Qwen2.5-7B", "Llama-3.1-8B", "DeepSeek-V3"]),
     scenario: str = Query("train", description="train | inference"),
     training_days: Optional[float] = Query(None, description="Target training days"),
     training_tokens: Optional[float] = Query(None, description="Training data volume (T tokens), auto-estimated if unset"),
@@ -495,7 +505,10 @@ def api_methodology():
 
 
 @app.get("/api/v1/chips/{identifier}")
-def api_chip_profile(identifier: str):
+def api_chip_profile(
+    identifier: str = Path(..., description="Chip ID (pure digits) or name (fuzzy)",
+                           examples=["A100 SXM4 80GB", "H200 SXM 141GB", "昇腾910C"]),
+):
     """Full chip profile.  identifier = ID (pure digits) or name (fuzzy)."""
     result = get_chip_profile(identifier)
     if result is None:
@@ -504,7 +517,9 @@ def api_chip_profile(identifier: str):
 
 
 @app.post("/api/v1/chips/batch")
-def api_chip_batch(body: BatchRequest):
+def api_chip_batch(
+    body: Annotated[BatchRequest, Body(examples=[{"identifiers": ["5", "A100 SXM4 80GB", "Ascend 910B B1 64GB"]}])],
+):
     """Batch chip profiles."""
     results = get_chip_profiles_batch(body.identifiers)
     missing = sum(1 for r in results if r is None)
@@ -541,7 +556,10 @@ def api_model_search(
 
 
 @app.get("/api/v1/models/{identifier}")
-def api_model_profile(identifier: str):
+def api_model_profile(
+    identifier: str = Path(..., description="Model ID (pure digits) or name (fuzzy)",
+                           examples=["Qwen2.5-7B", "DeepSeek-V3", "1"]),
+):
     """Full model profile.  identifier = ID (pure digits) or name (fuzzy)."""
     result = get_model_profile(identifier)
     if result is None:
@@ -550,7 +568,9 @@ def api_model_profile(identifier: str):
 
 
 @app.post("/api/v1/models/batch")
-def api_model_batch(body: BatchRequest):
+def api_model_batch(
+    body: Annotated[BatchRequest, Body(examples=[{"identifiers": ["Qwen2.5-7B", "DeepSeek-V3", "Llama-3.1-8B"]}])],
+):
     """Batch model profiles."""
     results = get_model_profiles_batch(body.identifiers)
     missing = sum(1 for r in results if r is None)
