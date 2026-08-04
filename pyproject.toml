@@ -1,0 +1,26 @@
+[project]
+name = "chip-recommend"
+version = "0.4.0"
+description = "AISHPerf Knowledge Graph — AI Chip × Model 知识图谱"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pyyaml>=6.0",
+    "scalar-fastapi>=1.0.0",
+    "typer>=0.12.0",
+    "requests>=2.32.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=5.0.0",
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.0",
+]
+
+[tool.uv]
+# 本项目非打包安装型：脚本自行把项目根目录加入 sys.path
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

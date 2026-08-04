@@ -2,9 +2,10 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Install Python dependencies
+# Install uv, then Python dependencies via uv
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir uv && \
+    uv pip install --system --no-cache -r requirements.txt
 
 # Copy application package
 COPY chip_model/ ./chip_model/
@@ -12,6 +13,9 @@ COPY chip_model/ ./chip_model/
 # Copy schema and static assets
 COPY schema.sql .
 COPY static/ ./static/
+
+# Copy skills so the chat agent can enumerate project capabilities
+COPY .claude/skills/ .claude/skills/
 
 # Copy data files
 COPY data/ ./data/

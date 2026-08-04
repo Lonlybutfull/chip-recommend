@@ -1,0 +1,14 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.env
+docs
+tests
+data/crawl_all
+data/crawl_fetched.jsonl
+*.db-shm
+*.db-wal
+.claude/settings.local.json
