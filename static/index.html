@@ -45,6 +45,13 @@ nav button{
 }
 nav button:hover{color:var(--text);background:var(--bg3)}
 nav button.active{color:var(--accent);background:var(--bg4)}
+.api-link{
+  color:var(--text2);font-size:0.8rem;font-weight:500;
+  padding:7px 12px;border-radius:var(--radius-sm);text-decoration:none;
+  border:1px solid var(--bg4);transition:var(--transition);white-space:nowrap;
+}
+.api-link:hover{color:var(--accent);background:var(--bg4)}
+.api-links{display:flex;gap:8px}
 
 /* ── Main ── */
 main{max-width:1440px;margin:0 auto;padding:24px}
@@ -330,6 +337,10 @@ main{max-width:1440px;margin:0 auto;padding:24px}
   <div class="header-inner">
     <div class="logo">⚡ AISH<span>Perf</span> <span class="version">v0.5</span></div>
     <nav id="main-nav"></nav>
+    <div class="api-links">
+      <a class="api-link" href="/api-docs.html">📖 API 文档</a>
+      <a class="api-link" href="/docs" target="_blank" rel="noopener">🛠 调试</a>
+    </div>
   </div>
 </header>
 

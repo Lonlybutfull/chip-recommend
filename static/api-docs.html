@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>API 文档 — AISHPerf 算力选型知识图谱</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1119;--bg2:#161925;--bg3:#1e2130;--bg4:#262a38;
+  --text:#e2e4ed;--text2:#9ca3b4;--text3:#6b7280;
+  --accent:#818cf8;--accent2:#6366f1;--green:#34d399;--red:#f87171;
+  --orange:#fb923c;--blue:#60a5fa;--purple:#c084fc;
+  --radius:12px;--radius-sm:8px;--transition:0.2s ease;
+}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.65;
+  display:flex;min-height:100vh;
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{
+  font-family:Consolas,'Courier New',monospace;font-size:0.85em;
+  background:var(--bg4);padding:2px 6px;border-radius:4px;color:var(--blue);
+}
+pre{
+  background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius-sm);
+  padding:14px 16px;overflow-x:auto;font-size:0.8rem;line-height:1.55;
+  margin:8px 0 18px;
+}
+pre code{background:none;padding:0;color:var(--text)}
+table{width:100%;border-collapse:collapse;font-size:0.8rem;margin:8px 0 18px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--bg4);vertical-align:top}
+th{color:var(--text2);font-weight:600;white-space:nowrap;background:var(--bg2)}
+td code{white-space:nowrap}
+.tag{display:inline-block;font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:4px;margin-right:6px;vertical-align:1px}
+.m-get{background:rgba(52,211,153,.15);color:var(--green)}
+.m-post{background:rgba(96,165,250,.15);color:var(--blue)}
+
+/* ── Layout ── */
+aside{
+  width:260px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--bg4);
+  position:sticky;top:0;height:100vh;overflow-y:auto;padding:20px 0;
+}
+aside .doc-logo{padding:0 20px 16px;font-size:1rem;font-weight:700}
+aside .doc-logo span{color:var(--accent)}
+aside .doc-sub{font-size:0.7rem;color:var(--text3);font-weight:400;margin-top:2px}
+nav a{
+  display:block;padding:6px 20px;color:var(--text2);font-size:0.82rem;
+  border-left:3px solid transparent;transition:var(--transition);
+}
+nav a:hover{color:var(--text);background:var(--bg3);text-decoration:none}
+nav a.section{color:var(--accent);font-weight:600;margin-top:8px}
+nav a.section::before{content:'▸ ';color:var(--text3)}
+nav a.active{color:var(--accent);border-left-color:var(--accent);background:var(--bg3)}
+
+main{flex:1;max-width:980px;padding:0 40px 80px;margin:0 auto}
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  position:sticky;top:0;background:var(--bg);z-index:10;padding:18px 0 12px;
+  border-bottom:1px solid var(--bg4);margin-bottom:24px;
+}
+.topbar h1{font-size:1.2rem;font-weight:700}
+.topbar .links{display:flex;gap:10px}
+.topbar .links a{
+  font-size:0.78rem;padding:6px 14px;border:1px solid var(--bg4);border-radius:var(--radius-sm);
+  color:var(--text2);transition:var(--transition);
+}
+.topbar .links a:hover{color:var(--accent);background:var(--bg4);text-decoration:none}
+section{margin-bottom:40px}
+section h2{
+  font-size:1.1rem;border-bottom:1px solid var(--bg4);padding-bottom:8px;margin-bottom:16px;
+  color:var(--text);scroll-margin-top:80px;
+}
+section h2 .anchor{color:var(--text3);font-size:0.7rem;margin-left:8px;font-weight:400}
+section h3{font-size:0.95rem;color:var(--accent);margin:20px 0 8px}
+.ep{margin-bottom:34px;padding:18px;background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius)}
+.ep-path{font-family:Consolas,monospace;font-size:0.9rem;word-break:break-all}
+.ep-desc{color:var(--text2);font-size:0.85rem;margin:4px 0 14px}
+.ep-note{background:var(--bg3);border-left:3px solid var(--orange);padding:8px 12px;font-size:0.78rem;color:var(--text2);border-radius:0 var(--radius-sm) var(--radius-sm) 0;margin:10px 0}
+h4{font-size:0.82rem;color:var(--text2);margin:12px 0 4px;font-weight:600}
+.pill{display:inline-block;background:var(--bg4);color:var(--text2);font-size:0.7rem;padding:1px 8px;border-radius:10px;margin:0 4px 4px 0}
+ul,ol{margin:6px 0 14px 20px;font-size:0.85rem}
+li{margin:3px 0}
+strong{color:var(--text)}
+</style>
+</head>
+<body>
+
+<aside>
+  <div class="doc-logo">⚡ AISH<span>Perf</span> <span class="doc-sub">API 文档 v2.0 · 中文版</span></div>
+  <nav id="toc">
+    <a href="#overview" class="section">📖 概述</a>
+    <a href="#conventions">通用约定</a>
+    <a href="#endpoints">端点总览</a>
+    <a href="#chat" class="section">💬 智能助手</a>
+    <a href="#chat-post">POST /api/v1/chat</a>
+    <a href="#chips" class="section">🔍 芯片</a>
+    <a href="#chips-get">GET /api/v1/chips</a>
+    <a href="#chips-recommend">GET /chips/recommend</a>
+    <a href="#chips-id">GET /chips/{id}</a>
+    <a href="#chips-batch">POST /chips/batch</a>
+    <a href="#models" class="section">🧠 模型</a>
+    <a href="#models-get">GET /api/v1/models</a>
+    <a href="#models-id">GET /models/{id}</a>
+    <a href="#models-batch">POST /models/batch</a>
+    <a href="#benchmarks" class="section">📊 评测</a>
+    <a href="#benchmarks-get">GET /api/v1/benchmarks</a>
+    <a href="#compat" class="section">🔗 兼容性</a>
+    <a href="#compat-get">GET /api/v1/compat</a>
+    <a href="#provenance" class="section">🔎 来源溯源</a>
+    <a href="#prov-get">GET /api/v1/provenance</a>
+    <a href="#prov-stats">GET /provenance/stats</a>
+    <a href="#system" class="section">⚙️ 系统</a>
+    <a href="#sys-status">GET /api/v1/db/status</a>
+    <a href="#sys-health">GET /api/v1/health</a>
+    <a href="#sys-methodology">GET /api/v1/methodology</a>
+    <a href="#appendix" class="section">📎 附录</a>
+  </nav>
+</aside>
+
+<main>
+<div class="topbar">
+  <h1>⚡ AISHPerf 算力选型知识图谱 — API 文档</h1>
+  <div class="links">
+    <a href="/">🏠 返回前端</a>
+    <a href="/docs" target="_blank" rel="noopener">🛠 交互式调试</a>
+  </div>
+</div>
+
+<!-- ═══════ 概述 ═══════ -->
+<section id="overview">
+  <h2>📖 概述</h2>
+  <p>AISHPerf 是「AI 芯片 × 模型」知识图谱系统，提供芯片搜索、画像、筛选、推荐能力。本 API 是其后端接口，底层为 SQLite 数据库，包含 5 张核心表：</p>
+  <table>
+    <tr><th>表</th><th>行数</th><th>说明</th></tr>
+    <tr><td><code>chips</code></td><td>1,098</td><td>芯片全生命周期信息（27 家厂商，78 字段）</td></tr>
+    <tr><td><code>models</code></td><td>1,370</td><td>模型信息（来自 HuggingFace API）</td></tr>
+    <tr><td><code>chip_model_benchmarks</code></td><td>2,103</td><td>芯片×模型 推理/训练实测数据</td></tr>
+    <tr><td><code>chip_model_compatibility</code></td><td>2,720</td><td>芯片×模型 兼容关系</td></tr>
+    <tr><td><code>field_provenance</code></td><td>12,677</td><td>字段级来源溯源（每次写入/更新的记录）</td></tr>
+  </table>
+  <h3>基础信息</h3>
+  <table>
+    <tr><th>项</th><th>值</th></tr>
+    <tr><td>基础路径</td><td><code>/api/v1</code>（与前端同源部署）</td></tr>
+    <tr><td>数据格式</td><td>JSON，UTF-8 编码（<code>Content-Type: application/json</code>）</td></tr>
+    <tr><td>认证</td><td>公开只读 API，无需认证。<code>/api/v1/chat</code> 使用服务端配置的 DeepSeek API Key，客户端无需提供。</td></tr>
+    <tr><td>分页</td><td>统一使用 <code>limit</code> / <code>offset</code>，<code>limit</code> 默认 <code>50</code>、上限 <code>2000</code></td></tr>
+    <tr><td>错误格式</td><td>HTTP 404/500，响应体 <code>{"detail": "错误说明"}</code></td></tr>
+  </table>
+</section>
+
+<!-- ═══════ 通用约定 ═══════ -->
+<section id="conventions">
+  <h2>通用约定</h2>
+  <h3>分组字段格式</h3>
+  <p>详情类端点（芯片画像、评测、兼容记录）返回<strong>分组结构</strong>，而非扁平字段。例如评测记录分为 <code>identity</code> / <code>test_metadata</code> / <code>inference_metrics</code> / <code>training_metrics</code> / <code>meta</code> 组。仅包含有值的分组（<code>meta</code> 始终返回），取值时需注意分组可能缺失。</p>
+  <h3>数值与空值</h3>
+  <p>为灵活性考虑，数据库中绝大多数字段以 TEXT 存储（如 <code>"610"</code>、<code>"192"</code>）。无数据的字段返回 <code>null</code>。前端调用时建议做类型转换与空值容错。</p>
+  <h3>来源溯源（field_provenance）</h3>
+  <p>所有字段的写入/更新均记录来源。查询参数 <code>source_type</code> 枚举：</p>
+  <p>
+    <span class="pill">official_datasheet</span><span class="pill">official_news</span><span class="pill">vendor_claim</span><span class="pill">benchmark_suite</span><span class="pill">community</span><span class="pill">web_crawl</span><span class="pill">llm_curated</span>
+  </p>
+  <p>置信度 <code>confidence</code> 枚举：<code>high</code> / <code>medium</code> / <code>low</code>。</p>
+  <h3>兼容状态枚举</h3>
+  <p><code>compat_status</code>：<code>verified</code>（实测验证）/ <code>vendor_claimed</code>（厂商宣称）/ <code>community</code>（社区）/ <code>unsupported</code>（不支持）。</p>
+  <h3>未发布芯片</h3>
+  <p>未公开发布芯片标记为 <code>production_status="未公开发布"</code> 且 <code>is_released="0"</code>，前端半透明显示并带 ⚠ 标签。</p>
+</section>
+
+<!-- ═══════ 端点总览 ═══════ -->
+<section id="endpoints">
+  <h2>端点总览</h2>
+  <table>
+    <tr><th>方法</th><th>路径</th><th>用途</th></tr>
+    <tr><td><span class="tag m-post">POST</span><code>/api/v1/chat</code></td><td>AI 芯片选型助手（SSE 流式对话，DeepSeek + 工具调用）</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/chips</code></td><td>芯片多条件筛选搜索</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/chips/recommend</code></td><td>芯片推荐（10 维评分引擎）</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/chips/{id}</code></td><td>芯片完整画像（含评测/兼容/溯源）</td></tr>
+    <tr><td><span class="tag m-post">POST</span><code>/api/v1/chips/batch</code></td><td>批量芯片画像</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/models</code></td><td>模型搜索</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/models/{id}</code></td><td>模型画像（含兼容芯片/溯源）</td></tr>
+    <tr><td><span class="tag m-post">POST</span><code>/api/v1/models/batch</code></td><td>批量模型画像</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/benchmarks</code></td><td>评测数据搜索（推理/训练实测）</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/compat</code></td><td>兼容性搜索（含 benchmark 证据）</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/provenance</code></td><td>来源溯源查询</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/provenance/stats</code></td><td>来源溯源统计</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/db/status</code></td><td>数据库统计</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/health</code></td><td>健康检查</td></tr>
+    <tr><td><span class="tag m-get">GET</span><code>/api/v1/methodology</code></td><td>推荐算法说明</td></tr>
+  </table>
+</section>
+
+<!-- ═══════ 智能助手 ═══════ -->
+<section id="chat">
+  <h2>💬 智能助手</h2>
+
+  <div class="ep" id="chat-post">
+    <div><span class="tag m-post">POST</span><span class="ep-path">/api/v1/chat</span></div>
+    <p class="ep-desc">AI 芯片选型助手：调用 DeepSeek（默认模型 <code>deepseek-v4-flash</code>），通过工具调用查询数据库、执行 CLI，返回流式 SSE 回复。</p>
+    <h4>请求体（JSON）</h4>
+    <pre><code>{
+  "messages": [
+    {"role": "system", "content": "（可选）系统提示词"},
+    {"role": "user", "content": "我想训练 Qwen2.5-7B，国产优先，给个方案"}
+  ],
+  "model": "deepseek-v4-flash"   // 可选，缺省用服务端配置
+}</code></pre>
+    <h4>响应（text/event-stream，SSE）</h4>
+    <p>流式事件格式，每行 <code>data: {…}</code>，以 <code>data: [DONE]</code> 结束：</p>
+    <pre><code>data: {"type": "thinking"}                                        // 正在调用工具
+data: {"type": "text", "content": "推荐使用 "}                      // 文本增量
+data: {"type": "text", "content": "昇腾910C…"}
+data: [DONE]</code></pre>
+    <div class="ep-note">💡 工具调用过程对用户不可见（前端跳过 <code>tool_*</code> 事件）。响应头已关闭缓冲（<code>X-Accel-Buffering: no</code>），适合流式输出。</div>
+  </div>
+</section>
+
+<!-- ═══════ 芯片 ═══════ -->
+<section id="chips">
+  <h2>🔍 芯片</h2>
+
+  <div class="ep" id="chips-get">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/chips</span></div>
+    <p class="ep-desc">芯片多条件筛选搜索，返回精简摘要字段（id、厂商、显存、算力等）。</p>
+    <h4>查询参数</h4>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>search</code> / <code>keyword</code></td><td>string</td><td>模糊搜索（厂商/型号/系列/架构），二者等价</td></tr>
+      <tr><td><code>vendor</code></td><td>string</td><td>厂商（同时匹配 vendor 与 vendor_display）</td></tr>
+      <tr><td><code>region</code></td><td>string</td><td><code>domestic</code>（国产）| <code>foreign</code>（海外）</td></tr>
+      <tr><td><code>usage</code></td><td>string</td><td><code>train</code> | <code>inference</code> | <code>both</code></td></tr>
+      <tr><td><code>vram_min</code> / <code>vram_max</code></td><td>number</td><td>显存范围（GB）</td></tr>
+      <tr><td><code>tdp_max</code></td><td>number</td><td>最大功耗（W）</td></tr>
+      <tr><td><code>price_max</code></td><td>number</td><td>最大单价（万元/片）</td></tr>
+      <tr><td><code>interconnect_min</code></td><td>number</td><td>最小互联带宽（GB/s）</td></tr>
+      <tr><td><code>tier</code></td><td>string</td><td><code>datacenter</code> | <code>consumer</code> | <code>all</code></td></tr>
+      <tr><td><code>min_maturity</code></td><td>int</td><td>最小生态成熟度（0–5）</td></tr>
+      <tr><td><code>for_model</code> + <code>scenario</code></td><td>string</td><td>按模型自动推算所需显存并筛选</td></tr>
+      <tr><td><code>limit</code> / <code>offset</code></td><td>int</td><td>分页（limit ≤ 2000）</td></tr>
+      <tr><td><code>include_provenance</code></td><td>bool</td><td>是否附加字段溯源摘要</td></tr>
+    </table>
+    <h4>示例请求</h4>
+    <pre><code>curl "http://localhost:8000/api/v1/chips?region=domestic&vram_min=32&limit=1"</code></pre>
+    <h4>示例响应</h4>
+    <pre><code>{
+  "count": 1098,
+  "chips": [{
+    "id": 32, "vendor_display": "AMD", "chip_series": "MI400X",
+    "chip_model": "MI400X", "chip_type": "GPU",
+    "architecture": "CDNA5", "process_node_nm": "3nm",
+    "vram_gb": "432", "vram_type": "HBM4",
+    "precision_perf": null, "tdp_w": null,
+    "production_status": "待发布",
+    "_benchmark_count": 0, "_compat_count": 0
+  }]
+}</code></pre>
+  </div>
+
+  <div class="ep" id="chips-recommend">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/chips/recommend</span></div>
+    <p class="ep-desc">芯片推荐引擎（v2.0 十维评分）：按「模型 × 场景 × 约束」给出推荐候选及评分明细。</p>
+    <h4>查询参数</h4>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>model</code>（必填）</td><td>string</td><td>模型名称（模糊匹配，如 <code>Qwen2.5-7B</code>）</td></tr>
+      <tr><td><code>scenario</code></td><td>string</td><td><code>train</code>（训练，默认）| <code>inference</code>（推理）</td></tr>
+      <tr><td><code>training_days</code></td><td>number</td><td>目标训练天数</td></tr>
+      <tr><td><code>training_tokens</code></td><td>number</td><td>训练数据量（T tokens，缺省自动估算）</td></tr>
+      <tr><td><code>sla_tps</code></td><td>number</td><td>推理吞吐目标（tok/s）</td></tr>
+      <tr><td><code>tier</code></td><td>string</td><td><code>datacenter</code> | <code>all</code></td></tr>
+      <tr><td><code>max_cards</code> / <code>min_cards</code></td><td>int</td><td>卡数硬约束（上限/下限，下限取 2 幂次）</td></tr>
+      <tr><td><code>max_price</code></td><td>number</td><td>单价硬约束（万元）</td></tr>
+      <tr><td><code>min_maturity</code></td><td>int</td><td>成熟度硬约束（0–5）</td></tr>
+      <tr><td><code>prefer_domestic</code></td><td>bool</td><td>国产优先</td></tr>
+      <tr><td><code>prefer_vendor</code></td><td>string</td><td>厂商偏好</td></tr>
+      <tr><td><code>tco_weight</code></td><td>float</td><td>TCO 权重（0.0–0.3，默认 0）</td></tr>
+      <tr><td><code>limit</code></td><td>int</td><td>返回条数（≤ 20，默认 5）</td></tr>
+    </table>
+    <h4>示例请求</h4>
+    <pre><code>curl "http://localhost:8000/api/v1/chips/recommend?model=Qwen2.5-7B&scenario=inference&prefer_domestic=true&limit=1"</code></pre>
+    <h4>示例响应</h4>
+    <pre><code>{
+  "model": "Qwen/Qwen2.5-7B-Instruct | Dense | 7.6B params",
+  "candidates": [{
+    "id": 6, "vendor_display": "NVIDIA", "chip_model": "B200 SXM 192GB",
+    "vram_gb": "192", "vram_type": "HBM3e",
+    "precision_perf": "FP16 Tensor: 2250 TFLOPS | BF16 Tensor: 2250 TFLOPS …",
+    "tdp_w": "1000", "interconnect_tech": "NVLink 5.0 …"
+  }]
+}</code></pre>
+    <div class="ep-note">💡 MoE 模型自动使用「激活参数」估算显存（如 Qwen3.5-397B-A17B 按 17B 估算）。模型不存在返回 404。</div>
+  </div>
+
+  <div class="ep" id="chips-id">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/chips/{identifier}</span></div>
+    <p class="ep-desc">芯片完整画像：78 字段分 14 组 + 评测数据 + 兼容模型 + 字段溯源。</p>
+    <h4>路径参数</h4>
+    <table>
+      <tr><th>参数</th><th>说明</th></tr>
+      <tr><td><code>identifier</code></td><td>纯数字 = 按 ID 精确查询；否则按名称模糊匹配（<code>chip_model</code> → 多字段 → 英文别名）</td></tr>
+    </table>
+    <h4>示例请求</h4>
+    <pre><code>curl "http://localhost:8000/api/v1/chips/5"</code></pre>
+    <h4>示例响应（结构）</h4>
+    <pre><code>{
+  "chip": {                      // 分组字段：identity / architecture / memory / …
+    "identity": {"id": 5, "vendor": "NVIDIA", "chip_model": "A100 SXM4 80GB", "chip_type": "GPU", …},
+    "architecture": {"architecture": "Ampere", "process_node_nm": "7", "foundry": "TSMC", …},
+    "memory": {"vram_gb": "80", "vram_type": "HBM2e", "vram_bw_gb_s": "2039", …}
+  },
+  "benchmarks": [ { "identity": {"model_id": "Qwen/Qwen2.5-7B-Instruct"},
+                    "test_metadata": {"suite_name": "community", "workload_type": "inference", …},
+                    "inference_metrics": {"throughput_tok_s": "610", "memory_peak_mb": "65000"} } ],
+  "compatibilities": [ { "identity": {"model_id": "Qwen/Qwen2.5-7B-Instruct"},
+                         "compat_details": {"compat_status": "verified", "framework": "vLLM", "precision": "FP16"} } ],
+  "field_provenance": { "vram_gb": { "history": [ { "source_type": "official_datasheet", … } ], "update_count": 1 } }
+}</code></pre>
+    <div class="ep-note">💡 <code>benchmarks</code> / <code>compatibilities</code> 均为分组结构；<code>field_provenance</code> 以字段名为键的索引。芯片不存在返回 404。</div>
+  </div>
+
+  <div class="ep" id="chips-batch">
+    <div><span class="tag m-post">POST</span><span class="ep-path">/api/v1/chips/batch</span></div>
+    <p class="ep-desc">批量获取芯片画像，单次请求多个标识符。</p>
+    <h4>请求体</h4>
+    <pre><code>{ "identifiers": ["5", "H100 SXM5 80GB", "Ascend 910B"] }</code></pre>
+    <h4>响应</h4>
+    <pre><code>{
+  "count": 3, "found": 3, "missing": 0,
+  "profiles": [ { …完整画像… }, … ]
+}</code></pre>
+  </div>
+</section>
+
+<!-- ═══════ 模型 ═══════ -->
+<section id="models">
+  <h2>🧠 模型</h2>
+
+  <div class="ep" id="models-get">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/models</span></div>
+    <p class="ep-desc">模型搜索，数据来自 HuggingFace API。</p>
+    <h4>查询参数</h4>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>search</code></td><td>string</td><td>模糊搜索（model_id / author）</td></tr>
+      <tr><td><code>architecture</code></td><td>string</td><td><code>dense</code> | <code>moe</code></td></tr>
+      <tr><td><code>params_min</code> / <code>params_max</code></td><td>number</td><td>参数量范围（B）</td></tr>
+      <tr><td><code>for_chip</code></td><td>string</td><td>按芯片反查兼容模型</td></tr>
+      <tr><td><code>limit</code> / <code>offset</code></td><td>int</td><td>分页</td></tr>
+      <tr><td><code>include_provenance</code></td><td>bool</td><td>附加字段溯源摘要</td></tr>
+    </table>
+    <h4>示例响应</h4>
+    <pre><code>{
+  "count": 1370,
+  "models": [{
+    "id": 48, "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+    "author": "sentence-transformers", "architecture_family": "Dense",
+    "total_params_b": "0.0", "pipeline_tag": "sentence-similarity",
+    "downloads": "253941670", "likes": "5135", "last_modified": "2026-06-01T06:29:13.000Z"
+  }]
+}</code></pre>
+  </div>
+
+  <div class="ep" id="models-id">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/models/{identifier}</span></div>
+    <p class="ep-desc">模型画像：18 字段分 5 组 + 兼容芯片列表（扁平）+ 溯源。</p>
+    <h4>示例请求</h4>
+    <pre><code>curl "http://localhost:8000/api/v1/models/1"</code></pre>
+    <h4>示例响应（结构）</h4>
+    <pre><code>{
+  "model": { "identity": {…}, "stats": {…}, "architecture": {…}, "raw": {…} },
+  "compatible_chips": [ { "chip_model": "Ascend 910B B1 64GB", "compat_status": "vendor_claimed", "framework": "MindSpore", … } ],
+  "field_provenance": {…}
+}</code></pre>
+  </div>
+
+  <div class="ep" id="models-batch">
+    <div><span class="tag m-post">POST</span><span class="ep-path">/api/v1/models/batch</span></div>
+    <p class="ep-desc">批量模型画像。</p>
+    <h4>请求体</h4>
+    <pre><code>{ "identifiers": ["Qwen2.5-7B", "DeepSeek-V3", "Llama-3.1-8B"] }</code></pre>
+    <h4>响应</h4>
+    <pre><code>{ "count": 3, "found": 3, "missing": 0, "profiles": [ … ] }</code></pre>
+  </div>
+</section>
+
+<!-- ═══════ 评测 ═══════ -->
+<section id="benchmarks">
+  <h2>📊 评测</h2>
+
+  <div class="ep" id="benchmarks-get">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/benchmarks</span></div>
+    <p class="ep-desc">评测数据搜索（MLPerf + 社区实测，芯片×模型推理/训练）。</p>
+    <h4>查询参数</h4>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>chip</code> / <code>chip_model</code></td><td>string</td><td>按芯片型号筛选，二者等价</td></tr>
+      <tr><td><code>model</code></td><td>string</td><td>按模型筛选</td></tr>
+      <tr><td><code>workload</code></td><td>string</td><td><code>inference</code> | <code>training</code></td></tr>
+      <tr><td><code>suite</code></td><td>string</td><td>套件：<code>MLPerf</code> | <code>vendor_doc</code> | <code>community</code> 等</td></tr>
+      <tr><td><code>limit</code> / <code>offset</code></td><td>int</td><td>分页</td></tr>
+      <tr><td><code>include_provenance</code></td><td>bool</td><td>附加字段溯源摘要</td></tr>
+    </table>
+    <h4>示例请求</h4>
+    <pre><code>curl "http://localhost:8000/api/v1/benchmarks?chip=H100&model=Llama&limit=3"</code></pre>
+    <h4>示例响应（结构）</h4>
+    <pre><code>{
+  "count": 2103,
+  "benchmarks": [{
+    "identity": { "id": 49, "chip_model": "C500 (OAM 64GB HBM2e)", "model_id": "meta-llama/Llama-3.1-70B-Instruct" },
+    "test_metadata": { "suite_name": "community", "workload_type": "inference", "precision": "FP16", "test_date": "2026-07-25", … },
+    "inference_metrics": { "throughput_tok_s": "610", "mfu_pct": null, … },
+    "training_metrics": { … },
+    "meta": { "created_at": null }
+  }]
+}</code></pre>
+    <div class="ep-note">💡 来源元数据（source_type/source_url/evidence）不在本表，需从 <code>field_provenance</code> 或 <code>include_provenance</code> 获取。</div>
+  </div>
+</section>
+
+<!-- ═══════ 兼容性 ═══════ -->
+<section id="compat">
+  <h2>🔗 兼容性</h2>
+
+  <div class="ep" id="compat-get">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/compat</span></div>
+    <p class="ep-desc">芯片↔模型兼容关系搜索，每条记录附带 <code>benchmark_evidence</code>（评测证据聚合，含来源）。</p>
+    <h4>查询参数</h4>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>chip</code> / <code>chip_model</code></td><td>string</td><td>按芯片筛选</td></tr>
+      <tr><td><code>model</code></td><td>string</td><td>按模型筛选</td></tr>
+      <tr><td><code>status</code></td><td>string</td><td><code>verified</code> | <code>vendor_claimed</code> | <code>community</code> | <code>unsupported</code></td></tr>
+      <tr><td><code>has_benchmark</code></td><td>bool</td><td>只返回有评测证据的记录</td></tr>
+      <tr><td><code>limit</code> / <code>offset</code></td><td>int</td><td>分页</td></tr>
+      <tr><td><code>include_provenance</code></td><td>bool</td><td>附加每条兼容记录的溯源摘要</td></tr>
+    </table>
+    <h4>示例请求</h4>
+    <pre><code>curl "http://localhost:8000/api/v1/compat?chip=H800&has_benchmark=true&limit=3"</code></pre>
+    <h4>示例响应（结构）</h4>
+    <pre><code>{
+  "count": 2720,
+  "compatibilities": [{
+    "identity": { "id": 182, "chip_model": "AMD Instinct MI325X 256GB HBM3E", "model_id": "llama2-70b-99" },
+    "compat_details": { "compat_status": "vendor_claimed", "framework": "other", "precision": "int8", "verified_at": "", "notes": "" },
+    "meta": { "created_at": "2026-07-23T20:19:10.229606" },
+    "benchmark_evidence": {
+      "count": 2,
+      "sources": ["benchmark_suite"],
+      "source_urls": ["https://mlcommons.org/…"],
+      "top_evidence": "high",
+      "max_throughput_tok_s": "18000",
+      "max_mfu_pct": null,
+      "benchmarks": [ { "source_type": "benchmark_suite", "source_url": "…", "evidence_level": "high", … } ]
+    }
+  }]
+}</code></pre>
+  </div>
+</section>
+
+<!-- ═══════ 来源溯源 ═══════ -->
+<section id="provenance">
+  <h2>🔎 来源溯源</h2>
+
+  <div class="ep" id="prov-get">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/provenance</span></div>
+    <p class="ep-desc">字段级溯源记录查询：每次字段写入/更新都有一条记录（来源 URL、新旧值、置信度）。</p>
+    <h4>查询参数</h4>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>table</code></td><td>string</td><td><code>chips</code> | <code>models</code> | <code>chip_model_benchmarks</code> | <code>chip_model_compatibility</code></td></tr>
+      <tr><td><code>row_id</code></td><td>string</td><td>行 ID</td></tr>
+      <tr><td><code>field</code></td><td>string</td><td>字段名（模糊）</td></tr>
+      <tr><td><code>source_type</code></td><td>string</td><td>来源类型（见通用约定）</td></tr>
+      <tr><td><code>confidence</code></td><td>string</td><td><code>high</code> | <code>medium</code> | <code>low</code></td></tr>
+      <tr><td><code>is_official</code></td><td>string</td><td><code>0</code> | <code>1</code></td></tr>
+      <tr><td><code>limit</code> / <code>offset</code></td><td>int</td><td>分页</td></tr>
+    </table>
+    <h4>示例响应</h4>
+    <pre><code>{
+  "count": 12677,
+  "records": [{
+    "id": 14098, "table_name": "chip_model_benchmarks", "row_id": "212",
+    "field_name": "_batch", "new_value": "MI355X",
+    "source_type": "benchmark_suite",
+    "source_url": "https://github.com/SemiAnalysisAI/InferenceX/…",
+    "source_detail": "Migrated from parse11 MLPerf data",
+    "confidence": "high", "is_official": "0",
+    "updated_at": "2026-07-30T18:48:46", "notes": "MLPerf benchmark migration"
+  }]
+}</code></pre>
+  </div>
+
+  <div class="ep" id="prov-stats">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/provenance/stats</span></div>
+    <p class="ep-desc">溯源聚合统计：按表 / 来源类型 / 置信度 / 是否官方聚合。</p>
+    <h4>查询参数</h4>
+    <table>
+      <tr><th>参数</th><th>类型</th><th>说明</th></tr>
+      <tr><td><code>table</code></td><td>string</td><td>按表过滤统计</td></tr>
+    </table>
+    <h4>示例响应</h4>
+    <pre><code>{
+  "total": 12677,
+  "by_table": { "chips": 5877, "models": 4900, "chip_model_benchmarks": 1648, "chip_model_compatibility": 252 },
+  "by_source_type": { "official_datasheet": 4082, "web_crawl": 2973, "community": 3880, "benchmark_suite": 1406, "vendor_claim": 299, "official_news": 37 },
+  "by_confidence": { "high": 6018, "medium": 6527, "low": 132 },
+  "by_is_official": { "official": 4697, "unofficial": 7980 }
+}</code></pre>
+  </div>
+</section>
+
+<!-- ═══════ 系统 ═══════ -->
+<section id="system">
+  <h2>⚙️ 系统</h2>
+
+  <div class="ep" id="sys-status">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/db/status</span></div>
+    <p class="ep-desc">数据库统计信息（各表行数）。</p>
+    <h4>示例响应</h4>
+    <pre><code>{
+  "database": "/app/data/data.db",
+  "tables": {
+    "chips": 1098, "models": 1370, "chip_model_benchmarks": 2103,
+    "chip_model_compatibility": 2720, "field_provenance": 12677, "link_library": 487
+  }
+}</code></pre>
+  </div>
+
+  <div class="ep" id="sys-health">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/health</span></div>
+    <p class="ep-desc">健康检查，用于探活/监控。</p>
+    <h4>示例响应</h4>
+    <pre><code>{ "status": "ok", "version": "0.4.0" }</code></pre>
+  </div>
+
+  <div class="ep" id="sys-methodology">
+    <div><span class="tag m-get">GET</span><span class="ep-path">/api/v1/methodology</span></div>
+    <p class="ep-desc">芯片推荐引擎的算法说明：显存估算、算力估算、十维评分维度、MFU 默认值等。</p>
+    <h4>示例响应（结构）</h4>
+    <pre><code>{
+  "version": "2.0.0",
+  "description": "AISHPerf 芯片推荐引擎 — 10维量化评分方法",
+  "card_estimation": { "vram_train": "总参数量(B) × 12 × 1.3 …", "vram_inference": "…", "mfu_default": 0.3 },
+  "scoring_dimensions": [ { "id": "compute_perf", "name_cn": "算力性能", "name_en": "Compute Performance", … } ]
+}</code></pre>
+  </div>
+</section>
+
+<!-- ═══════ 附录 ═══════ -->
+<section id="appendix">
+  <h2>📎 附录</h2>
+  <h3>常用 curl 示例</h3>
+  <pre><code># 搜索国产显存≥32GB 的芯片
+curl "http://localhost:8000/api/v1/chips?region=domestic&vram_min=32"
+
+# 查看 A100 完整画像（含评测/兼容/溯源）
+curl "http://localhost:8000/api/v1/chips/5"
+
+# 推理场景推荐 Qwen2.5-7B
+curl "http://localhost:8000/api/v1/chips/recommend?model=Qwen2.5-7B&scenario=inference"
+
+# 查询 H100 的兼容记录（含评测证据）
+curl "http://localhost:8000/api/v1/compat?chip=H100&has_benchmark=true"
+
+# 调用 AI 助手
+curl -N -X POST http://localhost:8000/api/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"训练 Qwen2.5-7B，3天完成，国产优先"}]}'
+</code></pre>
+  <h3>技术栈</h3>
+  <ul>
+    <li>后端：FastAPI + Uvicorn</li>
+    <li>数据库：SQLite（5 表，全部 TEXT 字段，无强约束）</li>
+    <li>交互式 API 调试：Scalar（<code>/docs</code>）</li>
+    <li>智能助手：DeepSeek API（默认 <code>deepseek-v4-flash</code>）</li>
+  </ul>
+</section>
+
+</main>
+</body>
+</html>
