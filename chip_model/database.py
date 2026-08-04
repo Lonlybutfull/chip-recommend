@@ -843,33 +843,55 @@ def search_compat(
             for chip_m, model_m in pairs:
                 key = f"{chip_m}|||{model_m}"
                 bm_rows = db.execute(
-                    "SELECT suite_name, source_type, source_url, evidence_level, "
-                    "confidence, test_date, throughput_tok_s, mfu_pct, precision, "
-                    "framework, batch_size, notes "
+                    "SELECT id, suite_name, workload_type, framework, precision, "
+                    "test_date, throughput_tok_s, mfu_pct, batch_size, notes "
                     "FROM chip_model_benchmarks "
                     "WHERE chip_model = ? AND model_id = ?",
                     [chip_m, model_m],
                 ).fetchall()
-                if bm_rows:
-                    bm_dicts = [dict(r) for r in bm_rows]
-                    sources = list({r["source_type"] for r in bm_dicts if r["source_type"]})
-                    source_urls = list({r["source_url"] for r in bm_dicts if r["source_url"]})
-                    evidence_levels = [r["evidence_level"] for r in bm_dicts if r["evidence_level"]]
-                    bm_evidence[key] = {
-                        "count": len(bm_dicts),
-                        "sources": sources[:10],
-                        "source_urls": source_urls[:5],
-                        "top_evidence": evidence_levels[0] if evidence_levels else None,
-                        "max_throughput_tok_s": max(
-                            (r["throughput_tok_s"] for r in bm_dicts if r.get("throughput_tok_s")),
-                            default=None,
-                        ),
-                        "max_mfu_pct": max(
-                            (r["mfu_pct"] for r in bm_dicts if r.get("mfu_pct")),
-                            default=None,
-                        ),
-                        "benchmarks": bm_dicts[:10],  # keep first 10 for detail view
-                    }
+                if not bm_rows:
+                    continue
+                bm_dicts = [dict(r) for r in bm_rows]
+                # Source metadata lives in field_provenance, keyed by benchmark row id
+                bm_ids = [str(r["id"]) for r in bm_rows]
+                prov_placeholders = ",".join("?" for _ in bm_ids)
+                prov_rows = db.execute(
+                    f"SELECT row_id, source_type, source_url, source_detail, confidence, is_official "
+                    f"FROM field_provenance "
+                    f"WHERE table_name='chip_model_benchmarks' AND row_id IN ({prov_placeholders})",
+                    bm_ids,
+                ).fetchall()
+                # Map benchmark id -> first provenance record, then enrich each benchmark row
+                bm_src: dict[str, dict] = {}
+                for pr in prov_rows:
+                    bm_src.setdefault(str(pr["row_id"]), dict(pr))
+                for b in bm_dicts:
+                    src = bm_src.get(str(b["id"]))
+                    if src:
+                        b["source_type"] = src.get("source_type")
+                        b["source_url"] = src.get("source_url")
+                        b["source_detail"] = src.get("source_detail")
+                        b["evidence_level"] = src.get("confidence")
+                        b["confidence"] = src.get("confidence")
+                        b["is_official"] = src.get("is_official")
+                sources = list({b["source_type"] for b in bm_dicts if b.get("source_type")})
+                source_urls = list({b["source_url"] for b in bm_dicts if b.get("source_url")})
+                evidence_levels = [b["evidence_level"] for b in bm_dicts if b.get("evidence_level")]
+                bm_evidence[key] = {
+                    "count": len(bm_dicts),
+                    "sources": sources[:10],
+                    "source_urls": source_urls[:5],
+                    "top_evidence": evidence_levels[0] if evidence_levels else None,
+                    "max_throughput_tok_s": max(
+                        (b["throughput_tok_s"] for b in bm_dicts if b.get("throughput_tok_s")),
+                        default=None,
+                    ),
+                    "max_mfu_pct": max(
+                        (b["mfu_pct"] for b in bm_dicts if b.get("mfu_pct")),
+                        default=None,
+                    ),
+                    "benchmarks": bm_dicts[:10],  # keep first 10 for detail view
+                }
 
         # ── Provenance enrichment ──
         summaries: dict[str, dict] = {}
