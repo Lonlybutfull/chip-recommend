@@ -986,32 +986,41 @@ async function openChipProfile(id){
     return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${label}</div><div class="group-body">${fields}</div></div>`:'';
   }).join('');
 
-  // Benchmarks section
+  // Benchmarks section — API returns grouped benchmark records
+  function pickPath(o, keys){for(const k of keys){if(o==null)return null;o=o[k]}return o}
   let bmHtml = '';
   if(data.benchmarks&&data.benchmarks.length){
     bmHtml = `<div class="group">
       <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">📊 评测数据 (${data.benchmarks.length})</div>
       <div class="group-body" style="grid-template-columns:1fr">
-        ${data.benchmarks.map(b=>`<div style="font-size:0.75rem;padding:6px;background:var(--bg3);border-radius:4px;margin:1px 0">
-          <b>${esc(b.model_id)}</b> · ${esc(b.workload_type)} · ${esc(b.suite_name)}<br>
-          <span style="color:var(--accent)">${b.throughput_tok_s?b.throughput_tok_s+' tok/s':''} ${b.mfu_pct?b.mfu_pct+'% MFU':''} ${b.memory_peak_mb?b.memory_peak_mb+'MB peak':''}</span>
-          ${b.test_date?`<span style="color:var(--text3)"> · ${esc(b.test_date)}</span>`:''}
-        </div>`).join('')}
+        ${data.benchmarks.map(b=>{
+          const bmId = pickPath(b,['identity','model_id'])||'?';
+          const meta = b.test_metadata||{}, inf = b.inference_metrics||{}, tr = b.training_metrics||{};
+          const perf = [inf.throughput_tok_s?inf.throughput_tok_s+' tok/s':'', tr.mfu_pct?tr.mfu_pct+'% MFU':'', inf.memory_peak_mb?inf.memory_peak_mb+'MB peak':''].filter(Boolean).join(' ');
+          return `<div style="font-size:0.75rem;padding:6px;background:var(--bg3);border-radius:4px;margin:1px 0">
+            <b>${esc(bmId)}</b> · ${esc(meta.workload_type||'')} · ${esc(meta.suite_name||'')}<br>
+            ${perf?`<span style="color:var(--accent)">${perf}</span>`:''}
+            ${meta.test_date?`<span style="color:var(--text3)"> · ${esc(meta.test_date)}</span>`:''}
+          </div>`;
+        }).join('')}
       </div></div>`;
   }
 
-  // Compat section
+  // Compat section — API returns grouped compatibility records
   let compHtml = '';
   if(data.compatibilities&&data.compatibilities.length){
     compHtml = `<div class="group">
       <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">🔗 兼容模型 (${data.compatibilities.length})</div>
       <div class="group-body" style="grid-template-columns:1fr">
-        ${data.compatibilities.map(c=>`<div style="font-size:0.75rem;padding:6px;background:var(--bg3);border-radius:4px;margin:1px 0">
-          <b>${esc(c.model_id)}</b> ·
-          <span style="color:${c.compat_status==='verified'?'var(--green)':'var(--orange)'}">${esc(c.compat_status)}</span>
-          · ${esc(c.framework||'')} · ${esc(c.precision||'')}
-          ${c.notes?`<br><span style="color:var(--text3)">${esc(c.notes)}</span>`:''}
-        </div>`).join('')}
+        ${data.compatibilities.map(c=>{
+          const idn = c.identity||{}, det = c.compat_details||{};
+          return `<div style="font-size:0.75rem;padding:6px;background:var(--bg3);border-radius:4px;margin:1px 0">
+            <b>${esc(idn.model_id)}</b> ·
+            <span style="color:${det.compat_status==='verified'?'var(--green)':'var(--orange)'}">${esc(det.compat_status)}</span>
+            · ${esc(det.framework||'')} · ${esc(det.precision||'')}
+            ${det.notes?`<br><span style="color:var(--text3)">${esc(det.notes)}</span>`:''}
+          </div>`;
+        }).join('')}
       </div></div>`;
   }
 
