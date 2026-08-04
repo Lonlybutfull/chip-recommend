@@ -63,7 +63,8 @@ main{max-width:1440px;margin:0 auto;padding:24px}
   outline:none;transition:var(--transition);
 }
 .filters input:focus,.filters select:focus{border-color:var(--accent)}
-.filters input{flex:1;min-width:160px}
+/* Note: autocomplete-wrapper owns flex:1 inside .filters — let it control width */
+.filters .autocomplete-wrapper{flex:1;min-width:160px}
 .filters select{min-width:100px}
 .filters .btn{
   background:var(--accent2);color:#fff;border:none;padding:8px 18px;
@@ -73,6 +74,27 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 .filters .btn:hover{background:var(--accent);transform:translateY(-1px)}
 .vram-slider{display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--text2)}
 .vram-slider input{width:80px;min-width:60px;text-align:center}
+
+/* ── Autocomplete dropdown ── */
+.autocomplete-wrapper{position:relative;flex:1;min-width:160px}
+.autocomplete-wrapper .ac-input{width:100%}
+.ac-dropdown{display:none;position:absolute;top:100%;left:0;right:0;z-index:500;
+  max-height:280px;overflow-y:auto;background:var(--bg2);border:1px solid var(--accent);
+  border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.5)}
+.ac-dropdown.open{display:block}
+.ac-item{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;
+  font-size:0.78rem;border-bottom:1px solid var(--bg4);transition:var(--transition)}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover,.ac-item.active{background:var(--bg3)}
+.ac-item .ac-name{font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-item .ac-meta{color:var(--text3);font-size:0.68rem;white-space:nowrap;flex-shrink:0}
+.ac-item .ac-tag{font-size:0.62rem;padding:1px 5px;border-radius:3px;flex-shrink:0}
+.ac-empty{padding:10px 14px;font-size:0.75rem;color:var(--text3);text-align:center}
+/* Selected tags (multi-pick for recommend) */
+.ac-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.ac-tag{display:inline-flex;align-items:center;gap:4px;background:var(--accent2);color:#fff;
+  padding:2px 8px;border-radius:4px;font-size:0.72rem;cursor:pointer}
+.ac-tag:hover{background:var(--red)}
 
 /* ── Cards grid ── */
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
@@ -228,6 +250,39 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 .score-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:3px}
 .scoring-dim{font-size:0.68rem;color:var(--text3);margin-top:6px;line-height:1.5}
 
+/* ── Agent Chat panel (tab) ── */
+.agent-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;height:calc(100vh - 140px);min-height:560px}
+@media(max-width:900px){.agent-layout{grid-template-columns:1fr}}
+.agent-chat-panel{display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);overflow:hidden}
+.agent-chat-header{padding:10px 16px;border-bottom:1px solid var(--bg4);font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.agent-chat-header .dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+#chat-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.chat-msg{max-width:85%;padding:8px 12px;border-radius:12px;font-size:0.8rem;line-height:1.5;word-break:break-word}
+.chat-msg.tool{background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);color:var(--blue);font-size:0.7rem;max-width:90%}
+.chat-msg.tool pre{font-size:0.65rem;max-height:120px;overflow:auto;margin:4px 0 0;padding:4px 6px;background:var(--bg2);border-radius:4px;white-space:pre-wrap}
+#chat-input-area{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--bg4);flex-shrink:0}
+#chat-input{flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--bg4);border-radius:20px;padding:8px 14px;font-size:0.82rem;outline:none}
+#chat-input:focus{border-color:var(--accent)}
+#chat-send{background:var(--accent2);color:#fff;border:none;border-radius:20px;padding:8px 18px;font-weight:600;cursor:pointer;font-size:0.82rem;transition:var(--transition)}
+#chat-send:hover{background:var(--accent)}
+#chat-send:disabled{opacity:0.5;cursor:default}
+.chat-typing{display:flex;gap:4px;padding:8px 12px}
+.chat-typing span{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:chatBounce 1.2s infinite}
+.chat-typing span:nth-child(2){animation-delay:0.2s}
+.chat-typing span:nth-child(3){animation-delay:0.4s}
+@keyframes chatBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+
+/* Agent quick-chips panel */
+.agent-quick-panel{background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);padding:16px;overflow-y:auto}
+.agent-quick-panel h3{font-size:0.85rem;margin-bottom:10px;color:var(--text2)}
+.quick-chip{display:block;width:100%;text-align:left;background:var(--bg3);border:1px solid var(--bg4);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;cursor:pointer;color:var(--text);font-size:0.78rem;transition:var(--transition)}
+.quick-chip:hover{background:var(--bg4);border-color:var(--accent)}
+.quick-chip .qc-title{font-weight:600;margin-bottom:2px}
+.quick-chip .qc-desc{color:var(--text3);font-size:0.68rem}
+.chat-msg.user{align-self:flex-end;background:var(--accent2);color:#fff;border-bottom-right-radius:4px}
+.chat-msg.assistant{align-self:flex-start;background:var(--bg3);color:var(--text);border-bottom-left-radius:4px}
+
 /* ── Status cards ── */
 .status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
 .stat-card{
@@ -279,8 +334,35 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 </header>
 
 <main>
+<!-- ═══ AGENT ═══ -->
+<section id="tab-agent" class="tab-panel active">
+  <div class="agent-layout">
+	<div class="agent-chat-panel">
+	  <div class="agent-chat-header"><span class="dot"></span> AI 芯片选型助手 · DeepSeek</div>
+	  <div id="chat-messages">
+		<div class="chat-msg assistant">你好！我是 AI 芯片选型助手 🤖<br>我可以帮你根据模型、场景和预算推荐最合适的芯片。<br><br>请告诉我你的需求，比如：<br>• 想训练/推理什么模型？<br>• 预算、功耗、时延有什么要求？<br>• 更偏好哪家厂商？</div>
+	  </div>
+	  <div id="chat-input-area">
+		<input type="text" id="chat-input" placeholder="输入你的需求…" onkeydown="if(event.key==='Enter')sendChat()">
+		<button id="chat-send" onclick="sendChat()">发送</button>
+	  </div>
+	</div>
+	<div class="agent-quick-panel" id="agent-quick-panel">
+	  <h3>💡 快捷提问</h3>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🔍 训练 Qwen2.5-7B，3天完成，国产优先</span><span class="qc-desc">推荐最适合的国产芯片方案</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🧠 推理 Llama-3-70B，需要什么配置？</span><span class="qc-desc">显存估算 + 芯片推荐</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">💰 预算有限，训练 7B 模型最便宜的方案</span><span class="qc-desc">性价比优先排序</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">📊 H100 和 昇腾910C 对比</span><span class="qc-desc">规格 + 性能 + 生态对比</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🖥️ 当前数据库中有多少芯片和模型？</span><span class="qc-desc">数据库概览统计</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🛠️ 你有哪些技能？列出所有skill</span><span class="qc-desc">查看项目安装的全部 skill</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🎯 我想训练 DeepSeek-R1 满血版，有什么方案？</span><span class="qc-desc">MoE大模型训练可行性分析</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">📈 国产芯片中，谁的单卡算力最强？</span><span class="qc-desc">国产芯片算力排行</span></button>
+	</div>
+  </div>
+</section>
+
 <!-- ═══ CHIPS ═══ -->
-<section id="tab-chips" class="tab-panel active">
+<section id="tab-chips" class="tab-panel">
   <div class="filters" id="chip-filters"></div>
   <div id="chip-summary" style="margin-bottom:8px"></div>
   <div id="chip-results" class="card-grid"></div>
@@ -334,78 +416,346 @@ function $(id){return document.getElementById(id)}
 function show(el,disp=''){el.style.display=disp}
 function hide(el){el.style.display='none'}
 
-/* ═══ Model multi-select ═══ */
-const SELECTED_MODELS = [];
-let MODEL_LIST = [];
+/* ═══ Chat Widget ═══ */
+const CHAT_HISTORY = []; // in-memory only, no history persistence
 
-async function loadModelList(){
-  const data = await fetchJSON(`${API}/models?limit=250`);
-  if(!data._error && data.models){
-    MODEL_LIST = data.models.map(m=>({
-      id: m.model_id || m.id || '',
-      author: m.author||'',
-      params: m.total_params_b||'?',
-      arch: m.architecture_family||'',
-      tag: m.pipeline_tag||'',
-      downloads: parseInt(m.downloads)||0,
-    })).filter(m=>m.id).sort((a,b)=>{
-      const pa=parseFloat(a.params)||0, pb=parseFloat(b.params)||0;
-      return pb-pa||(b.downloads||0)-(a.downloads||0);
+async function sendChat(){
+  const input=$('chat-input'), msg=input.value.trim();
+  if(!msg)return;
+  input.value='';
+  input.disabled=true;
+  $('chat-send').disabled=true;
+
+  // Show user message
+  appendChatMsg('user',msg);
+  CHAT_HISTORY.push({role:'user',content:msg});
+
+  // Show typing indicator
+  const typing=appendTyping();
+
+  try{
+    const resp=await fetch(`${API}/chat`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:CHAT_HISTORY})
     });
-  }
-}
+    if(!resp.ok){throw new Error(resp.status+': '+await resp.text())}
 
-function handleModelInput(e){
-  if(e.key==='Enter'){
-    e.preventDefault();
-    const input=$('rec-model-input'), val=(input.value||'').trim();
-    if(val && !SELECTED_MODELS.includes(val)){
-      SELECTED_MODELS.push(val);
-      renderModelTags();
+    let assistantText='';
+    let currentAssistantEl=null;
+
+    const reader=resp.body.getReader();
+    const decoder=new TextDecoder('utf-8');
+    let buffer='';
+
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      // Use stream:true so incomplete multi-byte characters at chunk boundary
+      // are held back and completed by the next chunk
+      buffer += decoder.decode(value, {stream: !done});
+      const lines=buffer.split('\n');
+      buffer=(done ? '' : lines.pop())||'';
+
+      for(const line of lines){
+        if(!line.startsWith('data: '))continue;
+        const data=line.slice(6).trim();
+        if(data==='[DONE]')break;
+        try{
+          const d=JSON.parse(data);
+          if(d.type==='text'){
+            assistantText+=d.content;
+            if(!currentAssistantEl){
+              typing.remove();
+              currentAssistantEl=appendChatMsg('assistant','');
+            }
+            currentAssistantEl.innerHTML=renderMarkdown(assistantText);
+            $('chat-messages').scrollTop=$('chat-messages').scrollHeight;
+          }else if(d.type==='tool_call'){
+            // Skip — tool process is invisible to user
+          }else if(d.type==='tool_start'){
+            // Skip — tool process is invisible to user
+          }else if(d.type==='tool_result'){
+            // Skip — tool process is invisible to user
+          }
+        }catch(e){}
+      }
     }
-    input.value='';
-    hide($('model-suggestions'));
-  }else if(e.key==='Backspace' && !$('rec-model-input').value && SELECTED_MODELS.length){
-    SELECTED_MODELS.pop();
-    renderModelTags();
+
+    // Cleanup on completion
+    if(assistantText){
+      // Final sanitize pass: remove any XML tags that slipped through
+      assistantText = assistantText.replace(/<[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*\/?\s*>/gi,'');
+      // Also remove full <tag>...</tag> blocks that might have snuck in
+      assistantText = assistantText.replace(/<[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>[\s\S]*?<\/[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>/gi,'');
+      CHAT_HISTORY.push({role:'assistant',content:assistantText});
+    }
+  }catch(e){
+    typing.remove();
+    appendChatMsg('assistant','抱歉，请求出错了: '+esc(e.message));
   }
+
+  input.disabled=false;
+  $('chat-send').disabled=false;
+  input.focus();
 }
 
-function renderModelTags(){
-  $('model-tags').innerHTML = SELECTED_MODELS.map((m,i)=>`<span style=\"background:var(--accent2);color:#fff;padding:2px 8px;border-radius:4px;font-size:0.73rem;display:flex;align-items:center;gap:4px;cursor:pointer\" onclick=\"SELECTED_MODELS.splice(${i},1);renderModelTags()\">${esc(m)} ✕</span>`).join('');
-  $('rec-model').value = SELECTED_MODELS.join(',');
+function appendChatMsg(role,content){
+  const msgs=$('chat-messages');
+  const el=document.createElement('div');
+  el.className='chat-msg '+role;
+  el.innerHTML=content;
+  msgs.appendChild(el);
+  msgs.scrollTop=msgs.scrollHeight;
+  return el;
 }
 
-function suggestModels(){
-  const input=$('rec-model-input'), q=(input.value||'').toLowerCase().trim();
-  const sug=$('model-suggestions');
-  if(!q || q.length<2){hide(sug);return}
-  const matches = MODEL_LIST.filter(m=>
-    m.id.toLowerCase().includes(q) || m.author.toLowerCase().includes(q)
-  ).slice(0,15);
-  if(!matches.length){hide(sug);return}
-  sug.innerHTML = matches.map(m=>{
-    const mid = esc(m.id);
-    const safeId = mid.replace(/'/g, "\\'");
-    return `<div style="padding:6px 10px;cursor:pointer;font-size:0.78rem;border-bottom:1px solid var(--bg4)" onmousedown="event.preventDefault();addModel('${safeId}')" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">${mid} <span style="color:var(--text3);font-size:0.68rem">${esc(m.params)}B ${esc(m.arch)}</span></div>`;
-  }).join('');
-  show(sug,'block');
-}
-function addModel(id){
-  if(!SELECTED_MODELS.includes(id)){
-    SELECTED_MODELS.push(id);
-    renderModelTags();
-  }
-  $('rec-model-input').value='';
-  hide($('model-suggestions'));
+function appendTyping(){
+  const msgs=$('chat-messages');
+  const el=document.createElement('div');
+  el.className='chat-typing';
+  el.innerHTML='<span></span><span></span><span></span>';
+  msgs.appendChild(el);
+  msgs.scrollTop=msgs.scrollHeight;
+  return el;
 }
 
-// Close suggestions on click outside
-document.addEventListener('click',e=>{
-  if(!e.target.closest('#model-suggestions') && !e.target.closest('#rec-model-input')){
-    hide($('model-suggestions'));
+function renderMarkdown(text){
+  // Safety net: strip all XML/DSML tool-call tags and their content
+  // Matches <function_calls>, <DSML|function_calls>, <invoke>, <parameter>, <tool_calls> etc.
+  let html=text.replace(/<[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>[\s\S]*?<\/[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>/gi,'');
+  html=html.replace(/<\/?[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*\/?>/gi,'');
+
+  // STRIP <__SYS-... and other hallucinated OpenAI tool call markers
+  html=html.replace(/<\s*__+[a-zA-Z_][^>]*\/?\s*>/g,'');
+
+  html=esc(html);
+  html=html.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  html=html.replace(/\*(.+?)\*/g,'<i>$1</i>');
+  html=html.replace(/`(.+?)`/g,'<code>$1</code>');
+  html=html.replace(/\\n/g,'<br>');
+  html=html.replace(/\n/g,'<br>');
+  return html;
+}
+
+/* ═══ Generic Autocomplete (used by chip/model search + recommend) ═══ */
+let CHIP_LIST = [];   // { id, name, vendor, type, arch, vram, ... }
+let MODEL_LIST = [];  // { id, author, params, arch, tag, downloads }
+
+async function ensureChipList(){
+  if(CHIP_LIST.length) return;
+  // Load all chips in fewer, larger requests
+  const BATCH = 1000;
+  let allChips = [];
+  for(let off=0; off<2000; off+=BATCH){
+    try {
+      const data = await fetchJSON(`${API}/chips?limit=${BATCH}&offset=${off}&tier=all`);
+      if(data._error || !data.chips || !data.chips.length) break;
+      allChips = allChips.concat(data.chips);
+      if(data.chips.length < BATCH) break; // last page
+    } catch(e) { break; }
   }
+  CHIP_LIST = allChips.map(c=>({
+    id: c.id, name: c.chip_model||'', vendor: c.vendor_display||'',
+    type: c.chip_type||'', arch: c.architecture||'', vram: c.vram_gb||'',
+    tier: '',
+  })).filter(c=>c.name).sort((a,b)=>a.name.localeCompare(b.name));
+}
+
+async function ensureModelList(){
+  if(MODEL_LIST.length) return;
+  let allModels = [];
+  const BATCH = 2000; // API now allows 2000
+  for(let off=0; off<2000; off+=BATCH){
+    try {
+      const data = await fetchJSON(`${API}/models?limit=${BATCH}&offset=${off}`);
+      if(data._error || !data.models || !data.models.length) break;
+      allModels = allModels.concat(data.models);
+      if(data.models.length < BATCH) break;
+    } catch(e) { break; }
+  }
+  MODEL_LIST = allModels.map(m=>({
+    id: m.model_id||m.id||'', author: m.author||'',
+    params: m.total_params_b||'?', arch: m.architecture_family||'',
+    tag: m.pipeline_tag||'', downloads: parseInt(m.downloads)||0,
+  })).filter(m=>m.id).sort((a,b)=>{
+    const pa=parseFloat(a.params)||0, pb=parseFloat(b.params)||0;
+    return pb-pa||(b.downloads||0)-(a.downloads||0);
+  });
+}
+
+/**
+ * Attach autocomplete behaviour to any text input.
+ * @param inputId       id of the <input>
+ * @param dropdownId    id of the <div> that holds .ac-item children
+ * @param source        'chips' | 'models' (which list to search)
+ * @param onPick(id)    called when user clicks/enters an item
+ * @param multi         if true, clear input after pick & keep dropdown open
+ * @param getPickName   optional — override display name for chip list (default name)
+ */
+function initAutocomplete(inputId, dropdownId, source, onPick, multi=false, getPickName=null){
+  const inp = $(inputId), dd = $(dropdownId);
+  let activeIdx = -1, lastQuery = '';
+
+  // Store onPick on the input element so pickAcItem can call it
+  inp._acOnPick = onPick;
+  inp._acMulti = multi;
+
+  function items(){ return dd.querySelectorAll('.ac-item'); }
+
+  async function suggest(){
+    const q = (inp.value||'').toLowerCase().trim();
+    if(q === lastQuery) return;
+    lastQuery = q;
+    activeIdx = -1;
+    if(!q || q.length < 1){ dd.classList.remove('open'); return; }
+
+    let matches;
+    if(source==='chips'){
+      await ensureChipList();
+      matches = CHIP_LIST.filter(c=>
+        c.name.toLowerCase().includes(q) || c.vendor.toLowerCase().includes(q) || c.arch.toLowerCase().includes(q)
+      ).slice(0,15);
+    } else {
+      await ensureModelList();
+      matches = MODEL_LIST.filter(m=>
+        m.id.toLowerCase().includes(q) || m.author.toLowerCase().includes(q)
+      ).slice(0,15);
+    }
+
+    if(!matches.length){ dd.classList.remove('open'); return; }
+
+    dd.innerHTML = matches.map((m,i)=>{
+      let name = source==='chips' ? (getPickName?getPickName(m):m.name) : m.id;
+      let meta = source==='chips'
+        ? `${esc(m.vendor)} · ${esc(m.type||'')} · VRAM ${m.vram||'?'}GB`
+        : `${esc(m.params)}B ${esc(m.arch||'')} · ${esc((m.downloads||0)>1e6?(m.downloads/1e6).toFixed(1)+'M':(m.downloads||0)>1e3?(m.downloads/1e3).toFixed(1)+'K':m.downloads)}↓`;
+      let tag = source==='chips'
+        ? (m.tier==='datacenter'?`<span class="ac-tag" style="background:rgba(129,140,248,0.15);color:var(--accent)">数据中心</span>`:'')
+        : (m.tag?`<span class="ac-tag" style="background:rgba(96,165,250,0.12);color:var(--blue)">${esc(m.tag)}</span>`:'');
+      // Use chip name (not numeric id) for the pick value
+      let pickValue = source==='chips' ? name : m.id;
+      return `<div class="ac-item" data-idx="${i}" data-name="${esc(pickValue)}">
+        <span class="ac-name">${esc(name)}</span>${tag}<span class="ac-meta">${meta}</span>
+      </div>`;
+    }).join('');
+    dd.classList.add('open');
+  }
+
+  // keyboard navigation
+  inp.addEventListener('keydown', async function(e){
+    const all = items();
+    if(e.key==='ArrowDown'){
+      e.preventDefault();
+      if(!all.length){ await suggest(); return; }
+      activeIdx = Math.min(activeIdx+1, all.length-1);
+      all.forEach(el=>el.classList.remove('active'));
+      if(all[activeIdx]) {
+        all[activeIdx].classList.add('active');
+        all[activeIdx].scrollIntoView({block:'nearest'});
+      }
+    } else if(e.key==='ArrowUp'){
+      e.preventDefault();
+      activeIdx = Math.max(activeIdx-1, 0);
+      all.forEach(el=>el.classList.remove('active'));
+      if(all[activeIdx]) all[activeIdx].classList.add('active');
+    } else if(e.key==='Enter'){
+      e.preventDefault();
+      if(activeIdx>=0 && all[activeIdx]){
+        const name = all[activeIdx].dataset.name;
+        activeIdx = -1;
+        if(!multi) inp.value = name;          // update input so _wireEnterFallback sees the picked value
+        inp._acPickFired = true;              // suppress duplicate blur/Enter fires
+        setTimeout(() => { if(inp) inp._acPickFired = false; }, 300);
+        onPick(name);
+        if(!multi) dd.classList.remove('open');
+      } else {
+        dd.classList.remove('open');
+        activeIdx = -1;
+      }
+    } else if(e.key==='Escape'){
+      dd.classList.remove('open');
+      activeIdx = -1;
+    }
+  });
+
+  inp.addEventListener('input', suggest);
+  inp.addEventListener('focus', suggest);
+
+  // Close on click outside
+  document.addEventListener('click', e=>{
+    if(!e.target.closest(`#${dropdownId}`) && !e.target.closest(`#${inputId}`)){
+      dd.classList.remove('open'); activeIdx = -1;
+    }
+  });
+}
+
+/* Global delegated mousedown on all .ac-dropdown children */
+document.addEventListener('mousedown', function(e){
+  const item = e.target.closest('.ac-item');
+  if(!item) return;
+  const dd = item.closest('.ac-dropdown');
+  if(!dd) return;
+  e.preventDefault();
+  const name = item.dataset.name;
+  const wrapper = dd.closest('.autocomplete-wrapper');
+  const inp = wrapper ? wrapper.querySelector('.ac-input') : null;
+  if(!inp || !name) return;
+  // Call the stored onPick callback
+  if(inp._acOnPick) {
+    inp._acOnPick(name);
+    if(!inp._acMulti) inp.value = name;
+  } else {
+    inp.value = name;
+  }
+  dd.classList.remove('open');
+  inp._acPickFired = true;
+  setTimeout(() => { if(inp) inp._acPickFired = false; }, 300);
 });
+
+/**
+ * Wire the onPick callback to fire on both:
+ * - Keyboard Enter with dropdown item selected (handled in initAutocomplete keydown)
+ * - Mouse click on dropdown item (pickAcItem + acPickFired flag)
+ */
+function _wireEnterFallback(inputId, onPick, multi){
+  const inp = $(inputId);
+  if(!inp) return;
+  inp.addEventListener('keydown', function(e){
+    if(e.key==='Enter'){
+      // If dropdown was just clicked (acPickFired), let the click do its thing
+      if(inp._acPickFired){ inp._acPickFired = false; return; }
+      // If dropdown is open and has a selection, the initAutocomplete Enter handler runs first
+      // This handler runs AFTER, so check if dropdown is still open
+      const dd = inp.closest('.autocomplete-wrapper')?.querySelector('.ac-dropdown');
+      if(dd && dd.classList.contains('open')) return; // initAutocomplete handler will handle it
+      // No dropdown open — user just pressed Enter in the input
+      const val = inp.value.trim();
+      if(val) {
+        inp._acPickFired = true;              // suppress duplicate blur fire
+        setTimeout(() => { if(inp) inp._acPickFired = false; }, 300);
+        onPick(val);
+      }
+    }
+  });
+  // ── Focus/blur based change detection ──
+  // Only fire onPick on blur when the user actually modified the text,
+  // not on every navigation (tab switch, card click, etc.).
+  let _focusVal = '';
+  inp.addEventListener('focus', function(){
+    _focusVal = inp.value;
+  });
+  // Fire onPick on blur if user typed a value manually and left the field
+  inp.addEventListener('blur', function(){
+    setTimeout(() => {
+      const dd2 = inp.closest('.autocomplete-wrapper')?.querySelector('.ac-dropdown');
+      if(dd2 && dd2.classList.contains('open')) return; // dropdown still open, mousedown will fire
+      if(inp._acPickFired) return; // already handled by pick
+      const val = inp.value.trim();
+      if(val && val !== _focusVal) onPick(val);
+    }, 150);
+  });
+}
 
 function esc(s){
   if(!s&&s!==0)return'';
@@ -437,6 +787,7 @@ function regionBadge(region){
 
 /* ═══════════════════ TABS ═══════════════════ */
 const TABS = [
+  {id:'agent',label:'💬 智能助手',action:()=>{$('chat-input').focus()}},
   {id:'chips',label:'🔍 芯片搜索',action:()=>searchChipsInit()},
   {id:'models',label:'🧠 模型搜索',action:()=>searchModelsInit()},
   {id:'recommend',label:'🎯 算力推荐',action:()=>initRecommend()},
@@ -468,7 +819,10 @@ async function searchChipsInit(){
     ? `<select id="chip-vendor"><option value="">全部厂商</option>${STATE.vendors.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select>`
     : '';
   $('chip-filters').innerHTML = `
-    <input type="text" id="chip-search" placeholder="搜索芯片… (名称/厂商/架构)" onkeydown="if(event.key==='Enter')searchChips()">
+    <div class="autocomplete-wrapper" style="flex:1;min-width:160px">
+      <input type="text" id="chip-search" class="ac-input" placeholder="搜索芯片… (名称/厂商/架构)" autocomplete="off">
+      <div class="ac-dropdown" id="chip-ac-dropdown"></div>
+    </div>
     ${vendorOptions}
     <select id="chip-region"><option value="">全部地区</option><option value="domestic">国产</option><option value="foreign">海外</option></select>
     <select id="chip-usage"><option value="">全部用途</option><option value="train">训练</option><option value="inference">推理</option><option value="both">训推一体</option></select>
@@ -485,10 +839,55 @@ async function searchChipsInit(){
       return;
     }
   }
+
+  // Autocomplete: pick → search immediately; Enter on empty → search current value
+  initAutocomplete('chip-search', 'chip-ac-dropdown', 'chips', (name)=>{
+    $('chip-search').value = name;
+    searchChips();
+  });
+  _wireEnterFallback('chip-search', (name)=>{ searchChips(); });
+  try {
+    await fetchJSON(`${API}/chips?limit=200`, {});
+  } catch(e) {}
+  ensureChipList(); // fire-and-forget: preload autocomplete list in background
   searchChips();
 }
 
+/* ── Pagination ── */
+const CHIP_PAGE_STATE = { page: 1, limit: 18, params: '', count: 0 };
+const MODEL_PAGE_STATE = { page: 1, limit: 18, params: '', count: 0 };
+const COMPAT_PAGE_STATE = { page: 1, limit: 10, params: '', count: 0 };
+let _pager_click = false; // flag: avoid resetting page when pager clicks
+
+function searchByState(){
+  // Dispatch based on which panel is visible
+  _pager_click = true;
+  const tab = document.querySelector('.tab-panel.active');
+  if(tab && tab.id === 'tab-models') { searchModels(); }
+  else if(tab && tab.id === 'tab-compat') { searchCompat(); }
+  else { searchChips(); }
+}
+
+function buildPager(cur, limit, total, stateVar){
+  if(total <= limit) return '';
+  var totalPages = Math.ceil(total / limit);
+  var pages = [];
+  for(var i=1; i<=totalPages; i++){
+    if(i===1 || i===totalPages || (i>=cur-2 && i<=cur+2)) pages.push(i);
+    else if(pages[pages.length-1]!=='...') pages.push('...');
+  }
+  return '<div class="pager" style="display:flex;justify-content:center;align-items:center;gap:4px;margin-top:16px;flex-wrap:wrap">'+
+    '<button class="btn pager-btn" style="min-width:32px;padding:4px 8px" '+(cur<=1?'disabled':'')+' onclick="'+stateVar+'='+1+';searchByState()">«</button>'+
+    '<button class="btn pager-btn" style="min-width:32px;padding:4px 8px" '+(cur<=1?'disabled':'')+' onclick="'+stateVar+'='+(cur-1)+';searchByState()">‹</button>'+
+    pages.map(function(p){return p==='...'?'<span style="padding:4px 8px;color:var(--text3)">...</span>':'<button class="btn pager-btn '+(p===cur?'active':'')+'" style="min-width:32px;padding:4px 8px;'+(p===cur?'background:var(--accent2);color:#fff;font-weight:700':'')+'" onclick="'+stateVar+'='+p+';searchByState()">'+p+'</button>';}).join('')+
+    '<button class="btn pager-btn" style="min-width:32px;padding:4px 8px" '+(cur>=totalPages?'disabled':'')+' onclick="'+stateVar+'='+(cur+1)+';searchByState()">›</button>'+
+    '<button class="btn pager-btn" style="min-width:32px;padding:4px 8px" '+(cur>=totalPages?'disabled':'')+' onclick="'+stateVar+'='+totalPages+';searchByState()">»</button>'+
+  '</div>';
+}
+
 async function searchChips(){
+  if(!_pager_click){CHIP_PAGE_STATE.page=1;}
+  _pager_click = false;
   const loading=$('chip-loading'), results=$('chip-results'), sum=$('chip-summary');
   show(loading);results.innerHTML='';sum.textContent='';
 
@@ -499,13 +898,16 @@ async function searchChips(){
   const u=($('chip-usage')||{}).value; if(u)params.set('usage',u);
   const vm=($('chip-vram-min')||{}).value; if(vm)params.set('vram_min',vm);
   const mm=($('chip-maturity')||{}).value; if(mm)params.set('min_maturity',mm);
-  params.set('limit','60');
+  params.set('limit', String(CHIP_PAGE_STATE.limit));
+  params.set('offset', String((CHIP_PAGE_STATE.page - 1) * CHIP_PAGE_STATE.limit));
 
   const data = await fetchJSON(`${API}/chips?${params}`);
   hide(loading);
   if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
 
-  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 个芯片</span>`;
+  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 个芯片`+
+    (data.count > CHIP_PAGE_STATE.limit ? ` · 第 <b>${CHIP_PAGE_STATE.page}</b> / <b>${Math.ceil(data.count/CHIP_PAGE_STATE.limit)}</b> 页` : '')+
+    `</span>`;
   if(!data.chips||!data.chips.length){results.innerHTML='<div class="empty">未找到匹配的芯片</div>';return}
 
   results.innerHTML = data.chips.map(c=>{
@@ -538,6 +940,8 @@ async function searchChips(){
       </div>`:''}
     </div>
   `}).join('');
+
+  results.innerHTML += buildPager(CHIP_PAGE_STATE.page, CHIP_PAGE_STATE.limit, data.count, 'CHIP_PAGE_STATE.page');
 }
 
 /* ── Chip detail ── */
@@ -627,16 +1031,26 @@ function closeDetail(){$('detail-overlay').classList.remove('open')}
 /* ═══════════════════ MODEL SEARCH ═══════════════════ */
 async function searchModelsInit(){
   $('model-filters').innerHTML = `
-    <input type="text" id="model-search" placeholder="搜索模型… (名称/作者)" onkeydown="if(event.key==='Enter')searchModels()">
+    <div class="autocomplete-wrapper" style="flex:1;min-width:160px">
+      <input type="text" id="model-search" class="ac-input" placeholder="搜索模型… (名称/作者)" autocomplete="off">
+      <div class="ac-dropdown" id="model-ac-dropdown"></div>
+    </div>
     <select id="model-arch"><option value="">全部架构</option><option value="dense">Dense</option><option value="moe">MoE</option></select>
     <div class="vram-slider">参数量<label>≥<input type="number" id="model-params-min" placeholder="0" min="0" step="1">B</label></div>
     <input type="text" id="model-for-chip" placeholder="按芯片反查…" style="max-width:180px">
     <button class="btn" onclick="searchModels()">搜索</button>
   `;
+  initAutocomplete('model-search', 'model-ac-dropdown', 'models', (name)=>{
+    $('model-search').value = name;
+    searchModels();
+  });
+  _wireEnterFallback('model-search', (name)=>{ searchModels(); });
   searchModels();
 }
 
 async function searchModels(){
+  if(!_pager_click){MODEL_PAGE_STATE.page=1;}
+  _pager_click = false;
   const loading=$('model-loading'), results=$('model-results'), sum=$('model-summary');
   show(loading);results.innerHTML='';sum.textContent='';
 
@@ -645,13 +1059,16 @@ async function searchModels(){
   const a=($('model-arch')||{}).value; if(a)params.set('architecture',a);
   const pm=($('model-params-min')||{}).value; if(pm)params.set('params_min',pm);
   const fc=($('model-for-chip')||{}).value; if(fc&&fc.trim())params.set('for_chip',fc.trim());
-  params.set('limit','50');
+  params.set('limit', String(MODEL_PAGE_STATE.limit));
+  params.set('offset', String((MODEL_PAGE_STATE.page - 1) * MODEL_PAGE_STATE.limit));
 
   const data = await fetchJSON(`${API}/models?${params}`);
   hide(loading);
   if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
 
-  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 个模型</span>`;
+  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 个模型`+
+    (data.count > MODEL_PAGE_STATE.limit ? ` · 第 <b>${MODEL_PAGE_STATE.page}</b> / <b>${Math.ceil(data.count/MODEL_PAGE_STATE.limit)}</b> 页` : '')+
+    `</span>`;
   if(!data.models||!data.models.length){results.innerHTML='<div class="empty">未找到匹配的模型</div>';return}
 
   results.innerHTML = data.models.map(m=>`
@@ -670,6 +1087,8 @@ async function searchModels(){
       </div>
     </div>
   `).join('');
+
+  results.innerHTML += buildPager(MODEL_PAGE_STATE.page, MODEL_PAGE_STATE.limit, data.count, 'MODEL_PAGE_STATE.page');
 }
 
 async function openModelProfile(id){
@@ -756,15 +1175,20 @@ function renderFieldProvenance(fp) {
 }
 
 /* ═══════════════════ RECOMMEND ═══════════════════ */
+let REC_SELECTED_MODELS = [];
+
 function initRecommend(){
   STATE.vendors = STATE.vendors || [];
-  loadModelList(); // Preload model list for suggestions
+  ensureModelList(); // Preload model list for suggestions
+  REC_SELECTED_MODELS = [];
   $('rec-form').innerHTML = `
     <div class="recommend-form">
-      <div class="form-group" style="grid-column:1/-1"><label>模型名称 * (多选，逗号分隔或逐个回车添加)</label>
-        <div id="model-tags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px"></div>
-        <input type="text" id="rec-model-input" placeholder="输入模型名模糊搜索… (如 Qwen2.5-7B)" onkeydown="handleModelInput(event)" oninput="suggestModels()" autocomplete="off">
-        <div id="model-suggestions" style="display:none;max-height:200px;overflow-y:auto;background:var(--bg3);border:1px solid var(--bg4);border-radius:4px;margin-top:2px"></div>
+      <div class="form-group" style="grid-column:1/-1"><label>模型名称 * (多选，输入搜索 + 点击/回车选中，Backspace删除)</label>
+        <div id="model-tags" class="ac-tags"></div>
+        <div class="autocomplete-wrapper" style="flex:1;min-width:160px">
+          <input type="text" id="rec-model-input" class="ac-input" placeholder="输入模型名模糊搜索… (如 Qwen2.5-7B)" autocomplete="off">
+          <div class="ac-dropdown" id="rec-model-ac-dropdown"></div>
+        </div>
         <input type="hidden" id="rec-model" value="">
       </div>
       <div class="form-group"><label>场景</label><select id="rec-scenario"><option value="train">训练</option><option value="inference">推理</option></select></div>
@@ -780,6 +1204,30 @@ function initRecommend(){
       <div class="form-actions"><button class="btn" onclick="runRecommend()">🎯 推荐芯片方案</button></div>
     </div>
   `;
+
+  // Multi-select autocomplete for models
+  initAutocomplete('rec-model-input', 'rec-model-ac-dropdown', 'models', (name)=>{
+    if(!REC_SELECTED_MODELS.includes(name)){
+      REC_SELECTED_MODELS.push(name);
+      renderRecModelTags();
+    }
+    $('rec-model-input').value = '';
+  }, true); // multi=true: keep dropdown open after pick
+
+  // Backspace on empty input → remove last tag
+  $('rec-model-input').addEventListener('keydown', function(e){
+    if(e.key==='Backspace' && !this.value && REC_SELECTED_MODELS.length){
+      REC_SELECTED_MODELS.pop();
+      renderRecModelTags();
+    }
+  });
+}
+
+function renderRecModelTags(){
+  const tagsEl = document.querySelector('#model-tags');
+  if(!tagsEl) return;
+  tagsEl.innerHTML = REC_SELECTED_MODELS.map((m,i)=>`<span class="ac-tag" onclick="REC_SELECTED_MODELS.splice(${i},1);renderRecModelTags()">${esc(m)} ✕</span>`).join('');
+  $('rec-model').value = REC_SELECTED_MODELS.join(',');
 }
 
 async function runRecommend(){
@@ -801,7 +1249,7 @@ async function runRecommend(){
   const mm=$('rec-maturity').value;if(mm)params.set('min_maturity',mm);
   if($('rec-domestic').classList.contains('on'))params.set('prefer_domestic','true');
   const pv=$('rec-vendor').value;if(pv)params.set('prefer_vendor',pv);
-  params.set('limit','6');params.set('tier','datacenter');
+  params.set('limit','20');params.set('tier','datacenter');
 
   const data = await fetchJSON(`${API}/chips/recommend?${params}`);
   hide(loading);
@@ -913,15 +1361,37 @@ async function showMethodology() {
 /* ═══════════════════ COMPAT ═══════════════════ */
 async function searchCompatInit(){
   $('compat-filters').innerHTML = `
-    <input type="text" id="compat-chip" placeholder="芯片名称…" onkeydown="if(event.key==='Enter')searchCompat()">
-    <input type="text" id="compat-model" placeholder="模型名称…">
+    <div class="autocomplete-wrapper" style="flex:1;min-width:160px">
+      <input type="text" id="compat-chip" class="ac-input" placeholder="芯片名称…" autocomplete="off">
+      <div class="ac-dropdown" id="compat-chip-dropdown"></div>
+    </div>
+    <div class="autocomplete-wrapper" style="flex:1;min-width:160px">
+      <input type="text" id="compat-model" class="ac-input" placeholder="模型名称…" autocomplete="off">
+      <div class="ac-dropdown" id="compat-model-dropdown"></div>
+    </div>
     <select id="compat-status"><option value="">全部状态</option><option value="verified">verified</option><option value="vendor_claimed">vendor_claimed</option><option value="community">community</option></select>
+    <div class="toggle-row" title="只显示有 benchmark 实测数据的兼容记录"><div class="toggle" id="compat-has-bench" onclick="this.classList.toggle('on');searchCompat()"></div><label>有实测</label></div>
     <button class="btn" onclick="searchCompat()">搜索</button>
   `;
+  // Autocomplete: chip name — use chip_model name (NOT numeric id)
+  initAutocomplete('compat-chip', 'compat-chip-dropdown', 'chips', (name)=>{
+    $('compat-chip').value = name;
+    searchCompat();
+  });
+  _wireEnterFallback('compat-chip', (name)=>{ searchCompat(); });
+  // Autocomplete: model name
+  initAutocomplete('compat-model', 'compat-model-dropdown', 'models', (name)=>{
+    $('compat-model').value = name;
+    searchCompat();
+  });
+  // Also Enter fallback for compat model input
+  _wireEnterFallback('compat-model', (name)=>{ searchCompat(); });
   searchCompat();
 }
 
 async function searchCompat(){
+  if(!_pager_click){COMPAT_PAGE_STATE.page=1;}
+  _pager_click = false;
   const loading=$('compat-loading'), results=$('compat-results'), sum=$('compat-summary');
   show(loading);results.innerHTML='';sum.textContent='';
 
@@ -929,36 +1399,128 @@ async function searchCompat(){
   const chip=($('compat-chip')||{}).value;if(chip&&chip.trim())params.set('chip',chip.trim());
   const model=($('compat-model')||{}).value;if(model&&model.trim())params.set('model',model.trim());
   const st=($('compat-status')||{}).value;if(st)params.set('status',st);
-  params.set('limit','50');
+  if($('compat-has-bench').classList.contains('on')) params.set('has_benchmark','true');
+  params.set('limit', String(COMPAT_PAGE_STATE.limit));
+  params.set('offset', String((COMPAT_PAGE_STATE.page - 1) * COMPAT_PAGE_STATE.limit));
 
   const data = await fetchJSON(`${API}/compat?${params}`);
   hide(loading);
   if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
 
-  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 条兼容记录</span>`;
+  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 条兼容记录`+
+    (data.count > COMPAT_PAGE_STATE.limit ? ` · 第 <b>${COMPAT_PAGE_STATE.page}</b> / <b>${Math.ceil(data.count/COMPAT_PAGE_STATE.limit)}</b> 页` : '')+
+    `</span>`;
   if(!data.compatibilities||!data.compatibilities.length){results.innerHTML='<div class="empty">未找到匹配的兼容记录</div>';return}
 
-  results.innerHTML = data.compatibilities.map(c=>{
-    const iden = c.identity || c;
-    const det = c.compat_details || c;
-    return `
-    <div style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius-sm);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <div>
-        <div style="font-weight:600;font-size:0.85rem">${esc(iden.chip_model)} ↔ ${esc(iden.model_id)}</div>
-        <div style="font-size:0.73rem;color:var(--text2);margin-top:2px">
-          ${esc(det.framework||'')} · ${esc(det.precision||'')}
-          ${det.notes?`<br>${esc(det.notes)}`:''}
-          ${det.verified_at?`<br><span style="color:var(--text3)">验证于: ${esc(det.verified_at)}</span>`:''}
-        </div>
-      </div>
-      <span style="font-size:0.75rem;padding:4px 10px;border-radius:4px;font-weight:600;
-        background:${det.compat_status==='verified'?'rgba(52,211,153,0.15)':det.compat_status==='vendor_claimed'?'rgba(251,146,60,0.15)':'rgba(96,165,250,0.15)'};
-        color:${det.compat_status==='verified'?'var(--green)':det.compat_status==='vendor_claimed'?'var(--orange)':'var(--blue)'}">
-        ${esc(det.compat_status)}
-      </span>
-    </div>
-  `;
+  results.innerHTML = data.compatibilities.map((c,i)=>renderCompatCard(c,i)).join('');
+  results.innerHTML += buildPager(COMPAT_PAGE_STATE.page, COMPAT_PAGE_STATE.limit, data.count, 'COMPAT_PAGE_STATE.page');
+
+  // Add delegated click handlers for expand/collapse
+  setTimeout(function(){
+    document.querySelectorAll('[id^="compat-title-"]').forEach(function(el){
+      el.onclick = function(){
+        var detailId = el.id.replace('compat-title-','compat-detail-');
+        var detail = document.getElementById(detailId);
+        if(detail) detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+      };
+    });
+  }, 50);
+}
+
+function renderCompatCard(c, idx){
+  var iden = c.identity || c;
+  var det = c.compat_details || c;
+  var ev = c.benchmark_evidence || {};
+  var hasBench = ev.count > 0;
+
+  function evBadge(el){
+    if(!el) return '';
+    var colors = {
+      official_benchmark: 'rgba(52,211,153,0.15);color:var(--green)',
+      peer_reviewed: 'rgba(129,140,248,0.15);color:var(--accent)',
+      open_audited_benchmark: 'rgba(96,165,250,0.15);color:var(--blue)',
+      community_parsed: 'rgba(251,146,60,0.15);color:var(--orange)',
+      internal_test: 'rgba(192,132,252,0.15);color:var(--purple)',
+    };
+    var style = colors[el] || 'rgba(107,114,128,0.12);color:var(--text2)';
+    return '<span style="font-size:0.62rem;padding:1px 5px;border-radius:3px;margin-left:4px;'+style+'">'+esc(el)+'</span>';
+  }
+
+  var srcLinks = (ev.source_urls||[]).map(function(u){
+    var short = u.length > 50 ? u.slice(0,50)+'…' : u;
+    return '<a href="'+esc(u)+'" target="_blank" rel="noopener" style="color:var(--accent);font-size:0.65rem" title="'+esc(u)+'">&#128279; '+esc(short)+'</a>';
+  });
+
+  var bmRows = (ev.benchmarks||[]).slice(0,5);
+  var bmDetails = bmRows.map(function(b){
+    var perf = (b.throughput_tok_s ? esc(b.throughput_tok_s)+' tok/s' : b.mfu_pct ? esc(b.mfu_pct)+'% MFU' : '-');
+    var srcCol = esc(b.source_type||b.test_date||'-');
+    var linkCol = (b.source_url ? '<a href="'+esc(b.source_url)+'" target="_blank" style="color:var(--accent)">link</a>' : '-');
+    return '<tr>'+
+      '<td>'+esc(b.evidence_level||b.confidence||'-')+'</td>'+
+      '<td>'+perf+'</td>'+
+      '<td>'+esc(b.precision||'-')+'</td>'+
+      '<td>'+esc(b.framework||'-')+'</td>'+
+      '<td>'+srcCol+'</td>'+
+      '<td>'+linkCol+'</td>'+
+    '</tr>';
   }).join('');
+
+  var h = '';
+  h += '<div class="compat-card" style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:8px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+  h += '<div style="flex:1;min-width:200px">';
+
+  // Title row — clickable expand/collapse if has benchmarks
+  h += '<div style="font-weight:600;font-size:0.85rem;'+(hasBench?'cursor:pointer':'')+'"'+' id="compat-title-'+idx+'"'+'>';
+  h += '<span>'+esc(iden.chip_model)+' ↔ '+esc(iden.model_id)+'</span>';
+  if(hasBench) h += ' <span style="font-size:0.65rem;color:var(--green);margin-left:4px">▼</span>';
+  h += '</div>';
+
+  // Framework + precision
+  h += '<div style="font-size:0.73rem;color:var(--text2);margin-top:2px;display:flex;align-items:center;flex-wrap:wrap;gap:6px">';
+  h += esc(det.framework||'')+' · '+esc(det.precision||'');
+  if(det.verified_at) h += '<span style="color:var(--text3)"> · '+esc(det.verified_at)+'</span>';
+  h += '</div>';
+
+  // Benchmark evidence row
+  h += '<div style="font-size:0.7rem;color:var(--text3);margin-top:3px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">';
+  if(hasBench){
+    h += '<span style="color:var(--green);font-weight:600">&#128202; '+ev.count+' 条实测</span>';
+    h += '<span> · 最高: '+(ev.max_throughput_tok_s ? esc(ev.max_throughput_tok_s)+' tok/s' : ev.max_mfu_pct ? esc(ev.max_mfu_pct)+'% MFU' : '—')+'</span>';
+    if(ev.top_evidence) h += evBadge(ev.top_evidence);
+  } else {
+    h += '<span style="color:var(--text3)">&#128202; 无实测</span>';
+  }
+  (ev.sources||[]).slice(0,3).forEach(function(s){
+    h += '<span style="font-size:0.62rem;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--text2)">'+esc(s)+'</span>';
+  });
+  h += '</div>';
+
+  // Source links
+  if(srcLinks.length) h += '<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">'+srcLinks.slice(0,2).join('')+'</div>';
+  // Notes
+  if(det.notes) h += '<div style="font-size:0.68rem;color:var(--text3);margin-top:2px;font-style:italic">💬 '+esc(det.notes)+'</div>';
+  h += '</div>'; // end left side
+
+  // Status badge
+  var statusBg = det.compat_status==='verified'?'rgba(52,211,153,0.15)':det.compat_status==='vendor_claimed'?'rgba(251,146,60,0.15)':'rgba(96,165,250,0.15)';
+  var statusClr = det.compat_status==='verified'?'var(--green)':det.compat_status==='vendor_claimed'?'var(--orange)':'var(--blue)';
+  h += '<span style="font-size:0.75rem;padding:4px 10px;border-radius:4px;font-weight:600;flex-shrink:0;background:'+statusBg+';color:'+statusClr+'">'+esc(det.compat_status)+'</span>';
+  h += '</div>'; // end flex row
+
+  // Expandable benchmark details
+  if(bmRows.length){
+    h += '<div id="compat-detail-'+idx+'" style="display:none;margin-top:8px;border-top:1px solid var(--bg4);padding-top:8px">';
+    h += '<div style="font-size:0.7rem;font-weight:600;color:var(--text2);margin-bottom:4px">&#128202; 关联实测数据 ('+ev.count+'条中展示前5条)</div>';
+    h += '<div class="table-wrap" style="max-height:200px">';
+    h += '<table class="data-table" style="font-size:0.68rem">';
+    h += '<thead><tr><th>证据等级</th><th>性能</th><th>精度</th><th>框架</th><th>来源</th><th>链接</th></tr></thead>';
+    h += '<tbody>'+bmDetails+'</tbody>';
+    h += '</table></div></div>';
+  }
+  h += '</div>'; // end card
+  return h;
 }
 
 /* ═══════════════════ DB STATUS ═══════════════════ */

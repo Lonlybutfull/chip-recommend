@@ -54,6 +54,7 @@ class CompatFilters:
     chip: str | None = None
     model: str | None = None
     status: str | None = None
+    has_benchmark: bool = False
 
 
 @dataclass
@@ -498,7 +499,10 @@ def get_chip_recommend_candidates(
             usage_cond = ""
             usage_params = []
 
-        min_vram_per_card = max(8.0, min_vram_total / 8)
+        # Use a low VRAM floor (8 GB) to keep all chips in play.
+        # The scoring engine later estimates card counts based on the per-chip
+        # VRAM, so the user still sees multi-card cluster recommendations.
+        min_vram_per_card = 8.0
 
         # Build query
         region_cond = "AND vendor_region = 'domestic'" if prefer_domestic else ""
@@ -797,6 +801,9 @@ def search_compat(
     """Search compatibility records by chip/model/status.
 
     When ``include_provenance=True``, each record gets a ``_provenance`` key.
+    When ``filters.has_benchmark=True``, only records with matching benchmark
+    data are returned.  Every record also gets a ``benchmark_evidence`` group
+    with aggregated benchmark metadata (sources, evidence levels, URLs).
     """
     with get_db(db_path, readonly=True) as db:
         conditions: list[str] = []
@@ -814,12 +821,55 @@ def search_compat(
             conditions.append("compat_status = ?")
             params.append(filters.status)
 
+        if filters.has_benchmark:
+            conditions.append(
+                "EXISTS (SELECT 1 FROM chip_model_benchmarks b "
+                "WHERE b.chip_model = chip_model_compatibility.chip_model "
+                "AND b.model_id = chip_model_compatibility.model_id)"
+            )
+
         where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
         count = _count(db, "chip_model_compatibility", conditions, params[:])
 
         sql = f"SELECT * FROM chip_model_compatibility {where} ORDER BY verified_at DESC LIMIT ? OFFSET ?"
         rows = [dict(r) for r in db.execute(sql, params + [limit, offset]).fetchall()]
+
+        # ── Benchmark evidence lookup (batch) ──
+        bm_evidence: dict[str, dict] = {}
+        if rows:
+            # Build unique (chip_model, model_id) pairs
+            pairs = list({(r["chip_model"] or "", r["model_id"] or "") for r in rows})
+            for chip_m, model_m in pairs:
+                key = f"{chip_m}|||{model_m}"
+                bm_rows = db.execute(
+                    "SELECT suite_name, source_type, source_url, evidence_level, "
+                    "confidence, test_date, throughput_tok_s, mfu_pct, precision, "
+                    "framework, batch_size, notes "
+                    "FROM chip_model_benchmarks "
+                    "WHERE chip_model = ? AND model_id = ?",
+                    [chip_m, model_m],
+                ).fetchall()
+                if bm_rows:
+                    bm_dicts = [dict(r) for r in bm_rows]
+                    sources = list({r["source_type"] for r in bm_dicts if r["source_type"]})
+                    source_urls = list({r["source_url"] for r in bm_dicts if r["source_url"]})
+                    evidence_levels = [r["evidence_level"] for r in bm_dicts if r["evidence_level"]]
+                    bm_evidence[key] = {
+                        "count": len(bm_dicts),
+                        "sources": sources[:10],
+                        "source_urls": source_urls[:5],
+                        "top_evidence": evidence_levels[0] if evidence_levels else None,
+                        "max_throughput_tok_s": max(
+                            (r["throughput_tok_s"] for r in bm_dicts if r.get("throughput_tok_s")),
+                            default=None,
+                        ),
+                        "max_mfu_pct": max(
+                            (r["mfu_pct"] for r in bm_dicts if r.get("mfu_pct")),
+                            default=None,
+                        ),
+                        "benchmarks": bm_dicts[:10],  # keep first 10 for detail view
+                    }
 
         # ── Provenance enrichment ──
         summaries: dict[str, dict] = {}
@@ -841,6 +891,18 @@ def search_compat(
         result = []
         for r in rows:
             c = group_compat(r)
+            bm_key = f"{r.get('chip_model', '')}|||{r.get('model_id', '')}"
+            bm_ev = bm_evidence.get(bm_key, {
+                "count": 0,
+                "sources": [],
+                "source_urls": [],
+                "top_evidence": None,
+                "max_throughput_tok_s": None,
+                "max_mfu_pct": None,
+                "benchmarks": [],
+            })
+            # Attach benchmark_evidence on the grouped result
+            c["benchmark_evidence"] = bm_ev
             if include_provenance:
                 c["_provenance"] = summaries.get(str(r["id"]), {
                     "field_count": 0, "record_count": 0, "sources": [],
@@ -1807,7 +1869,8 @@ def get_chip_benchmarks_for_model(
     """Get all relevant benchmark rows for a chip+model combination.
 
     Tries exact chip+model match first, then falls back to same-scale models
-    (params within 0.5×–2× of target).
+    (params within 0.5×–2× of target). If nothing in range, returns all
+    benchmarks for this chip with a note that they are approximate references.
     """
     with get_db(db_path, readonly=True) as db:
         # Exact match on chip_model and model_id
@@ -1817,7 +1880,10 @@ def get_chip_benchmarks_for_model(
             (f"%{chip_model_name}%", f"%{model_id}%"),
         ).fetchall()
         if rows:
-            return [dict(r) for r in rows]
+            result = [dict(r) for r in rows]
+            for r in result:
+                r["_match_quality"] = "exact"
+            return result
 
         # Fallback: same-scale models on the same chip
         lo, hi = params_B * 0.5, params_B * 2.0
@@ -1828,7 +1894,22 @@ def get_chip_benchmarks_for_model(
             "AND CAST(m.total_params_b AS REAL) BETWEEN ? AND ?",
             (f"%{chip_model_name}%", lo, hi),
         ).fetchall()
-        return [dict(r) for r in rows]
+        if rows:
+            result = [dict(r) for r in rows]
+            for r in result:
+                r["_match_quality"] = "scale_match"
+            return result
+
+        # Second fallback: any benchmarks for this chip (approximate reference)
+        rows = db.execute(
+            "SELECT * FROM chip_model_benchmarks "
+            "WHERE chip_model LIKE ?",
+            (f"%{chip_model_name}%",),
+        ).fetchall()
+        result = [dict(r) for r in rows]
+        for r in result:
+            r["_match_quality"] = "chip_only"
+        return result
 
 
 def get_chip_benchmark_mfu(chip_model_name: str,

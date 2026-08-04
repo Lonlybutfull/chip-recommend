@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import FastAPI, Query, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from scalar_fastapi import get_scalar_api_reference, Theme
 
@@ -109,6 +110,36 @@ class BatchRequest(BaseModel):
     identifiers: list[str]
 
 
+class ChatRequest(BaseModel):
+    messages: list[dict]
+    model: str | None = None
+
+
+# ═══════════════════════════════════════════════════════════════
+# Chat Agent (DeepSeek streaming)
+# ═══════════════════════════════════════════════════════════════
+
+@app.post("/api/v1/chat")
+async def api_chat(body: ChatRequest):
+    """Streaming chat with DeepSeek + AISHPerf tool calling."""
+    from chip_model.chat_agent import chat_stream, DEEPSEEK_MODEL
+
+    async def event_generator():
+        async for chunk in chat_stream(body.messages, body.model or DEEPSEEK_MODEL):
+            yield chunk
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
 # ═══════════════════════════════════════════════════════════════
 # Chips
 # ═══════════════════════════════════════════════════════════════
@@ -129,7 +160,7 @@ def api_chip_search(
     min_maturity: Optional[int] = Query(None, description="Min ecosystem maturity (0-5)"),
     for_model: Optional[str] = Query(None, description="Auto-estimate VRAM for this model"),
     scenario: Optional[str] = Query(None, description="train | inference (with for_model)"),
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, le=2000),
     offset: int = Query(0),
     include_provenance: bool = Query(False, description="Include per-chip field provenance summary"),
 ):
@@ -175,6 +206,38 @@ def api_chip_recommend(
     model_id = str(model_data.get("model_id", "") or "")
     arch_family = str(model_data.get("architecture_family", "") or "")
 
+    # 2a. Detect MoE models and use activated parameters for VRAM estimation
+    # e.g. Qwen/Qwen3.5-397B-A17B → 397B total, 17B activated
+    #       deepseek-ai/DeepSeek-V3 → 671B total, 37B activated
+    import re as _re
+    moe_activated = None
+    # Pattern 1: model_id contains "-A{activated}B" or "A{activated}B" (Qwen naming)
+    m = _re.search(r'-A(\d+(?:\.\d+)?)\s*B', model_id)
+    # Pattern 2: model_id contains "{total}B-A{activated}B"
+    if not m:
+        m = _re.search(r'A(\d+(?:\.\d+)?)\s*B', model_id)
+    # Pattern 3: architecture_family is MoE and model_id has "/some-{activated}B"
+    if not m and arch_family.lower().startswith('moe'):
+        # Try to find the lower number after a dash
+        nums = _re.findall(r'[-/](\d+(?:\.\d+)?)\s*B', model_id)
+        if len(nums) >= 2:
+            lower = min(float(n) for n in nums)
+            m = _re.match(rf'{lower}', str(lower))
+    if m:
+        moe_activated = float(m.group(1))
+        if scenario == "inference":
+            # Inference: use activated params for VRAM (but total for throughput estimation)
+            effective_params = moe_activated
+            print(f"[INFO] MoE model detected: {total_params}B total, {moe_activated}B activated → using activated for VRAM")
+        else:
+            # Training: use activated params for forward + backward,
+            # but expert routing means not all params participate in every step.
+            # Use a compromise: 2× activated as effective training footprint.
+            effective_params = min(total_params, moe_activated * 2.0)
+            print(f"[INFO] MoE model detected: {total_params}B total, {moe_activated}B activated → effective training params {effective_params:.0f}B")
+    else:
+        effective_params = total_params
+
     # 2. Auto-estimate training tokens if unset (Chinchilla: tokens ≈ 20×params, use 50% = 10×params)
     if training_tokens is None:
         training_tokens_val = max(0.1, min(100.0, total_params * 10.0))
@@ -201,15 +264,15 @@ def api_chip_recommend(
         raise HTTPException(400, f"量化模型 {model_id} 只能用于推理场景，不支持训练")
 
     if scenario == "train":
-        min_vram_total = total_params * 12 * 1.3
-        total_flops = 6 * (total_params * 1e9) * (training_tokens_val * 1e12)
+        min_vram_total = effective_params * 12 * 1.3
+        total_flops = 6 * (effective_params * 1e9) * (training_tokens_val * 1e12)
     else:
         # Inference: adjust VRAM for quantized models
         if is_quantized and quant_bits:
             bytes_per_param = quant_bits / 8.0
         else:
             bytes_per_param = 2.0  # FP16 default
-        min_vram_total = total_params * bytes_per_param * 1.25
+        min_vram_total = effective_params * bytes_per_param * 1.25
         total_flops = 0.0
 
     # 4. Get candidates
@@ -219,11 +282,24 @@ def api_chip_recommend(
     )
 
     if not candidates:
+        if scenario == "train" and moe_activated and moe_activated < total_params:
+            raise HTTPException(
+                404,
+                f"MoE模型 {model_id} 训练需加载全部 {total_params:.0f}B 参数 (非仅激活参数 {moe_activated:.0f}B)，"
+                f"VRAM 估算 ≥{min_vram_total:.0f}GB。当前数据库无单卡满足需求的芯片。\n"
+                f"建议：\n"
+                f"1. 使用推理模式 (scenario=inference) — MoE 推理仅需激活参数 {moe_activated:.0f}B\n"
+                f"2. 如坚持训练，需多卡集群（如 8×H100 80GB = 640GB、16×MI300X 192GB = 3072GB）\n"
+                f"3. 考虑蒸馏为更小的 dense 模型进行训练"
+            )
         raise HTTPException(404, f"没有芯片满足 {model} 的VRAM需求 (≥{min_vram_total:.0f}GB)，请尝试其他模型或放宽约束")
 
     # 5. Scoring loop
     weights = TRAIN_WEIGHTS if scenario == "train" else INFERENCE_WEIGHTS
     scored: list[dict] = []
+    # One-liner to round up and cap for sane display
+    _card = lambda n, cap=64: min(round_up_pow2(n), cap)
+
     for chip in candidates:
         chip_dict = dict(chip)
         vram = float(chip_dict.get("vram_gb", 1))
@@ -232,8 +308,8 @@ def api_chip_recommend(
         chip_model_name = str(chip_dict.get("chip_model", "") or "")
 
         # ── Card estimation ──
-        vram_cards = max(1, int(min_vram_total / vram) + 1)
-        vram_cards = round_up_pow2(vram_cards)
+        vram_cards_raw = max(1, int(min_vram_total / vram) + 1)
+        vram_cards = _card(vram_cards_raw)
         compute_cards = vram_cards
         deadline_cards = vram_cards
         estimated_days = None
@@ -247,7 +323,7 @@ def api_chip_recommend(
             effective_per_card_day = fp16_val * 1e12 * mfu_target * 86400
             if effective_per_card_day > 0 and training_days:
                 raw_compute = int(total_flops / (effective_per_card_day * training_days)) + 1
-                compute_cards = round_up_pow2(max(vram_cards, raw_compute))
+                compute_cards = _card(max(vram_cards_raw, raw_compute))
                 deadline_cards = compute_cards
                 estimated_days = round(
                     total_flops / (effective_per_card_day * deadline_cards), 1
@@ -257,9 +333,9 @@ def api_chip_recommend(
 
         # Min cards floor
         if min_cards:
-            min_cards_pow2 = round_up_pow2(min_cards)
+            min_cards_pow2 = _card(min_cards)
             if recommended_cards < min_cards_pow2:
-                recommended_cards = round_up_pow2(min_cards_pow2)
+                recommended_cards = _card(min_cards_pow2)
 
         # Hard exclude
         if max_cards and recommended_cards > max_cards:
@@ -451,7 +527,7 @@ def api_model_search(
     params_min: Optional[float] = Query(None, description="Min params (B)"),
     params_max: Optional[float] = Query(None, description="Max params (B)"),
     for_chip: Optional[str] = Query(None, description="Find models compatible with this chip"),
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, le=2000),
     offset: int = Query(0),
     include_provenance: bool = Query(False, description="Include per-model field provenance summary"),
 ):
@@ -497,7 +573,7 @@ def api_benchmark_search(
     model: Optional[str] = Query(None),
     workload: Optional[str] = Query(None, description="inference | training"),
     suite: Optional[str] = Query(None, description="MLPerf | vendor_doc | community"),
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, le=2000),
     offset: int = Query(0),
     include_provenance: bool = Query(False, description="Include per-benchmark field provenance summary"),
 ):
@@ -518,13 +594,15 @@ def api_compat_search(
     chip_model: Optional[str] = Query(None, description="Alias for 'chip' parameter"),
     model: Optional[str] = Query(None),
     status: Optional[str] = Query(None, description="verified | vendor_claimed | community | unsupported"),
-    limit: int = Query(50, le=200),
+    has_benchmark: bool = Query(False, description="Only return records that have benchmark evidence"),
+    limit: int = Query(50, le=2000),
     offset: int = Query(0),
     include_provenance: bool = Query(False, description="Include per-compat field provenance summary"),
 ):
     """Search compatibility records."""
     effective_chip = chip or chip_model
-    filters = CompatFilters(chip=effective_chip, model=model, status=status)
+    filters = CompatFilters(chip=effective_chip, model=model, status=status,
+                            has_benchmark=has_benchmark)
     return search_compat(filters, limit=limit, offset=offset,
                          include_provenance=include_provenance)
 
@@ -541,7 +619,7 @@ def api_provenance_search(
     source_type: Optional[str] = Query(None),
     confidence: Optional[str] = Query(None, description="high | medium | low"),
     is_official: Optional[str] = Query(None, description="0 | 1"),
-    limit: int = Query(50, le=200),
+    limit: int = Query(50, le=2000),
     offset: int = Query(0),
 ):
     """Search field-level provenance records."""

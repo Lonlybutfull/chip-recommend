@@ -56,13 +56,18 @@ from chip_model.database import (
     add_model,
     update_model_fields,
     add_benchmark,
-    update_benchmark_fields,
-    add_compatibility,
-    update_compatibility_fields,
+    add_compat,
     get_chip_benchmarks_for_model,
     get_chip_benchmark_mfu,
     get_chip_benchmark_tps,
     get_chip_model_compat_count,
+    search_links,
+    LinkFilters,
+    add_link,
+    upsert_link,
+    import_links_csv,
+    export_links_csv,
+    get_link_library_stats,
 )
 from chip_model.scoring import (  # v2.0 scoring engine
     parse_fp16,
@@ -73,16 +78,7 @@ from chip_model.scoring import (  # v2.0 scoring engine
     aggregate_score,
     scoring_result_to_dict,
 )
-    add_benchmark,
-    add_compat,
-    search_links,
-    LinkFilters,
-    add_link,
-    upsert_link,
-    import_links_csv,
-    export_links_csv,
-    get_link_library_stats,
-)
+
 from chip_model.config import load_config, set_config
 
 # ── App ──
