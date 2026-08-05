@@ -8,15 +8,18 @@
 /* ── Reset & Base ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0f1119;--bg2:#161925;--bg3:#1e2130;--bg4:#262a38;
-  --text:#e2e4ed;--text2:#9ca3b4;--text3:#6b7280;
-  --accent:#818cf8;--accent2:#6366f1;--green:#34d399;--red:#f87171;
-  --orange:#fb923c;--blue:#60a5fa;--purple:#c084fc;
-  --radius:12px;--radius-sm:8px;--transition:0.2s ease;
+  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#f7f8fa;--bg4:#e8eaed;
+  --text:#1a1d2b;--text2:#6b7280;--text3:#9ca3af;
+  --accent:#2d8cf0;--accent2:#1a6fd4;--green:#10b981;--red:#ef4444;
+  --orange:#f59e0b;--blue:#3b82f6;--purple:#8b5cf6;
+  --radius:10px;--radius-sm:6px;--border:1px solid var(--bg4);
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04);
+  --shadow-hover:0 4px 12px rgba(0,0,0,0.08);
+  --transition:0.2s ease;
 }
 html{font-size:16px;scroll-behavior:smooth}
 body{
-  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
   background:var(--bg);color:var(--text);line-height:1.6;
   min-height:100vh;
 }
@@ -24,61 +27,60 @@ a{color:var(--accent);text-decoration:none}
 
 /* ── Header ── */
 header{
-  background:var(--bg2);border-bottom:1px solid var(--bg4);
+  background:var(--bg2);border-bottom:var(--border);
   padding:0 24px;position:sticky;top:0;z-index:100;
-  backdrop-filter:blur(12px);
+  box-shadow:0 1px 2px rgba(0,0,0,0.04);
 }
 .header-inner{
   max-width:1440px;margin:0 auto;display:flex;align-items:center;
-  justify-content:space-between;height:64px;gap:12px;
+  justify-content:space-between;height:60px;gap:12px;
 }
-.logo{font-size:1.25rem;font-weight:700;letter-spacing:-0.02em}
+.logo{font-size:1.2rem;font-weight:700;color:var(--text)}
 .logo span{color:var(--accent)}
-.version{font-size:0.75rem;color:var(--text3)}
+.version{font-size:0.7rem;color:var(--text3);font-weight:400}
 
 /* ── Tabs ── */
-nav{display:flex;gap:4px;flex-wrap:wrap}
+nav{display:flex;gap:2px;flex-wrap:wrap}
 nav button{
   background:none;border:none;color:var(--text2);font-size:0.8rem;
-  padding:7px 12px;border-radius:var(--radius-sm);cursor:pointer;
+  padding:8px 14px;border-radius:6px;cursor:pointer;
   font-weight:500;transition:var(--transition);white-space:nowrap;
 }
-nav button:hover{color:var(--text);background:var(--bg3)}
-nav button.active{color:var(--accent);background:var(--bg4)}
+nav button:hover{color:var(--accent);background:var(--bg3)}
+nav button.active{color:var(--accent);background:rgba(45,140,240,0.08)}
 .api-link{
   color:var(--text2);font-size:0.8rem;font-weight:500;
-  padding:7px 12px;border-radius:var(--radius-sm);text-decoration:none;
-  border:1px solid var(--bg4);transition:var(--transition);white-space:nowrap;
+  padding:7px 14px;border-radius:6px;text-decoration:none;
+  border:var(--border);transition:var(--transition);white-space:nowrap;
 }
-.api-link:hover{color:var(--accent);background:var(--bg4)}
+.api-link:hover{color:var(--accent);border-color:var(--accent);background:rgba(45,140,240,0.04)}
 .api-links{display:flex;gap:8px}
 
 /* ── Main ── */
-main{max-width:1440px;margin:0 auto;padding:24px}
+main{max-width:1440px;margin:0 auto;padding:20px 24px}
 .tab-panel{display:none}
 .tab-panel.active{display:block}
 
 /* ── Filters bar ── */
 .filters{
-  display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;
-  align-items:center;padding:16px;background:var(--bg2);
-  border-radius:var(--radius);border:1px solid var(--bg4);
+  display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;
+  align-items:center;padding:14px 16px;background:var(--bg2);
+  border-radius:var(--radius);border:var(--border);box-shadow:var(--shadow);
 }
 .filters input,.filters select{
-  background:var(--bg3);color:var(--text);border:1px solid var(--bg4);
-  border-radius:var(--radius-sm);padding:8px 12px;font-size:0.85rem;
+  background:var(--bg3);color:var(--text);border:var(--border);
+  border-radius:var(--radius-sm);padding:8px 12px;font-size:0.84rem;
   outline:none;transition:var(--transition);
 }
-.filters input:focus,.filters select:focus{border-color:var(--accent)}
-/* Note: autocomplete-wrapper owns flex:1 inside .filters — let it control width */
+.filters input:focus,.filters select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,140,240,0.12)}
 .filters .autocomplete-wrapper{flex:1;min-width:160px}
 .filters select{min-width:100px}
 .filters .btn{
-  background:var(--accent2);color:#fff;border:none;padding:8px 18px;
+  background:var(--accent);color:#fff;border:none;padding:9px 20px;
   border-radius:var(--radius-sm);font-weight:600;cursor:pointer;
-  font-size:0.85rem;transition:var(--transition);
+  font-size:0.84rem;transition:var(--transition);
 }
-.filters .btn:hover{background:var(--accent);transform:translateY(-1px)}
+.filters .btn:hover{background:var(--accent2);box-shadow:var(--shadow-hover);transform:translateY(-1px)}
 .vram-slider{display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--text2)}
 .vram-slider input{width:80px;min-width:60px;text-align:center}
 
@@ -87,37 +89,37 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 .autocomplete-wrapper .ac-input{width:100%}
 .ac-dropdown{display:none;position:absolute;top:100%;left:0;right:0;z-index:500;
   max-height:280px;overflow-y:auto;background:var(--bg2);border:1px solid var(--accent);
-  border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.5)}
+  border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 .ac-dropdown.open{display:block}
 .ac-item{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;
-  font-size:0.78rem;border-bottom:1px solid var(--bg4);transition:var(--transition)}
+  font-size:0.78rem;border-bottom:var(--border);transition:var(--transition)}
 .ac-item:last-child{border-bottom:none}
 .ac-item:hover,.ac-item.active{background:var(--bg3)}
 .ac-item .ac-name{font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ac-item .ac-meta{color:var(--text3);font-size:0.68rem;white-space:nowrap;flex-shrink:0}
 .ac-item .ac-tag{font-size:0.62rem;padding:1px 5px;border-radius:3px;flex-shrink:0}
 .ac-empty{padding:10px 14px;font-size:0.75rem;color:var(--text3);text-align:center}
-/* Selected tags (multi-pick for recommend) */
+/* Selected tags */
 .ac-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
-.ac-tag{display:inline-flex;align-items:center;gap:4px;background:var(--accent2);color:#fff;
-  padding:2px 8px;border-radius:4px;font-size:0.72rem;cursor:pointer}
+.ac-tag{display:inline-flex;align-items:center;gap:4px;background:var(--accent);color:#fff;
+  padding:3px 10px;border-radius:14px;font-size:0.72rem;cursor:pointer}
 .ac-tag:hover{background:var(--red)}
 
-/* ── Cards grid ── */
-.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
+/* ── Cards ── */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
 .card{
-  background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);
-  padding:16px 18px;cursor:pointer;transition:var(--transition);
+  background:var(--bg2);border:var(--border);border-radius:var(--radius);
+  padding:16px 18px;cursor:pointer;transition:var(--transition);box-shadow:var(--shadow);
 }
-.card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(99,102,241,0.12)}
+.card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:var(--shadow-hover)}
 
 .card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
 .card-vendor{
   font-size:0.72rem;padding:2px 8px;border-radius:4px;
   font-weight:600;letter-spacing:0.04em;
 }
-.vendor-foreign{background:rgba(96,165,250,0.15);color:var(--blue)}
-.vendor-domestic{background:rgba(251,146,60,0.15);color:var(--orange)}
+.vendor-foreign{background:rgba(59,130,246,0.1);color:var(--blue)}
+.vendor-domestic{background:rgba(245,158,11,0.1);color:var(--orange)}
 .card-model{font-size:1rem;font-weight:600;margin-bottom:4px}
 .card-series{font-size:0.78rem;color:var(--text3);margin-bottom:8px}
 
@@ -127,16 +129,16 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 .card-stat .value{font-weight:600;font-variant-numeric:tabular-nums}
 
 .card-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.card-meta{display:flex;gap:12px;font-size:0.7rem;color:var(--text3);margin-top:6px;padding-top:6px;border-top:1px solid var(--bg4)}
+.card-meta{display:flex;gap:12px;font-size:0.7rem;color:var(--text3);margin-top:6px;padding-top:6px;border-top:var(--border)}
 .card-meta span{display:flex;align-items:center;gap:3px}
 .tag{
   font-size:0.68rem;padding:2px 8px;border-radius:4px;
   background:var(--bg3);color:var(--text2);
 }
-.tag.precision{color:var(--purple);background:rgba(192,132,252,0.12)}
-.tag.maturity{color:var(--green);background:rgba(52,211,153,0.12)}
-.tag.compat{color:var(--blue);background:rgba(96,165,250,0.12)}
-.tag.undisclosed{color:var(--red);background:rgba(248,113,113,0.12);font-weight:600}
+.tag.precision{color:var(--purple);background:rgba(139,92,246,0.08)}
+.tag.cloud{color:var(--blue);background:rgba(59,130,246,0.08)}
+.tag.compat{color:var(--blue);background:rgba(59,130,246,0.08)}
+.tag.undisclosed{color:var(--red);background:rgba(239,68,68,0.08);font-weight:600}
 
 /* ── Detail panel ── */
 .detail-overlay{
@@ -144,13 +146,15 @@ main{max-width:1440px;margin:0 auto;padding:24px}
   background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);
   overflow-y:auto;padding:24px;
 }
-.detail-overlay.open{display:flex;justify-content:center;align-items:flex-start}
+.detail-overlay.open{display:flex;justify-content:center;align-items:center}
 .detail-panel{
-  background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);
-  width:100%;max-width:900px;margin:24px 0;
+  background:var(--bg2);border:var(--border);border-radius:var(--radius);
+  width:100%;max-width:960px;max-height:82vh;
+  display:flex;flex-direction:column;
+  box-shadow:0 16px 48px rgba(0,0,0,0.12);overflow:hidden;
 }
 .detail-header{
-  padding:18px 22px;border-bottom:1px solid var(--bg4);
+  padding:18px 22px;border-bottom:var(--border);
   display:flex;justify-content:space-between;align-items:center;
   position:sticky;top:0;background:var(--bg2);border-radius:var(--radius) var(--radius) 0 0;z-index:10;
 }
@@ -161,36 +165,49 @@ main{max-width:1440px;margin:0 auto;padding:24px}
   align-items:center;justify-content:center;transition:var(--transition);
 }
 .detail-close:hover{background:var(--red);color:#fff}
-.detail-body{padding:14px 22px 22px}
+/* ── Detail tabs (v3.0) ── */
+.detail-tabs{
+  display:flex;gap:4px;padding:0 22px;border-bottom:var(--border);
+  background:var(--bg3);overflow-x:auto;
+}
+.detail-tab{
+  background:none;border:none;color:var(--text2);font-size:0.78rem;
+  padding:10px 16px;cursor:pointer;font-weight:500;
+  border-bottom:2px solid transparent;transition:var(--transition);
+  white-space:nowrap;
+}
+.detail-tab:hover{color:var(--text);background:var(--bg4)}
+.detail-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.detail-tab-panel{display:none;padding:14px 22px 22px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;word-break:break-word}
+.detail-tab-panel.active{display:block;overflow-y:auto;max-height:100%}
+.detail-body{padding:0;overflow:hidden;flex:1;min-height:0;display:flex;flex-direction:column}
 
 .group{
-  margin-bottom:14px;border:1px solid var(--bg4);border-radius:var(--radius-sm);
-  overflow:hidden;
+  margin-bottom:14px;border:var(--border);border-radius:var(--radius-sm);
+  overflow:visible;
 }
 .group-header{
   padding:9px 14px;background:var(--bg3);
-  font-size:0.78rem;font-weight:700;text-transform:uppercase;
+  font-size:0.78rem;font-weight:700;
   letter-spacing:0.05em;color:var(--accent);cursor:pointer;
   display:flex;justify-content:space-between;align-items:center;
+  position:relative;z-index:1;text-transform:none;
 }
-.group-header::after{content:'-';font-size:0.9rem}
-.group.collapsed .group-header::after{content:'+'}
-.group-body{padding:10px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:5px}
+.group-header{text-transform:none;}
 .group.collapsed .group-body{display:none}
-.group-field{display:flex;justify-content:space-between;font-size:0.78rem;gap:6px;padding:4px 6px;border-bottom:1px solid var(--bg4);border-radius:2px}
+.group-body{overflow:visible!important;padding:10px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+.group-field{overflow:visible;display:flex;justify-content:space-between;font-size:0.78rem;gap:6px;padding:4px 6px;border-bottom:var(--border);border-radius:2px}
 .group-field:nth-child(even){background:var(--bg4)}
 .group-field .key{color:var(--text3);white-space:nowrap;min-width:120px}
 .group-field .val{font-weight:500;text-align:right;word-break:break-all;position:relative;cursor:help}
 .group-field .val:hover{color:var(--accent)}
 
-/* Provenance tooltip */
-.prov-tooltip{display:none;position:absolute;bottom:calc(100% + 6px);right:0;z-index:999;
-  background:var(--bg2);border:1px solid var(--accent);border-radius:var(--radius-sm);
-  padding:8px 10px;min-width:240px;max-width:380px;box-shadow:0 8px 24px rgba(0,0,0,0.5);
+/* Provenance tooltip — positioned via JS, CSS fallback */
+.prov-tooltip{display:none;position:absolute;bottom:calc(100% + 6px);right:0;z-index:99999;
+  background:var(--bg2);border:2px solid var(--accent);border-radius:var(--radius-sm);
+  padding:8px 10px;min-width:240px;max-width:380px;box-shadow:0 12px 32px rgba(0,0,0,0.2);
   font-size:0.68rem;text-align:left;pointer-events:none}
-.prov-tooltip .pt-src{color:var(--accent);word-break:break-all;margin-bottom:3px}
-.prov-tooltip .pt-meta{color:var(--text3)}
-.val-has-provenance:hover .prov-tooltip{display:block}
+.val-has-provenance:hover>.prov-tooltip{display:block}
 
 /* Provenance row */
 .prov-row{
@@ -203,23 +220,23 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 .data-table{width:100%;border-collapse:collapse;font-size:0.78rem}
 .data-table th{
   text-align:left;padding:8px 10px;background:var(--bg3);
-  color:var(--text2);font-weight:600;border-bottom:1px solid var(--bg4);
+  color:var(--text2);font-weight:600;border-bottom:var(--border);
   position:sticky;top:0;
 }
-.data-table td{padding:6px 10px;border-bottom:1px solid var(--bg4)}
+.data-table td{padding:6px 10px;border-bottom:var(--border)}
 .data-table tr:hover{background:var(--bg3)}
-.table-wrap{max-height:500px;overflow:auto;border:1px solid var(--bg4);border-radius:var(--radius-sm)}
+.table-wrap{max-height:500px;overflow:auto;border:var(--border);border-radius:var(--radius-sm)}
 
 /* ── Recommend form ── */
 .recommend-form{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
   gap:10px;padding:18px;background:var(--bg2);border-radius:var(--radius);
-  border:1px solid var(--bg4);margin-bottom:18px;
+  border:var(--border);margin-bottom:18px;
 }
 .form-group{display:flex;flex-direction:column;gap:4px}
 .form-group label{font-size:0.73rem;color:var(--text2);font-weight:600}
 .form-group input,.form-group select{
-  background:var(--bg3);color:var(--text);border:1px solid var(--bg4);
+  background:var(--bg3);color:var(--text);border:var(--border);
   border-radius:var(--radius-sm);padding:8px 10px;font-size:0.85rem;outline:none;
 }
 .form-group input:focus,.form-group select:focus{border-color:var(--accent)}
@@ -240,11 +257,11 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 
 /* ── Recommend result card ── */
 .rec-card{
-  background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);
+  background:var(--bg2);border:var(--border);border-radius:var(--radius);
   padding:16px 18px;margin-bottom:10px;transition:var(--transition);
 }
 .rec-card:hover{border-color:var(--accent)}
-.rec-card.best{border-color:var(--accent);box-shadow:0 4px 16px rgba(99,102,241,0.2)}
+.rec-card.best{border-color:var(--accent);box-shadow:0 4px 16px rgba(45,140,240,0.15)}
 .rec-rank{font-size:0.72rem;color:var(--accent);font-weight:700;margin-bottom:3px}
 .rec-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
 .rec-header h3{font-size:0.95rem}
@@ -255,21 +272,23 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 .rec-rationale{font-size:0.75rem;color:var(--text2);font-style:italic}
 .score-bar{height:5px;background:var(--bg4);border-radius:3px;margin-top:6px;overflow:hidden;}
 .score-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:3px}
+.scoring-details{margin-top:8px}
+.scoring-details summary{font-size:0.75rem;color:var(--text2);cursor:pointer;font-weight:500;user-select:none}
 .scoring-dim{font-size:0.68rem;color:var(--text3);margin-top:6px;line-height:1.5}
 
-/* ── Agent Chat panel (tab) ── */
+/* Agent quick-chips panel */
 .agent-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;height:calc(100vh - 140px);min-height:560px}
 @media(max-width:900px){.agent-layout{grid-template-columns:1fr}}
-.agent-chat-panel{display:flex;flex-direction:column;background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);overflow:hidden}
-.agent-chat-header{padding:10px 16px;border-bottom:1px solid var(--bg4);font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.agent-chat-panel{display:flex;flex-direction:column;background:var(--bg2);border:var(--border);border-radius:var(--radius);overflow:visible;box-shadow:var(--shadow)}
+.agent-chat-header{padding:10px 16px;border-bottom:var(--border);font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:8px;flex-shrink:0}
 .agent-chat-header .dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 #chat-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
 .chat-msg{max-width:85%;padding:8px 12px;border-radius:12px;font-size:0.8rem;line-height:1.5;word-break:break-word}
-.chat-msg.tool{background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.2);color:var(--blue);font-size:0.7rem;max-width:90%}
+.chat-msg.tool{background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);color:var(--blue);font-size:0.7rem;max-width:90%}
 .chat-msg.tool pre{font-size:0.65rem;max-height:120px;overflow:auto;margin:4px 0 0;padding:4px 6px;background:var(--bg2);border-radius:4px;white-space:pre-wrap}
-#chat-input-area{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--bg4);flex-shrink:0}
-#chat-input{flex:1;background:var(--bg3);color:var(--text);border:1px solid var(--bg4);border-radius:20px;padding:8px 14px;font-size:0.82rem;outline:none}
+#chat-input-area{display:flex;gap:8px;padding:10px 12px;border-top:var(--border);flex-shrink:0}
+#chat-input{flex:1;background:var(--bg3);color:var(--text);border:var(--border);border-radius:20px;padding:8px 14px;font-size:0.82rem;outline:none}
 #chat-input:focus{border-color:var(--accent)}
 #chat-send{background:var(--accent2);color:#fff;border:none;border-radius:20px;padding:8px 18px;font-weight:600;cursor:pointer;font-size:0.82rem;transition:var(--transition)}
 #chat-send:hover{background:var(--accent)}
@@ -281,19 +300,19 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 @keyframes chatBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
 
 /* Agent quick-chips panel */
-.agent-quick-panel{background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);padding:16px;overflow-y:auto}
+.agent-quick-panel{background:var(--bg2);border:var(--border);border-radius:var(--radius);padding:16px;overflow-y:auto}
 .agent-quick-panel h3{font-size:0.85rem;margin-bottom:10px;color:var(--text2)}
-.quick-chip{display:block;width:100%;text-align:left;background:var(--bg3);border:1px solid var(--bg4);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;cursor:pointer;color:var(--text);font-size:0.78rem;transition:var(--transition)}
+.quick-chip{display:block;width:100%;text-align:left;background:var(--bg3);border:var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;cursor:pointer;color:var(--text);font-size:0.78rem;transition:var(--transition)}
 .quick-chip:hover{background:var(--bg4);border-color:var(--accent)}
 .quick-chip .qc-title{font-weight:600;margin-bottom:2px}
 .quick-chip .qc-desc{color:var(--text3);font-size:0.68rem}
-.chat-msg.user{align-self:flex-end;background:var(--accent2);color:#fff;border-bottom-right-radius:4px}
+.chat-msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
 .chat-msg.assistant{align-self:flex-start;background:var(--bg3);color:var(--text);border-bottom-left-radius:4px}
 
 /* ── Status cards ── */
 .status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
 .stat-card{
-  background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);
+  background:var(--bg2);border:var(--border);border-radius:var(--radius);
   padding:14px;text-align:center;
 }
 .stat-card .num{font-size:1.8rem;font-weight:700;color:var(--accent)}
@@ -306,16 +325,16 @@ main{max-width:1440px;margin:0 auto;padding:24px}
   border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px;
 }@keyframes spin{to{transform:rotate(360deg)}}
 .empty{text-align:center;padding:36px;color:var(--text3);font-size:0.85rem}
-.error{background:rgba(248,113,113,0.1);color:var(--red);padding:10px 14px;
-  border-radius:var(--radius-sm);font-size:0.8rem;margin-bottom:10px}
-.info{background:rgba(96,165,250,0.1);color:var(--blue);padding:10px 14px;
-  border-radius:var(--radius-sm);font-size:0.8rem;margin-bottom:10px}
+.error{background:rgba(239,68,68,0.06);color:var(--red);padding:10px 14px;
+  border-radius:var(--radius-sm);font-size:0.8rem;margin-bottom:10px;border:1px solid rgba(239,68,68,0.15)}
+.info{background:rgba(59,130,246,0.06);color:var(--blue);padding:10px 14px;
+  border-radius:var(--radius-sm);font-size:0.8rem;margin-bottom:10px;border:1px solid rgba(59,130,246,0.12)}
 
 /* ── Provenance field history ── */
-.prov-field{border-bottom:1px solid var(--bg4);padding:8px 0}
+.prov-field{border-bottom:var(--border);padding:8px 0}
 .prov-field:last-child{border-bottom:none}
 .prov-field-header{padding:4px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.prov-field-history{padding-left:12px;border-left:2px solid var(--bg4)}
+.prov-field-history{padding-left:12px;border-left:2px solid var(--bg4);word-break:break-word;overflow-wrap:break-word}
 .prov-history-row{padding:4px 0;border-bottom:1px dashed var(--bg4)}
 .prov-history-row:last-child{border-bottom:none}
 
@@ -329,13 +348,59 @@ main{max-width:1440px;margin:0 auto;padding:24px}
   .recommend-form{grid-template-columns:1fr}
   .detail-panel{margin:8px 0}
 }
+/* ── Login overlay ── */
+.login-overlay{
+  position:fixed;inset:0;z-index:9999;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity .35s ease,visibility .35s ease;
+}
+.login-overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.login-card{
+  background:var(--bg2);border-radius:14px;padding:40px 36px 32px;
+  width:400px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.12);
+  text-align:center;
+}
+.login-card .login-icon{font-size:2.5rem;margin-bottom:8px}
+.login-card h2{font-size:1.25rem;font-weight:700;margin-bottom:4px}
+.login-card .login-sub{font-size:0.8rem;color:var(--text2);margin-bottom:24px}
+.login-field{text-align:left;margin-bottom:14px}
+.login-field label{display:block;font-size:0.78rem;font-weight:600;color:var(--text2);margin-bottom:4px}
+.login-field input{
+  width:100%;padding:10px 12px;border:var(--border);border-radius:var(--radius-sm);
+  font-size:0.9rem;background:var(--bg3);color:var(--text);
+  outline:none;transition:var(--transition);
+}
+.login-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,140,240,0.12)}
+.login-error{font-size:0.75rem;color:var(--red);margin-bottom:10px;min-height:18px}
+.login-card .btn{width:100%;padding:11px;font-size:0.95rem;font-weight:600}
 </style>
 </head>
 <body>
 
+<!-- ═══ Login Overlay ═══ -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <div class="login-icon">🔐</div>
+    <h2>AISHPerf 算力选型平台</h2>
+    <div class="login-sub">请输入管理员账号密码登录</div>
+    <form onsubmit="doLogin();return false">
+      <div class="login-field">
+        <label>账号</label>
+        <input type="text" id="login-user" placeholder="请输入账号" autocomplete="username">
+      </div>
+      <div class="login-field">
+        <label>密码</label>
+        <input type="password" id="login-pass" placeholder="请输入密码" autocomplete="current-password">
+      </div>
+      <div class="login-error" id="login-error"></div>
+      <button class="btn" type="submit">登 录</button>
+    </form>
+  </div>
+</div>
+
 <header>
   <div class="header-inner">
-    <div class="logo">⚡ AISH<span>Perf</span> <span class="version">v0.5</span></div>
+    <div class="logo">⚡ AISH<span>Perf</span> <span class="version">v0.6</span></div>
     <nav id="main-nav"></nav>
     <div class="api-links">
       <a class="api-link" href="/api-docs.html">📖 API 文档</a>
@@ -416,6 +481,26 @@ main{max-width:1440px;margin:0 auto;padding:24px}
 </div>
 
 <script>
+/* ═══════════════════ LOGIN ═══════════════════ */
+const LOGIN_CRED = {user:'admin',pass:'y1y2f3@AKd!'};
+function doLogin(){
+  const u = ($('login-user')||{}).value||'', p = ($('login-pass')||{}).value||'';
+  const err = $('login-error');
+  if(u !== LOGIN_CRED.user || p !== LOGIN_CRED.pass){
+    err.textContent = '账号或密码错误，请重试';
+    return;
+  }
+  err.textContent = '';
+  $('login-overlay').classList.add('hidden');
+  sessionStorage.setItem('aishperf_authed','1');
+}
+(function checkLogin(){
+  if(sessionStorage.getItem('aishperf_authed') === '1'){
+    $('login-overlay').classList.add('hidden');
+  }
+  setTimeout(()=>{ const el=$('login-user'); if(el)el.focus(); },100);
+})();
+
 /* ═══════════════════════════════════════════════════════════
    AISHPerf v0.5 — Dynamic component-based SPA
    ═══════════════════════════════════════════════════════════ */
@@ -643,7 +728,7 @@ function initAutocomplete(inputId, dropdownId, source, onPick, multi=false, getP
         : `${esc(m.params)}B ${esc(m.arch||'')} · ${esc((m.downloads||0)>1e6?(m.downloads/1e6).toFixed(1)+'M':(m.downloads||0)>1e3?(m.downloads/1e3).toFixed(1)+'K':m.downloads)}↓`;
       let tag = source==='chips'
         ? (m.tier==='datacenter'?`<span class="ac-tag" style="background:rgba(129,140,248,0.15);color:var(--accent)">数据中心</span>`:'')
-        : (m.tag?`<span class="ac-tag" style="background:rgba(96,165,250,0.12);color:var(--blue)">${esc(m.tag)}</span>`:'');
+        : (m.tag?`<span class="ac-tag" style="background:rgba(59,130,246,0.08);color:var(--blue)">${esc(m.tag)}</span>`:'');
       // Use chip name (not numeric id) for the pick value
       let pickValue = source==='chips' ? name : m.id;
       return `<div class="ac-item" data-idx="${i}" data-name="${esc(pickValue)}">
@@ -838,7 +923,6 @@ async function searchChipsInit(){
     <select id="chip-region"><option value="">全部地区</option><option value="domestic">国产</option><option value="foreign">海外</option></select>
     <select id="chip-usage"><option value="">全部用途</option><option value="train">训练</option><option value="inference">推理</option><option value="both">训推一体</option></select>
     <div class="vram-slider">显存<label>≥<input type="number" id="chip-vram-min" placeholder="0" min="0" step="8">GB</label></div>
-    <div class="vram-slider">成熟度<label>≥<select id="chip-maturity" style="width:60px"><option value="">不限</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label></div>
     <button class="btn" onclick="searchChips()">搜索</button>
   `;
 
@@ -908,7 +992,6 @@ async function searchChips(){
   const r=($('chip-region')||{}).value; if(r)params.set('region',r);
   const u=($('chip-usage')||{}).value; if(u)params.set('usage',u);
   const vm=($('chip-vram-min')||{}).value; if(vm)params.set('vram_min',vm);
-  const mm=($('chip-maturity')||{}).value; if(mm)params.set('min_maturity',mm);
   params.set('limit', String(CHIP_PAGE_STATE.limit));
   params.set('offset', String((CHIP_PAGE_STATE.page - 1) * CHIP_PAGE_STATE.limit));
 
@@ -929,7 +1012,7 @@ async function searchChips(){
       <div class="card-header">
         ${regionBadge(c.vendor_region)}
         <span style="font-size:0.75rem;color:var(--text2)">${esc(c.vendor_display)}</span>
-        ${c.maturity_level?`<span class="tag maturity">★${c.maturity_level}/5</span>`:''}
+        ${c.cloud_available && parseInt(c.cloud_available) >= 1 ? `<span class="tag cloud">☁ 云可用</span>` : ''}
         ${isUndisclosed?`<span class="tag undisclosed">⚠ 未公开</span>`:''}
       </div>
       <div class="card-model">${esc(c.chip_model)}</div>
@@ -985,9 +1068,10 @@ async function openChipProfile(id){
         let tooltipHtml = '';
         if(hasProv){
           const latest = prov.history[0];
-          tooltipHtml = `<div class="prov-tooltip">
+          const isOff = latest.is_official === '1';
+          tooltipHtml = `<div class="prov-tooltip" onmouseenter="var r=this.getBoundingClientRect();if(r.top<0)this.style.bottom='auto';else this.style.top='auto'">
             <div class="pt-src">${esc((latest.source_url||'').slice(0,120))}</div>
-            <div class="pt-meta">${esc(latest.source_type||'?')} · ${esc(latest.confidence||'?')} · ${esc((latest.updated_at||'').slice(0,16))}${latest.is_official==='1'?' · ✓官方':''}</div>
+            <div class="pt-meta">${esc(latest.source_type||'?')} · ${esc(latest.confidence||'?')} · ${esc((latest.updated_at||'').slice(0,16))}${isOff?' · ✓官方':' · ⚠非官方'}</div>
             ${prov.update_count>1?`<div class="pt-meta" style="margin-top:2px">${prov.update_count}次变更</div>`:''}
           </div>`;
         }
@@ -999,6 +1083,38 @@ async function openChipProfile(id){
 
   // Benchmarks section — API returns grouped benchmark records
   function pickPath(o, keys){for(const k of keys){if(o==null)return null;o=o[k]}return o}
+  // Helper to render groups by key
+  function renderDetailGroups(groupKeys){
+    return groupKeys.map(key=>{
+      const label = (CHIP_GROUPS_MAP||{})[key] || key;
+      const g = chip[key];
+      if(!g||Object.keys(g).length===0)return'';
+      const fp = data.field_provenance || {};
+      const fields = Object.entries(g)
+        .filter(([k])=>k!=='id'&&!k.startsWith('_'))
+        .map(([k,v])=>{
+          const prov = fp[k];
+          const hasProv = prov && prov.history && prov.history.length > 0;
+          let tooltipHtml = '';
+          if(hasProv){
+            const latest = prov.history[0];
+            const isOff = latest.is_official === '1';
+            tooltipHtml = `<div class="prov-tooltip" onmouseenter="var r=this.getBoundingClientRect();if(r.top<0)this.style.bottom='auto';else this.style.top='auto'">
+              <div class="pt-src">${esc((latest.source_url||'').slice(0,120))}</div>
+              <div class="pt-meta">${esc(latest.source_type||'?')} · ${esc(latest.confidence||'?')} · ${esc((latest.updated_at||'').slice(0,16))}${isOff?' · ✓官方':' · ⚠非官方'}</div>
+              ${prov.update_count>1?`<div class="pt-meta" style="margin-top:2px">${prov.update_count}次变更</div>`:''}
+            </div>`;
+          }
+          return `<div class="group-field"><span class="key">${esc(k)}</span><span class="val${hasProv?' val-has-provenance':''}">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}${tooltipHtml}</span></div>`;
+        })
+        .join('');
+      return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${label}</div><div class="group-body">${fields}</div></div>`:'';
+    }).join('');
+  }
+  // Build group map
+  const CHIP_GROUPS_MAP = {};
+  CHIP_GROUPS.forEach(([k,v])=>{ CHIP_GROUPS_MAP[k]=v; });
+
   let bmHtml = '';
   if(data.benchmarks&&data.benchmarks.length){
     bmHtml = `<div class="group">
@@ -1043,10 +1159,32 @@ async function openChipProfile(id){
       <h2>${esc(chip.identity?.chip_model||'Chip')} <small style="color:var(--text3);font-weight:400;font-size:0.85rem">ID:${id}</small></h2>
       <button class="detail-close" onclick="closeDetail()">✕</button>
     </div>
-    <div class="detail-body">${groupsHtml}${bmHtml}${compHtml}${provHtml}</div>
+    <div class="detail-tabs" id="detail-tabs">
+      <button class="detail-tab active" onclick="switchDetailTab(event,'tab-basic')">📋 基本信息</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-compute')">⚡ 计算参数</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-physical')">🔧 物理信息</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-bench')">📊 兼容评测</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-provenance')">📝 溯源记录</button>
+    </div>
+    <div class="detail-body" id="detail-body">
+      <div class="detail-tab-panel active" id="tab-basic">${renderDetailGroups(['identity','architecture','memory','interconnect','price','status'])}</div>
+      <div class="detail-tab-panel" id="tab-compute">${renderDetailGroups(['compute_units','precision','tdp'])}</div>
+      <div class="detail-tab-panel" id="tab-physical">${renderDetailGroups(['physical','cache','package'])}</div>
+      <div class="detail-tab-panel" id="tab-bench">${bmHtml}${compHtml}</div>
+      <div class="detail-tab-panel" id="tab-provenance">${provHtml}</div>
+    </div>
   `;
 }
 function closeDetail(){$('detail-overlay').classList.remove('open')}
+
+function switchDetailTab(evt, panelId){
+  const tabs = document.querySelectorAll('#detail-tabs .detail-tab');
+  tabs.forEach(t=>t.classList.remove('active'));
+  evt.target.classList.add('active');
+  const panels = document.querySelectorAll('#detail-body .detail-tab-panel');
+  panels.forEach(p=>p.classList.remove('active'));
+  document.getElementById(panelId).classList.add('active');
+}
 
 /* ═══════════════════ MODEL SEARCH ═══════════════════ */
 async function searchModelsInit(){
@@ -1095,7 +1233,7 @@ async function searchModels(){
     <div class="card" onclick="openModelProfile('${m.id}')">
       <div class="card-header">
         <span class="card-vendor vendor-foreign">${esc(m.author||'?')}</span>
-        ${m.architecture_family?`<span class="tag maturity">${esc(m.architecture_family)}</span>`:''}
+        ${m.architecture_family?`<span class="tag arch">${esc(m.architecture_family)}</span>`:''}
         ${m.pipeline_tag?`<span class="tag compat">${esc(m.pipeline_tag)}</span>`:''}
       </div>
       <div class="card-model" style="font-size:0.9rem;word-break:break-all">${esc(m.model_id)}</div>
@@ -1159,10 +1297,18 @@ async function openModelProfile(id){
 // ── Shared provenance renderer for both chip & model detail ──
 function renderFieldProvenance(fp) {
   if(!fp || Object.keys(fp).length===0) return '';
-  const fieldNames = Object.keys(fp).sort();
-  const fieldsHtml = fieldNames.map(fn => {
-    const fi = fp[fn];
+  const fieldsByGroup = {};
+  // Group by source official/non-official
+  const officialFields = [], unofficialFields = [];
+  Object.entries(fp).forEach(([fn, fi]) => {
+    const history = fi.history || [];
+    const isOfficial = history.length > 0 && history[0].is_official === '1';
+    (isOfficial ? officialFields : unofficialFields).push([fn, fi]);
+  });
+  const allFields = [...officialFields, ...unofficialFields];
+  const fieldsHtml = allFields.map(([fn, fi]) => {
     const label = fi.field_label || fn;
+    const isOfficial = fi.history && fi.history[0] && fi.history[0].is_official === '1';
     const historyRows = fi.history.map(h => `
       <div class="prov-history-row">
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -1181,15 +1327,16 @@ function renderFieldProvenance(fp) {
     return `<div class="prov-field">
       <div class="prov-field-header">
         <b>${esc(label)}</b> <code style="color:var(--text3);font-size:0.7rem">${esc(fn)}</code>
-        ${fi.update_count>1?`<span style="color:var(--orange);font-size:0.65rem"> (${fi.update_count}次变更)</span>`:''}
+        ${isOfficial?' <span style="color:var(--green);font-size:0.68rem;font-weight:600">✓官方</span>':' <span style="color:var(--orange);font-size:0.68rem">⚠非官方</span>'}
+        ${fi.update_count>1?`<span style="color:var(--text3);font-size:0.65rem"> (${fi.update_count}次变更)</span>`:''}
       </div>
       <div class="prov-field-history">${historyRows}</div>
     </div>`;
   }).join('');
 
   return `<div class="group collapsed">
-    <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">📋 字段来源追溯 (${fieldNames.length}个字段)</div>
-    <div class="group-body" style="grid-template-columns:1fr;max-height:60vh;overflow-y:auto">
+    <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">📋 字段来源追溯 (${allFields.length}个字段 · ${officialFields.length}官方)</div>
+    <div class="group-body" style="grid-template-columns:1fr;max-height:44vh;overflow-y:auto;overflow-x:hidden;padding:8px 12px">
       ${fieldsHtml}
     </div></div>`;
 }
@@ -1199,7 +1346,7 @@ let REC_SELECTED_MODELS = [];
 
 function initRecommend(){
   STATE.vendors = STATE.vendors || [];
-  ensureModelList(); // Preload model list for suggestions
+  ensureModelList();
   REC_SELECTED_MODELS = [];
   $('rec-form').innerHTML = `
     <div class="recommend-form">
@@ -1211,14 +1358,16 @@ function initRecommend(){
         </div>
         <input type="hidden" id="rec-model" value="">
       </div>
-      <div class="form-group"><label>场景</label><select id="rec-scenario"><option value="train">训练</option><option value="inference">推理</option></select></div>
+      <div class="form-group"><label>场景</label><select id="rec-scenario" onchange="updateRecForm()"><option value="train">训练</option><option value="inference">推理</option></select></div>
+      <div class="form-group" id="rec-stage-grp"><label>训练阶段</label><select id="rec-stage"><option value="sft">SFT (监督微调)</option><option value="cpt">CPT (持续预训练)</option><option value="rl">RL (强化学习)</option></select></div>
+      <div class="form-group" id="rec-method-grp"><label>训练方式</label><select id="rec-method"><option value="full_param">全参微调</option><option value="lora">LoRA (低秩适配)</option><option value="qlora">QLoRA (量化LoRA)</option></select></div>
+      <div class="form-group" id="rec-quant-grp" style="display:none"><label>量化精度</label><select id="rec-quant"><option value="fp16">FP16 (全精度)</option><option value="int8">INT8</option><option value="int4_gptq">INT4 GPTQ</option><option value="int4_awq">INT4 AWQ</option><option value="gguf_q4">GGUF Q4</option><option value="gguf_q8">GGUF Q8</option></select></div>
       <div class="form-group"><label>期望训练天数</label><input type="number" id="rec-days" placeholder="3" min="0.1" step="0.5"></div>
       <div class="form-group"><label>训练数据量 (T tokens)</label><input type="number" id="rec-tokens" placeholder="自动推算" min="0.1" max="1000" step="0.5"></div>
       <div class="form-group"><label>目标推理吞吐 (tok/s)</label><input type="number" id="rec-tps" placeholder="可选" min="0"></div>
       <div class="form-group"><label>最大卡数</label><input type="number" id="rec-max-cards" placeholder="可选" min="1"></div>
       <div class="form-group"><label>最小卡数</label><input type="number" id="rec-min-cards" placeholder="可选" min="1"></div>
       <div class="form-group"><label>最高单价 (万元/片)</label><input type="number" id="rec-max-price" placeholder="可选" min="0"></div>
-      <div class="form-group"><label>最低成熟度</label><select id="rec-maturity"><option value="">不限</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
       <div class="form-group"><label>优先国产</label><div class="toggle-row"><div class="toggle" id="rec-domestic" onclick="this.classList.toggle('on')"></div></div></div>
       <div class="form-group"><label>优先厂商</label><select id="rec-vendor"><option value="">不限</option>${[...new Set(STATE.vendors)].map(v=>`<option>${esc(v)}</option>`).join('')}</select></div>
       <div class="form-actions"><button class="btn" onclick="runRecommend()">🎯 推荐芯片方案</button></div>
@@ -1232,7 +1381,7 @@ function initRecommend(){
       renderRecModelTags();
     }
     $('rec-model-input').value = '';
-  }, true); // multi=true: keep dropdown open after pick
+  }, true);
 
   // Backspace on empty input → remove last tag
   $('rec-model-input').addEventListener('keydown', function(e){
@@ -1241,6 +1390,29 @@ function initRecommend(){
       renderRecModelTags();
     }
   });
+
+  // SFT method depends on stage: only SFT shows method, RL/CPT are full_param only
+  $('rec-stage').addEventListener('change', function(){
+    const g = $('rec-method-grp');
+    if(this.value === 'sft'){ g.style.display=''; }
+    else { g.style.display='none'; $('rec-method').value='full_param'; }
+  });
+}
+
+function updateRecForm(){
+  const sc = $('rec-scenario').value;
+  const stageGrp = $('rec-stage-grp'), methodGrp = $('rec-method-grp'), quantGrp = $('rec-quant-grp');
+  const daysEl = $('rec-days').parentElement, tokensEl = $('rec-tokens').parentElement, tpsEl = $('rec-tps').parentElement;
+  if(sc === 'train'){
+    stageGrp.style.display=''; methodGrp.style.display=''; quantGrp.style.display='none';
+    daysEl.style.display=''; tokensEl.style.display=''; tpsEl.style.display='';
+    // SFT only: show method dropdown
+    if($('rec-stage').value === 'sft'){ methodGrp.style.display=''; }
+    else { methodGrp.style.display='none'; $('rec-method').value='full_param'; }
+  } else {
+    stageGrp.style.display='none'; methodGrp.style.display='none'; quantGrp.style.display='';
+    daysEl.style.display='none'; tokensEl.style.display='none'; tpsEl.style.display='';
+  }
 }
 
 function renderRecModelTags(){
@@ -1259,14 +1431,20 @@ async function runRecommend(){
 
   const params = new URLSearchParams();
   params.set('model',model);
-  params.set('scenario',$('rec-scenario').value);
-  const tokens=$('rec-tokens').value;if(tokens)params.set('training_tokens',tokens);
-  const days=$('rec-days').value;if(days)params.set('training_days',days);
-  const tps=$('rec-tps').value;if(tps)params.set('sla_tps',tps);
+  const sc=$('rec-scenario').value; params.set('scenario',sc);
+  if(sc==='train'){
+    params.set('stage',$('rec-stage').value);
+    if($('rec-stage').value==='sft') params.set('method',$('rec-method').value);
+    else params.set('method','full_param');
+    const tokens=$('rec-tokens').value;if(tokens)params.set('training_tokens',tokens);
+    const days=$('rec-days').value;if(days)params.set('training_days',days);
+  } else {
+    params.set('quant',$('rec-quant').value);
+    const tps=$('rec-tps').value;if(tps)params.set('sla_tps',tps);
+  }
   const mc=$('rec-max-cards').value;if(mc)params.set('max_cards',mc);
   const mnc=$('rec-min-cards').value;if(mnc)params.set('min_cards',mnc);
   const mp=$('rec-max-price').value;if(mp)params.set('max_price',mp);
-  const mm=$('rec-maturity').value;if(mm)params.set('min_maturity',mm);
   if($('rec-domestic').classList.contains('on'))params.set('prefer_domestic','true');
   const pv=$('rec-vendor').value;if(pv)params.set('prefer_vendor',pv);
   params.set('limit','20');params.set('tier','datacenter');
@@ -1281,9 +1459,9 @@ async function runRecommend(){
 
   results.innerHTML = `
     <div class="info" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <span>模型: <b>${esc(data.model||'')}</b> · 场景: <b>${req.scenario==='train'?'训练':'推理'}</b>
-      · 最低显存: <b>${req.min_vram_gb} GB</b>
-      · 训练数据量: <b>${req.training_tokens_T!=null?req.training_tokens_T+'T tokens':'—'}</b>
+      <span>模型: <b>${esc(data.model||'')}</b> · 场景: <b>${req.scenario_label||(req.scenario==='train'?'训练':'推理')}</b>
+      · VRAM: <b>${req.min_vram_gb} GB</b>
+      ${req.vram_formula ? `· <span style="font-size:0.7rem;color:var(--text2)">${esc(req.vram_formula)}</span>` : ''}
       · 候选: <b>${data.candidates?.length||0}</b> · 排除: <b>${data.rejected||0}</b></span>
       <button class="btn" onclick="showMethodology()" style="font-size:0.75rem;padding:4px 12px">📖 算法说明</button>
     </div>
@@ -1291,7 +1469,6 @@ async function runRecommend(){
       const rec = c.recommend||{};
       const scoring = c.scoring||{};
       const scoreBarPct = Math.min(100, (scoring.total||rec.score)/100*100);
-      // Map dimension meta for display
       const dimNameMap = {};
       dimMeta.forEach(m=>{ dimNameMap[m.id]=m; });
       return `
@@ -1311,7 +1488,10 @@ async function runRecommend(){
           </div>
           <div class="rec-rationale">${esc(rec.rationale||'')}</div>
           <div class="score-bar"><div class="score-bar-fill" style="width:${scoreBarPct}%"></div></div>
-          ${renderDimensionBreakdown(scoring, dimNameMap)}
+          <details class="scoring-details" style="margin-top:8px">
+            <summary style="font-size:0.75rem;color:var(--text2);cursor:pointer">📊 评分明细 ▼</summary>
+            ${renderDimensionBreakdown(scoring, dimNameMap)}
+          </details>
         </div>
       `;
     }).join('')}
@@ -1330,7 +1510,7 @@ function renderDimensionBreakdown(scoring, dimNameMap) {
     if (s>=3) return 'linear-gradient(90deg, var(--orange), var(--green))';
     return 'linear-gradient(90deg, var(--red), var(--orange))';
   }
-  return `<div class="dim-breakdown" style="margin-top:10px;border-top:1px solid var(--bg4);padding-top:8px">
+  return `<div class="dim-breakdown" style="margin-top:10px;border-top:var(--border);padding-top:8px">
     <div style="font-size:0.7rem;color:var(--text3);margin-bottom:6px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">📊 评分明细 ▼</div>
     <div style="display:block">${entries.map(([id,v])=>{
       const meta = dimNameMap[id] || {};
@@ -1487,7 +1667,7 @@ function renderCompatCard(c, idx){
   }).join('');
 
   var h = '';
-  h += '<div class="compat-card" style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:8px">';
+  h += '<div class="compat-card" style="background:var(--bg2);border:var(--border);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:8px">';
   h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
   h += '<div style="flex:1;min-width:200px">';
 
@@ -1531,7 +1711,7 @@ function renderCompatCard(c, idx){
 
   // Expandable benchmark details
   if(bmRows.length){
-    h += '<div id="compat-detail-'+idx+'" style="display:none;margin-top:8px;border-top:1px solid var(--bg4);padding-top:8px">';
+    h += '<div id="compat-detail-'+idx+'" style="display:none;margin-top:8px;border-top:var(--border);padding-top:8px">';
     h += '<div style="font-size:0.7rem;font-weight:600;color:var(--text2);margin-bottom:4px">&#128202; 关联实测数据 ('+ev.count+'条中展示前5条)</div>';
     h += '<div class="table-wrap" style="max-height:200px">';
     h += '<table class="data-table" style="font-size:0.68rem">';
