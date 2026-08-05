@@ -11,4 +11,7 @@ data/crawl_all
 data/crawl_fetched.jsonl
 *.db-shm
 *.db-wal
+data/*.backup_*
+*.log
+.server.pid
 .claude/settings.local.json

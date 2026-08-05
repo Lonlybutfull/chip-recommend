@@ -28,7 +28,9 @@ from typing import Optional, Literal
 # ═══════════════════════════════════════════════════════════
 
 TrainStage = Literal["cpt", "sft", "rl"]
-TrainMethod = Literal["full_param", "lora", "qlora"]
+TrainMethod = Literal["full_param", "lora"]
+QuantizeMethod = Literal["gptq", "awq", "bitsandbytes", "gguf"]
+QuantizeBits = Literal["int8", "int4", "fp8"]
 InferenceQuant = Literal["fp16", "int8", "int4_gptq", "int4_awq", "gguf_q4", "gguf_q8"]
 
 
@@ -38,10 +40,11 @@ InferenceQuant = Literal["fp16", "int8", "int4_gptq", "int4_awq", "gguf_q4", "gg
 
 def estimate_vram_total(
     params_B: float,
-    scenario: str,                    # "train" | "inference"
+    scenario: str,                    # "train" | "quantize" | "inference"
     stage: TrainStage = "sft",
-    method: TrainMethod = "full_param",
-    quant: InferenceQuant = "fp16",
+    method: str = "full_param",       # train: full_param/lora  |  quantize: gptq/awq/bitsandbytes/gguf
+    quant: str = "fp16",              # inference: fp16/int8/int4_gptq/int4_awq/gguf_q4/gguf_q8
+    quantize_bits: str = "int4",      # quantize: int8/int4/fp8
     moe_activated_B: float | None = None,
 ) -> tuple[float, str]:
     """Estimate total VRAM needed (GB) for a model under a scenario.
@@ -66,10 +69,6 @@ def estimate_vram_total(
                 # ~2.5 bytes/param for the frozen base + LoRA overhead
                 bytes_per = 2.5
                 label = "SFT(LoRA)"
-            elif method == "qlora":
-                # QLoRA: NF4 quantized base(0.5) + LoRA adapters + overhead
-                bytes_per = 0.9
-                label = "SFT(QLoRA)"
             else:
                 bytes_per = 20.0
                 label = "SFT(full_param)"
@@ -86,6 +85,34 @@ def estimate_vram_total(
         effective_P = P
         if moe_activated_B and moe_activated_B < P:
             effective_P = min(P, moe_activated_B * 2.0)  # compromise for MoE training
+
+        vram = effective_P * bytes_per * safety
+        return round(vram, 1), f"{label}: {effective_P:.1f}B × {bytes_per} bytes/param × {safety} = {vram:.0f}GB"
+
+    elif scenario == "quantize":
+        # ── Quantization scenario (v3.1): needs training-capable chips ──
+        # Must hold FP16 full model + calibration data structures in VRAM.
+        # Different methods need different overhead:
+        #   GPTQ: needs Hessian matrix (~1.5× per layer being processed)
+        #   AWQ: needs activation statistics buffer (~1.0×)
+        #   bitsandbytes: lightweight, mainly the model + quant buffers (~0.5×)
+        #   GGUF: needs calibration dataset batches (~0.5×)
+        safety = 1.25
+        quantize_bytes = {
+            "gptq": 3.5,           # 2.0 (FP16 model) + 1.5 (Hessian matrices)
+            "awq": 3.0,            # 2.0 (FP16 model) + 1.0 (activation stats)
+            "bitsandbytes": 2.5,   # 2.0 (FP16 model) + 0.5 (quant buffers)
+            "gguf": 2.5,           # 2.0 (FP16 model) + 0.5 (calibration data)
+        }
+        bytes_per = quantize_bytes.get(method, 3.5)
+        method_label = {"gptq": "GPTQ", "awq": "AWQ",
+                        "bitsandbytes": "bitsandbytes", "gguf": "GGUF"}.get(method, method)
+        bits_label = {"int8": "INT8", "int4": "INT4", "fp8": "FP8"}.get(quantize_bits, quantize_bits)
+        label = f"量化({method_label}-{bits_label})"
+
+        # Quantization processes the full model (not just activated experts for MoE),
+        # since every layer needs calibration passes.
+        effective_P = P
 
         vram = effective_P * bytes_per * safety
         return round(vram, 1), f"{label}: {effective_P:.1f}B × {bytes_per} bytes/param × {safety} = {vram:.0f}GB"
@@ -175,11 +202,21 @@ WEIGHTS_SFT_LORA = ScoringWeights(
     sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.08,
 )
 
-# SFT QLoRA: same as LoRA but even more VRAM-oriented
-WEIGHTS_SFT_QLORA = ScoringWeights(
-    compute_perf=0.10, vram_sufficiency=0.25, cost_efficiency=0.17,
-    power_efficiency=0.08, interconnect_quality=0.05, ecosystem_maturity=0.12,
-    sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.08,
+# SFT QLoRA: removed from train methods in v3.1 — quantization is now its own scenario
+# (see WEIGHTS_QUANTIZE below)
+
+# Quantize scenario: VRAM-dominant (must hold FP16 model + calibration structures),
+# needs training-capable hardware for forward+backward calibration passes.
+WEIGHTS_QUANTIZE = ScoringWeights(
+    compute_perf=0.12,          # calibration computation needs some compute
+    vram_sufficiency=0.28,      # most critical — FP16 model + calibration data in VRAM
+    cost_efficiency=0.12,       # one-time cost, moderate importance
+    power_efficiency=0.06,      # one-shot task, power less important
+    interconnect_quality=0.08,  # only 70B+ models need multi-card quantization
+    ecosystem_maturity=0.12,    # AutoGPTQ/AutoAWQ/bitsandbytes/llama.cpp toolchain support
+    sla_satisfaction=0.08,      # one-shot task, SLA is soft
+    production_readiness=0.06,
+    benchmark_evidence=0.08,
 )
 
 # RL: multi-model copies → VRAM + interconnect critical
@@ -207,13 +244,24 @@ WEIGHTS_INFER_QUANT = ScoringWeights(
 TRAIN_WEIGHTS = WEIGHTS_SFT_FULL    # default train = SFT full-param
 INFERENCE_WEIGHTS = WEIGHTS_INFER_FP16
 
-# ── Lookup table ──
+# ── Lookup table (v3.1: qlora removed from train, quantize scenario added) ──
 _SCENARIO_KEY_MAP = {
     ("train", "cpt", "full_param"): WEIGHTS_CPT,
     ("train", "sft", "full_param"): WEIGHTS_SFT_FULL,
     ("train", "sft", "lora"): WEIGHTS_SFT_LORA,
-    ("train", "sft", "qlora"): WEIGHTS_SFT_QLORA,
     ("train", "rl", "full_param"): WEIGHTS_RL,
+    ("quantize", "gptq", "int8"): WEIGHTS_QUANTIZE,
+    ("quantize", "gptq", "int4"): WEIGHTS_QUANTIZE,
+    ("quantize", "gptq", "fp8"): WEIGHTS_QUANTIZE,
+    ("quantize", "awq", "int8"): WEIGHTS_QUANTIZE,
+    ("quantize", "awq", "int4"): WEIGHTS_QUANTIZE,
+    ("quantize", "awq", "fp8"): WEIGHTS_QUANTIZE,
+    ("quantize", "bitsandbytes", "int8"): WEIGHTS_QUANTIZE,
+    ("quantize", "bitsandbytes", "int4"): WEIGHTS_QUANTIZE,
+    ("quantize", "bitsandbytes", "fp8"): WEIGHTS_QUANTIZE,
+    ("quantize", "gguf", "int8"): WEIGHTS_QUANTIZE,
+    ("quantize", "gguf", "int4"): WEIGHTS_QUANTIZE,
+    ("quantize", "gguf", "fp8"): WEIGHTS_QUANTIZE,
     ("inference", "fp16"): WEIGHTS_INFER_FP16,
     ("inference", "int8"): WEIGHTS_INFER_QUANT,
     ("inference", "int4_gptq"): WEIGHTS_INFER_QUANT,
@@ -226,8 +274,19 @@ _SCENARIO_LABEL_MAP = {
     ("train", "cpt", "full_param"): "训练·CPT·全参",
     ("train", "sft", "full_param"): "训练·SFT·全参",
     ("train", "sft", "lora"): "训练·SFT·LoRA",
-    ("train", "sft", "qlora"): "训练·SFT·QLoRA",
     ("train", "rl", "full_param"): "训练·RL·全参",
+    ("quantize", "gptq", "int8"): "量化·GPTQ·INT8",
+    ("quantize", "gptq", "int4"): "量化·GPTQ·INT4",
+    ("quantize", "gptq", "fp8"): "量化·GPTQ·FP8",
+    ("quantize", "awq", "int8"): "量化·AWQ·INT8",
+    ("quantize", "awq", "int4"): "量化·AWQ·INT4",
+    ("quantize", "awq", "fp8"): "量化·AWQ·FP8",
+    ("quantize", "bitsandbytes", "int8"): "量化·bitsandbytes·INT8",
+    ("quantize", "bitsandbytes", "int4"): "量化·bitsandbytes·INT4",
+    ("quantize", "bitsandbytes", "fp8"): "量化·bitsandbytes·FP8",
+    ("quantize", "gguf", "int8"): "量化·GGUF·INT8",
+    ("quantize", "gguf", "int4"): "量化·GGUF·INT4",
+    ("quantize", "gguf", "fp8"): "量化·GGUF·FP8",
     ("inference", "fp16"): "推理·FP16",
     ("inference", "int8"): "推理·INT8",
     ("inference", "int4_gptq"): "推理·INT4-GPTQ",
@@ -239,16 +298,20 @@ _SCENARIO_LABEL_MAP = {
 def get_scenario_weights(
     scenario: str,
     stage: TrainStage = "sft",
-    method: TrainMethod = "full_param",
-    quant: InferenceQuant = "fp16",
+    method: str = "full_param",
+    quant: str = "fp16",
+    quantize_bits: str = "int4",
 ) -> tuple[ScoringWeights, str]:
     """Return (weights, display_label) for a given scenario configuration."""
     if scenario == "train":
         key = ("train", stage, method)
+    elif scenario == "quantize":
+        key = ("quantize", method, quantize_bits)
     else:
         key = ("inference", quant)
     return (
-        _SCENARIO_KEY_MAP.get(key, TRAIN_WEIGHTS if scenario == "train" else INFERENCE_WEIGHTS),
+        _SCENARIO_KEY_MAP.get(key, TRAIN_WEIGHTS if scenario == "train" else
+                               WEIGHTS_QUANTIZE if scenario == "quantize" else INFERENCE_WEIGHTS),
         _SCENARIO_LABEL_MAP.get(key, scenario),
     )
 
@@ -279,10 +342,11 @@ class RecommendContext:
     """All data needed for scoring one chip."""
     chip: dict
     model_params_B: float
-    scenario: str                     # "train" | "inference"
+    scenario: str                     # "train" | "quantize" | "inference"
     stage: str = "sft"                # "cpt" | "sft" | "rl"
-    method: str = "full_param"        # "full_param" | "lora" | "qlora"
-    quant: str = "fp16"               # "fp16" | "int8" | "int4_gptq" | "int4_awq" | "gguf_q4" | "gguf_q8"
+    method: str = "full_param"        # train: full_param/lora  |  quantize: gptq/awq/bitsandbytes/gguf
+    quant: str = "fp16"               # inference: fp16/int8/int4_gptq/int4_awq/gguf_q4/gguf_q8
+    quantize_bits: str = "int4"       # quantize: int8/int4/fp8
     min_vram_total: float = 0.0
     vram_formula: str = ""            # human-readable formula
     vram_cards: int = 0
@@ -792,6 +856,13 @@ def aggregate_score(
             ctx.fp16_tflops, float(chip.get("vram_bw_gb_s", 0) or 0), ctx.model_params_B,
         )
         dims["sla_satisfaction"] = score_sla_inference(est_tps, ctx.target_tps)
+    elif ctx.scenario == "quantize":
+        # Quantization is a one-shot task — SLA is soft.
+        # Score based on whether the chip has sufficient VRAM in recommended configuration.
+        dims["sla_satisfaction"] = DimensionResult(
+            score=5.0, detail="量化是一次性任务，无SLA目标 → 中性 5.0/10",
+            raw_values={"note": "quantize_no_sla"},
+        )
     else:
         dims["sla_satisfaction"] = DimensionResult(
             score=5.0, detail="无SLA目标 → 中性 5.0/10",

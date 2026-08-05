@@ -1358,10 +1358,12 @@ function initRecommend(){
         </div>
         <input type="hidden" id="rec-model" value="">
       </div>
-      <div class="form-group"><label>场景</label><select id="rec-scenario" onchange="updateRecForm()"><option value="train">训练</option><option value="inference">推理</option></select></div>
+      <div class="form-group"><label>场景</label><select id="rec-scenario" onchange="updateRecForm()"><option value="train">训练</option><option value="quantize">量化</option><option value="inference">推理</option></select></div>
       <div class="form-group" id="rec-stage-grp"><label>训练阶段</label><select id="rec-stage"><option value="sft">SFT (监督微调)</option><option value="cpt">CPT (持续预训练)</option><option value="rl">RL (强化学习)</option></select></div>
-      <div class="form-group" id="rec-method-grp"><label>训练方式</label><select id="rec-method"><option value="full_param">全参微调</option><option value="lora">LoRA (低秩适配)</option><option value="qlora">QLoRA (量化LoRA)</option></select></div>
-      <div class="form-group" id="rec-quant-grp" style="display:none"><label>量化精度</label><select id="rec-quant"><option value="fp16">FP16 (全精度)</option><option value="int8">INT8</option><option value="int4_gptq">INT4 GPTQ</option><option value="int4_awq">INT4 AWQ</option><option value="gguf_q4">GGUF Q4</option><option value="gguf_q8">GGUF Q8</option></select></div>
+      <div class="form-group" id="rec-method-grp"><label>训练方式</label><select id="rec-method"><option value="full_param">全参微调</option><option value="lora">LoRA (低秩适配)</option></select></div>
+      <div class="form-group" id="rec-quantize-method-grp" style="display:none"><label>量化方式</label><select id="rec-quantize-method"><option value="gptq">GPTQ</option><option value="awq">AWQ</option><option value="bitsandbytes">bitsandbytes</option><option value="gguf">GGUF</option></select></div>
+      <div class="form-group" id="rec-quantize-bits-grp" style="display:none"><label>量化比特</label><select id="rec-quantize-bits"><option value="int4">INT4</option><option value="int8">INT8</option><option value="fp8">FP8</option></select></div>
+      <div class="form-group" id="rec-quant-grp" style="display:none"><label>推理精度</label><select id="rec-quant"><option value="fp16">FP16 (全精度)</option><option value="int8">INT8</option><option value="int4_gptq">INT4 GPTQ</option><option value="int4_awq">INT4 AWQ</option><option value="gguf_q4">GGUF Q4</option><option value="gguf_q8">GGUF Q8</option></select></div>
       <div class="form-group"><label>期望训练天数</label><input type="number" id="rec-days" placeholder="3" min="0.1" step="0.5"></div>
       <div class="form-group"><label>训练数据量 (T tokens)</label><input type="number" id="rec-tokens" placeholder="自动推算" min="0.1" max="1000" step="0.5"></div>
       <div class="form-group"><label>目标推理吞吐 (tok/s)</label><input type="number" id="rec-tps" placeholder="可选" min="0"></div>
@@ -1402,15 +1404,22 @@ function initRecommend(){
 function updateRecForm(){
   const sc = $('rec-scenario').value;
   const stageGrp = $('rec-stage-grp'), methodGrp = $('rec-method-grp'), quantGrp = $('rec-quant-grp');
+  const qMethGrp = $('rec-quantize-method-grp'), qBitsGrp = $('rec-quantize-bits-grp');
   const daysEl = $('rec-days').parentElement, tokensEl = $('rec-tokens').parentElement, tpsEl = $('rec-tps').parentElement;
   if(sc === 'train'){
     stageGrp.style.display=''; methodGrp.style.display=''; quantGrp.style.display='none';
+    qMethGrp.style.display='none'; qBitsGrp.style.display='none';
     daysEl.style.display=''; tokensEl.style.display=''; tpsEl.style.display='';
     // SFT only: show method dropdown
     if($('rec-stage').value === 'sft'){ methodGrp.style.display=''; }
     else { methodGrp.style.display='none'; $('rec-method').value='full_param'; }
+  } else if(sc === 'quantize'){
+    stageGrp.style.display='none'; methodGrp.style.display='none'; quantGrp.style.display='none';
+    qMethGrp.style.display=''; qBitsGrp.style.display='';
+    daysEl.style.display='none'; tokensEl.style.display='none'; tpsEl.style.display='none';
   } else {
     stageGrp.style.display='none'; methodGrp.style.display='none'; quantGrp.style.display='';
+    qMethGrp.style.display='none'; qBitsGrp.style.display='none';
     daysEl.style.display='none'; tokensEl.style.display='none'; tpsEl.style.display='';
   }
 }
@@ -1438,6 +1447,9 @@ async function runRecommend(){
     else params.set('method','full_param');
     const tokens=$('rec-tokens').value;if(tokens)params.set('training_tokens',tokens);
     const days=$('rec-days').value;if(days)params.set('training_days',days);
+  } else if(sc==='quantize'){
+    params.set('method',$('rec-quantize-method').value);
+    params.set('quantize_bits',$('rec-quantize-bits').value);
   } else {
     params.set('quant',$('rec-quant').value);
     const tps=$('rec-tps').value;if(tps)params.set('sla_tps',tps);
