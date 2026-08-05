@@ -276,6 +276,37 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 .scoring-details summary{font-size:0.75rem;color:var(--text2);cursor:pointer;font-weight:500;user-select:none}
 .scoring-dim{font-size:0.68rem;color:var(--text3);margin-top:6px;line-height:1.5}
 
+/* Score tooltip */
+.score-tooltip{
+  position:fixed;z-index:9999;max-width:380px;min-width:200px;
+  background:rgba(20,24,36,0.96);color:#e8eaf0;
+  border:1px solid rgba(255,255,255,0.12);border-radius:10px;
+  padding:12px 15px;font-size:0.78rem;line-height:1.55;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5);
+  pointer-events:none;opacity:0;transition:opacity 0.18s;
+  backdrop-filter:blur(8px);
+}
+.score-tooltip.visible{opacity:1}
+.score-tooltip .tt-title{font-weight:700;font-size:0.88rem;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.score-tooltip .tt-title .tt-score{font-size:1.1rem;color:var(--accent)}
+.score-tooltip .tt-formula{color:var(--text2);font-size:0.73rem;margin-bottom:6px;padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:6px;font-family:'SF Mono','Cascadia Code',Consolas,monospace}
+.score-tooltip .tt-raw{font-size:0.7rem;color:var(--text3)}
+.score-tooltip .tt-raw span{display:inline-block;margin-right:10px;white-space:nowrap}
+.score-tooltip .tt-weight{color:var(--text3);font-size:0.7rem;margin-top:4px}
+
+.dim-row{cursor:pointer;transition:background 0.15s;padding:3px 4px;border-radius:4px;margin:0 -4px}
+.dim-row:hover{background:rgba(255,255,255,0.04)}
+
+/* Calculation Breakdown */
+.calc-breakdown{margin-top:10px;padding:10px 12px;background:var(--bg3);border-radius:8px;font-size:0.73rem}
+.calc-breakdown summary{font-weight:600;color:var(--accent);cursor:pointer;user-select:none;font-size:0.78rem}
+.calc-breakdown .calc-item{margin:6px 0;padding:4px 0;border-bottom:1px solid var(--bg4)}
+.calc-breakdown .calc-item:last-child{border-bottom:none}
+.calc-breakdown .calc-label{color:var(--text2);font-size:0.68rem}
+.calc-breakdown .calc-value{color:var(--text);font-weight:600;font-family:monospace;font-size:0.75rem}
+.calc-breakdown .calc-detail{color:var(--text3);font-size:0.66rem;margin-top:2px}
+
+
 /* Agent quick-chips panel */
 .agent-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;height:calc(100vh - 140px);min-height:560px}
 @media(max-width:900px){.agent-layout{grid-template-columns:1fr}}
@@ -1473,7 +1504,7 @@ async function runRecommend(){
     <div class="info" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <span>模型: <b>${esc(data.model||'')}</b> · 场景: <b>${req.scenario_label||(req.scenario==='train'?'训练':'推理')}</b>
       · VRAM: <b>${req.min_vram_gb} GB</b>
-      ${req.vram_formula ? `· <span style="font-size:0.7rem;color:var(--text2)">${esc(req.vram_formula)}</span>` : ''}
+      ${req.vram_formula ? `· <span style="font-size:0.7rem;color:var(--text2)" title="${esc(req.vram_formula)}">${esc(req.vram_formula.substring(0,60))}…</span>` : ''}
       · 候选: <b>${data.candidates?.length||0}</b> · 排除: <b>${data.rejected||0}</b></span>
       <button class="btn" onclick="showMethodology()" style="font-size:0.75rem;padding:4px 12px">📖 算法说明</button>
     </div>
@@ -1499,11 +1530,9 @@ async function runRecommend(){
             <div class="rec-stat"><div class="label">显存</div><div class="value">${c.vram_gb||'?'} GB</div></div>
           </div>
           <div class="rec-rationale">${esc(rec.rationale||'')}</div>
+          ${renderCalcBreakdown(req, rec, c)}
           <div class="score-bar"><div class="score-bar-fill" style="width:${scoreBarPct}%"></div></div>
-          <details class="scoring-details" style="margin-top:8px">
-            <summary style="font-size:0.75rem;color:var(--text2);cursor:pointer">📊 评分明细 ▼</summary>
-            ${renderDimensionBreakdown(scoring, dimNameMap)}
-          </details>
+          ${renderDimensionBreakdown(scoring, dimNameMap)}
         </div>
       `;
     }).join('')}
@@ -1522,20 +1551,100 @@ function renderDimensionBreakdown(scoring, dimNameMap) {
     if (s>=3) return 'linear-gradient(90deg, var(--orange), var(--green))';
     return 'linear-gradient(90deg, var(--red), var(--orange))';
   }
-  return `<div class="dim-breakdown" style="margin-top:10px;border-top:var(--border);padding-top:8px">
-    <div style="font-size:0.7rem;color:var(--text3);margin-bottom:6px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">📊 评分明细 ▼</div>
-    <div style="display:block">${entries.map(([id,v])=>{
+  return `<div class="dim-breakdown" style="margin-top:8px;border-top:var(--border);padding-top:6px">
+    <div style="font-size:0.68rem;color:var(--text3);margin-bottom:4px">📊 评分明细（鼠标悬浮查看计算公式）</div>
+    ${entries.map(([id,v])=>{
       const meta = dimNameMap[id] || {};
       const name = meta.name_cn || id;
       const pct = Math.min(100, v.score*10);
-      return `<div class="dim-row" style="display:flex;align-items:center;gap:6px;font-size:0.7rem;padding:2px 0">
-        <span style="width:72px;color:var(--text2);white-space:nowrap;text-align:right;flex-shrink:0" title="${esc(v.detail||'')}">${esc(name)}</span>
-        <span style="flex:1;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:${pct}%;background:${barColor(v.score)};border-radius:3px"></span></span>
-        <span style="width:28px;text-align:right;font-weight:600;color:var(--text);flex-shrink:0">${v.score}</span>
-        <span style="width:64px;text-align:right;color:var(--text3);font-size:0.65rem;flex-shrink:0">×${v.weight.toFixed(2)}=${v.weighted.toFixed(2)}</span>
+      const tooltipData = esc(JSON.stringify({name, score:v.score, weight:v.weight, weighted:v.weighted, detail:v.detail||'', raw:v.raw_values||{}}));
+      return `<div class="dim-row" style="display:flex;align-items:center;gap:6px;font-size:0.68rem;padding:3px 4px;margin:0 -4px;border-radius:4px"
+        onmouseenter="showScoreTooltip(event, ${tooltipData})"
+        onmousemove="moveScoreTooltip(event)"
+        onmouseleave="hideScoreTooltip()">
+        <span style="width:68px;color:var(--text2);white-space:nowrap;text-align:right;flex-shrink:0">${esc(name)}</span>
+        <span style="flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden"><span style="display:block;height:100%;width:${pct}%;background:${barColor(v.score)};border-radius:3px"></span></span>
+        <span style="width:24px;text-align:center;font-weight:700;color:var(--text);flex-shrink:0;font-size:0.75rem">${v.score}</span>
+        <span style="width:56px;text-align:right;color:var(--text3);font-size:0.62rem;flex-shrink:0">×${v.weight.toFixed(2)}=${v.weighted.toFixed(1)}</span>
       </div>`;
-    }).join('')}</div>
+    }).join('')}
   </div>`;
+}
+
+// ── Score Tooltip (floating) ──
+let _tooltipEl = null;
+function getTooltip(){
+  if(!_tooltipEl){
+    _tooltipEl = document.createElement('div');
+    _tooltipEl.className = 'score-tooltip';
+    document.body.appendChild(_tooltipEl);
+  }
+  return _tooltipEl;
+}
+function showScoreTooltip(ev, data){
+  const tt = getTooltip();
+  const rawEntries = Object.entries(data.raw||{}).filter(([,v])=>v!=null&&v!==''&&String(v)!=='undefined');
+  tt.innerHTML = `
+    <div class="tt-title"><span>${esc(data.name)}</span><span class="tt-score">${data.score}<span style="font-size:0.65rem;color:var(--text3)">/10</span></span></div>
+    <div class="tt-formula">${esc(data.detail)}</div>
+    ${rawEntries.length ? '<div class="tt-raw">'+rawEntries.map(([k,v])=>`<span>${esc(k)}: <b>${esc(typeof v==='number'?v.toFixed(2):String(v))}</b></span>`).join(' ')+'</div>' : ''}
+    <div class="tt-weight">权重: ${data.weight.toFixed(2)} · 加权: ${(data.score*data.weight).toFixed(2)}</div>
+  `;
+  tt.classList.add('visible');
+  moveScoreTooltip(ev);
+}
+function moveScoreTooltip(ev){
+  const tt = getTooltip();
+  const x = ev.clientX + 16, y = ev.clientY - 10;
+  const r = tt.getBoundingClientRect();
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const finalX = x + r.width > vw - 10 ? ev.clientX - r.width - 16 : x;
+  const finalY = y + r.height > vh - 10 ? ev.clientY - r.height - 10 : y;
+  tt.style.left = finalX + 'px';
+  tt.style.top = finalY + 'px';
+}
+function hideScoreTooltip(){
+  getTooltip().classList.remove('visible');
+}
+
+// ── Calculation Breakdown (collapsible) ──
+function renderCalcBreakdown(req, rec, chip){
+  const items = [];
+  // VRAM calculation
+  if(req.vram_formula){
+    items.push({label:'显存需求计算', value:req.min_vram_gb!=null?req.min_vram_gb.toFixed(1)+' GB':'?', detail:req.vram_formula});
+  }
+  // Cards
+  if(rec.vram_cards != null){
+    items.push({label:'显存约束最少卡数', value:rec.vram_cards+' 卡', detail:`单卡${chip.vram_gb||'?'}GB / 需要${req.min_vram_gb!=null?req.min_vram_gb.toFixed(1):'?'}GB → 向上取2幂次方`});
+  }
+  if(rec.recommended_cards != null && rec.recommended_cards !== rec.vram_cards){
+    items.push({label:'算力约束最少卡数', value:rec.recommended_cards+' 卡', detail:'按训练FLOPs需求计算所需卡数'});
+  }
+  // Training time
+  if(rec.estimated_training_days != null && req.target_training_days != null){
+    items.push({label:'预计训练时间', value:rec.estimated_training_days.toFixed(1)+' 天', detail:`目标: ${req.target_training_days}天 · 训练量: ${req.training_tokens_T||'?'}T tokens`});
+  }
+  // Price
+  if(rec.total_cost_wan != null){
+    items.push({label:'预估总价', value:rec.total_cost_wan+' 万元', detail:`${rec.recommended_cards||rec.vram_cards}卡 × ${chip.price_cny_wan||'?'}万/卡`});
+  }
+  // Scenario weights
+  const w = rec.scenario_weights || (chip.scoring && chip.scoring.weights);
+  if(w){
+    const dimNames = {compute_perf:'算力',vram_sufficiency:'显存',cost_efficiency:'成本',power_efficiency:'能效',interconnect_quality:'互联',ecosystem_maturity:'生态',sla_satisfaction:'SLA',production_readiness:'量产',benchmark_evidence:'实测'};
+    const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${dimNames[k]||k}:${(v*100).toFixed(0)}%`).join(' ');
+    items.push({label:'场景权重分配', value:parts, detail:`总分=Σ(维度分×权重)×10, 0-100分制`});
+  }
+  if(!items.length) return '';
+  return `<details class="calc-breakdown">
+    <summary>📐 计算过程</summary>
+    ${items.map(it=>`<div class="calc-item">
+      <div class="calc-label">${esc(it.label)}</div>
+      <div class="calc-value">${esc(it.value)}</div>
+      ${it.detail ? `<div class="calc-detail">${esc(it.detail)}</div>` : ''}
+    </div>`).join('')}
+  </details>`;
 }
 
 async function showMethodology() {
@@ -1559,13 +1668,23 @@ async function showMethodology() {
         <div class="group"><div class="group-header">硬约束条件</div><div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px">
           ${(data.hard_constraints||[]).map(c=>`<div class="group-field"><span class="val">${esc(c)}</span></div>`).join('')}
         </div></div>
-        <div class="group"><div class="group-header">评分维度 (10维)</div>
+        <div class="group"><div class="group-header">评分维度 (11维)</div>
         <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:6px">
           ${dims.map(d=>`<div class="group-field" style="flex-direction:column;align-items:flex-start;gap:2px">
-            <span style="font-weight:600;color:var(--accent)">${esc(d.name_cn)} (${esc(d.name_en)}) — 训练权重${d.train_weight||0} / 推理权重${d.infer_weight||0}</span>
+            <span style="font-weight:600;color:var(--accent)">${esc(d.name_cn)} (${esc(d.name_en)})</span>
             <span style="color:var(--text2);font-size:0.73rem">${esc(d.desc||'')} · 单位: ${esc(d.unit||'')}</span>
+            <span style="color:var(--text3);font-size:0.68rem">训练:${(d.train_weight||0).toFixed(2)} | 推理:${(d.infer_weight||0).toFixed(2)} | 量化:${(d.quantize_weight||0).toFixed(2)}</span>
           </div>`).join('')}
         </div></div>
+        ${data.scenario_weights ? `
+        <div class="group"><div class="group-header">场景权重矩阵</div>
+        <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px;font-size:0.7rem">
+          ${Object.entries(data.scenario_weights).map(([scenario,w])=>{
+            const dimNames = {compute_perf:'算力',vram_sufficiency:'显存',cost_efficiency:'成本',power_efficiency:'能效',interconnect_quality:'互联',ecosystem_maturity:'生态',sla_satisfaction:'SLA',production_readiness:'量产',benchmark_evidence:'实测'};
+            const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>dimNames[k]+':'+(v*100).toFixed(0)+'%').join(', ');
+            return `<div class="group-field"><span class="key" style="font-weight:600">${esc(scenario)}</span><span class="val">${esc(parts)}</span></div>`;
+          }).join('')}
+        </div></div>` : ''}
       </div>`;
   } catch(e) { panel.innerHTML = `<div class="error">加载失败: ${esc(e.message)}</div>`; }
 }
