@@ -42,13 +42,16 @@ from chip_model.database import (
     get_chip_benchmark_tps,
     get_chip_model_compat_count,
 )
-from chip_model.scoring import (  # v2.0 scoring engine
+from chip_model.scoring import (  # v3.0 scoring engine
     parse_fp16,
     round_up_pow2,
     RecommendContext,
     ScoringWeights,
     TRAIN_WEIGHTS,
     INFERENCE_WEIGHTS,
+    get_scenario_weights,
+    estimate_vram_total,
+    estimate_training_flops,
     DimensionResult,
     ScoringResult,
     aggregate_score,
@@ -166,7 +169,6 @@ def api_chip_search(
     price_max: Optional[float] = Query(None, description="Max unit price (万元/片)"),
     interconnect_min: Optional[float] = Query(None, description="Min interconnect BW (GB/s)"),
     tier: Optional[str] = Query(None, description="datacenter | consumer | all"),
-    min_maturity: Optional[int] = Query(None, description="Min ecosystem maturity (0-5)"),
     for_model: Optional[str] = Query(None, description="Auto-estimate VRAM for this model"),
     scenario: Optional[str] = Query(None, description="train | inference (with for_model)"),
     limit: int = Query(50, le=2000),
@@ -180,7 +182,7 @@ def api_chip_search(
         search=effective_search, vendor=vendor, region=region, usage=usage,
         vram_min=vram_min, vram_max=vram_max, tdp_max=tdp_max,
         price_max=price_max, interconnect_min=interconnect_min,
-        tier=tier, min_maturity=min_maturity,
+        tier=tier,
         for_model=for_model, scenario=scenario,
     )
     return search_chips(filters, limit=limit, offset=offset,
@@ -192,6 +194,9 @@ def api_chip_recommend(
     model: str = Query(..., description="Model name (fuzzy match)",
                        examples=["Qwen2.5-7B", "Llama-3.1-8B", "DeepSeek-V3"]),
     scenario: str = Query("train", description="train | inference"),
+    stage: Optional[str] = Query("sft", description="[train] cpt | sft | rl"),
+    method: Optional[str] = Query("full_param", description="[train] full_param | lora | qlora"),
+    quant: Optional[str] = Query("fp16", description="[inference] fp16 | int8 | int4_gptq | int4_awq | gguf_q4 | gguf_q8"),
     training_days: Optional[float] = Query(None, description="Target training days"),
     training_tokens: Optional[float] = Query(None, description="Training data volume (T tokens), auto-estimated if unset"),
     sla_tps: Optional[float] = Query(None, description="Target inference throughput (tok/s)"),
@@ -199,13 +204,20 @@ def api_chip_recommend(
     max_cards: Optional[int] = Query(None, description="Hard exclude: max cards"),
     min_cards: Optional[int] = Query(None, description="Hard floor: min cards (round up to pow2)"),
     max_price: Optional[float] = Query(None, description="Hard exclude: max unit price (万元)"),
-    min_maturity: Optional[int] = Query(None, description="Hard exclude: min maturity 0-5"),
     prefer_domestic: bool = Query(False, description="Prefer domestic chips"),
     prefer_vendor: Optional[str] = Query(None, description="Prefer vendor"),
     tco_weight: float = Query(0.0, ge=0.0, le=0.3, description="TCO dimension weight 0.0-0.3"),
     limit: int = Query(5, le=20),
 ):
-    """Recommend chips for a model × scenario × constraints.  v2.0 10-dimension scoring."""
+    """Recommend chips for a model × scenario × constraints.  v3.0 fine-grained scenarios.
+
+    Training: choose stage (CPT/SFT/RL) + method (full_param/LoRA/QLoRA).
+    Inference: choose quantization (FP16/INT8/INT4-GPTQ/AWQ/GGUF).
+    """
+    stage_val = stage or "sft"
+    method_val = method or "full_param"
+    quant_val = quant or "fp16"
+
     # 1. Find model
     model_result = search_models(ModelFilters(search=model), limit=1)
     if model_result["count"] == 0:
@@ -216,19 +228,13 @@ def api_chip_recommend(
     model_id = str(model_data.get("model_id", "") or "")
     arch_family = str(model_data.get("architecture_family", "") or "")
 
-    # 2a. Detect MoE models and use activated parameters for VRAM estimation
-    # e.g. Qwen/Qwen3.5-397B-A17B → 397B total, 17B activated
-    #       deepseek-ai/DeepSeek-V3 → 671B total, 37B activated
+    # 2a. Detect MoE models
     import re as _re
     moe_activated = None
-    # Pattern 1: model_id contains "-A{activated}B" or "A{activated}B" (Qwen naming)
     m = _re.search(r'-A(\d+(?:\.\d+)?)\s*B', model_id)
-    # Pattern 2: model_id contains "{total}B-A{activated}B"
     if not m:
         m = _re.search(r'A(\d+(?:\.\d+)?)\s*B', model_id)
-    # Pattern 3: architecture_family is MoE and model_id has "/some-{activated}B"
     if not m and arch_family.lower().startswith('moe'):
-        # Try to find the lower number after a dash
         nums = _re.findall(r'[-/](\d+(?:\.\d+)?)\s*B', model_id)
         if len(nums) >= 2:
             lower = min(float(n) for n in nums)
@@ -236,29 +242,9 @@ def api_chip_recommend(
     if m:
         moe_activated = float(m.group(1))
         if scenario == "inference":
-            # Inference: use activated params for VRAM (but total for throughput estimation)
-            effective_params = moe_activated
             print(f"[INFO] MoE model detected: {total_params}B total, {moe_activated}B activated → using activated for VRAM")
-        else:
-            # Training: use activated params for forward + backward,
-            # but expert routing means not all params participate in every step.
-            # Use a compromise: 2× activated as effective training footprint.
-            effective_params = min(total_params, moe_activated * 2.0)
-            print(f"[INFO] MoE model detected: {total_params}B total, {moe_activated}B activated → effective training params {effective_params:.0f}B")
-    else:
-        effective_params = total_params
 
-    # 2. Auto-estimate training tokens if unset (Chinchilla: tokens ≈ 20×params, use 50% = 10×params)
-    if training_tokens is None:
-        training_tokens_val = max(0.1, min(100.0, total_params * 10.0))
-    else:
-        training_tokens_val = training_tokens
-
-    model_summary = (
-        f"{model_id} | {arch_family} | {total_params}B params"
-    )
-
-    # 3. Calculate VRAM + FLOPs requirements (with quantized model support)
+    # 2b. Check quantized model in model data
     import json as _json
     config_raw = model_data.get("config_json", "") or ""
     is_quantized = False
@@ -273,19 +259,25 @@ def api_chip_recommend(
     if scenario == "train" and is_quantized:
         raise HTTPException(400, f"量化模型 {model_id} 只能用于推理场景，不支持训练")
 
+    # 3. Calculate VRAM + FLOPs with v3.0 fine-grained formulas
+    min_vram_total, vram_formula = estimate_vram_total(
+        total_params, scenario=scenario,
+        stage=stage_val, method=method_val, quant=quant_val,
+        moe_activated_B=moe_activated,
+    )
+
     if scenario == "train":
-        min_vram_total = effective_params * 12 * 1.3
-        total_flops = 6 * (effective_params * 1e9) * (training_tokens_val * 1e12)
+        training_tokens_val = training_tokens if training_tokens else max(0.1, min(100.0, total_params * 10.0))
+        total_flops = estimate_training_flops(total_params, training_tokens_val)
     else:
-        # Inference: adjust VRAM for quantized models
-        if is_quantized and quant_bits:
-            bytes_per_param = quant_bits / 8.0
-        else:
-            bytes_per_param = 2.0  # FP16 default
-        min_vram_total = effective_params * bytes_per_param * 1.25
+        training_tokens_val = 0.0
         total_flops = 0.0
 
-    # 4. Get candidates
+    model_summary = (
+        f"{model_id} | {arch_family} | {total_params}B params"
+    )
+
+    # 4. Get candidates (v3.0: no min_maturity filtering)
     _, candidates = get_chip_recommend_candidates(
         model, scenario=scenario, tier=tier or "datacenter",
         prefer_domestic=prefer_domestic,
@@ -304,16 +296,18 @@ def api_chip_recommend(
             )
         raise HTTPException(404, f"没有芯片满足 {model} 的VRAM需求 (≥{min_vram_total:.0f}GB)，请尝试其他模型或放宽约束")
 
-    # 5. Scoring loop
-    weights = TRAIN_WEIGHTS if scenario == "train" else INFERENCE_WEIGHTS
+    # 5. Get scenario-specific weights
+    weights, scenario_label = get_scenario_weights(
+        scenario, stage=stage_val, method=method_val, quant=quant_val,
+    )
+
+    # 6. Scoring loop
     scored: list[dict] = []
-    # One-liner to round up and cap for sane display
     _card = lambda n, cap=64: min(round_up_pow2(n), cap)
 
     for chip in candidates:
         chip_dict = dict(chip)
         vram = float(chip_dict.get("vram_gb", 1))
-        maturity = int(float(chip_dict.get("maturity_level", 0) or 0))
         price_wan = float(chip_dict.get("price_cny_wan", 0) or 0)
         chip_model_name = str(chip_dict.get("chip_model", "") or "")
 
@@ -327,7 +321,6 @@ def api_chip_recommend(
         fp16_val = parse_fp16(chip_dict.get("precision_perf", ""))
 
         if scenario == "train" and fp16_val > 0:
-            # Get measured MFU or use default 0.30
             bench_mfu = get_chip_benchmark_mfu(chip_model_name)
             mfu_target = (bench_mfu / 100.0) if bench_mfu else 0.30
             effective_per_card_day = fp16_val * 1e12 * mfu_target * 86400
@@ -341,25 +334,22 @@ def api_chip_recommend(
 
         recommended_cards = deadline_cards
 
-        # Min cards floor
         if min_cards:
             min_cards_pow2 = _card(min_cards)
             if recommended_cards < min_cards_pow2:
                 recommended_cards = _card(min_cards_pow2)
 
-        # Hard exclude
+        # Hard exclude (v3.0: no min_maturity)
         if max_cards and recommended_cards > max_cards:
             continue
         if max_price and price_wan and price_wan > max_price:
-            continue
-        if min_maturity is not None and maturity < min_maturity:
             continue
 
         meets_sla = True
         if training_days and estimated_days is not None and estimated_days > training_days:
             meets_sla = False
 
-        # ── Benchmark data for scoring ──
+        # ── Benchmark data ──
         bench_records = get_chip_benchmarks_for_model(
             chip_model_name, model_id, total_params,
         )
@@ -367,12 +357,16 @@ def api_chip_recommend(
         bench_tps_val = get_chip_benchmark_tps(chip_model_name)
         compat_verified = get_chip_model_compat_count(chip_model_name)
 
-        # ── v2.0 Scoring ──
+        # ── v3.0 Scoring ──
         ctx = RecommendContext(
             chip=chip_dict,
             model_params_B=total_params,
             scenario=scenario,
+            stage=stage_val,
+            method=method_val,
+            quant=quant_val,
             min_vram_total=min_vram_total,
+            vram_formula=vram_formula,
             vram_cards=vram_cards,
             recommended_cards=recommended_cards,
             fp16_tflops=fp16_val,
@@ -405,7 +399,7 @@ def api_chip_recommend(
         })
 
     if not scored:
-        raise HTTPException(404, "所有候选芯片均被硬约束排除，请放宽最大卡数/最小卡数、最高单价或最低成熟度限制")
+        raise HTTPException(404, "所有候选芯片均被硬约束排除，请放宽最大卡数或最高单价限制")
 
     scored.sort(key=lambda x: x["score"], reverse=True)
     top = scored[:limit]
@@ -414,17 +408,22 @@ def api_chip_recommend(
         "model": model_summary,
         "requirements": {
             "scenario": scenario,
+            "stage": stage_val,
+            "method": method_val if scenario == "train" else None,
+            "quant": quant_val if scenario == "inference" else None,
+            "scenario_label": scenario_label,
+            "vram_formula": vram_formula,
             "min_vram_gb": round(min_vram_total, 1),
-            "training_tokens_T": round(training_tokens_val, 1),
+            "training_tokens_T": round(training_tokens_val, 1) if scenario == "train" else None,
             "target_training_days": training_days,
             "target_tokens_per_sec": sla_tps,
             "max_cards": max_cards,
             "min_cards": min_cards,
             "max_price_wan": max_price,
-            "min_maturity": min_maturity,
         },
         "scoring_meta": {
-            "version": "2.0.0",
+            "version": "3.0.0",
+            "scenario_label": scenario_label,
             "scenario_weights": weights.__dict__,
             "dimensions": DIMENSION_META,
         },
@@ -497,7 +496,6 @@ def api_methodology():
             "max_cards: 推荐卡数超过此值 → 排除",
             "min_cards: 推荐卡数低于此值 → 拉高到 min_cards (2幂次方)",
             "max_price: 单价超过此值 → 排除",
-            "min_maturity: 成熟度低于此值 → 排除",
         ],
     }
 

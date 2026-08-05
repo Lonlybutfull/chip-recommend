@@ -27,7 +27,6 @@ class ChipFilters:
     price_max: float | None = None
     interconnect_min: float | None = None
     tier: str | None = None
-    min_maturity: int | None = None
     for_model: str | None = None
     scenario: str | None = None
 
@@ -280,11 +279,6 @@ def search_chips(
         if filters.tier and filters.tier != "all":
             conditions.append("tier = ?")
             params.append(filters.tier)
-
-        # ── maturity ──
-        if filters.min_maturity is not None:
-            conditions.append("CAST(maturity_level AS REAL) >= ?")
-            params.append(filters.min_maturity)
 
         where = "WHERE " + " AND ".join(conditions) if conditions else ""
 

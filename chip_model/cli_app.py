@@ -265,9 +265,6 @@ def chip_search(
     tier: Optional[str] = typer.Option(
         None, "--tier", help="级别: datacenter | consumer | all"
     ),
-    min_maturity: Optional[int] = typer.Option(
-        None, "--min-maturity", help="最低生态成熟度(0-5)"
-    ),
     for_model: Optional[str] = typer.Option(
         None, "--for-model", "-m", help="根据模型自动估算显存需求"
     ),
@@ -289,7 +286,6 @@ def chip_search(
         price_max=price_max,
         interconnect_min=interconnect_min,
         tier=tier,
-        min_maturity=min_maturity,
         for_model=for_model,
         scenario=scenario,
     )
@@ -367,9 +363,6 @@ def chip_recommend(
     max_price: Optional[float] = typer.Option(
         None, "--max-price", help="最高单价 万元/片（硬排除）"
     ),
-    min_maturity: Optional[int] = typer.Option(
-        None, "--min-maturity", help="最低生态成熟度 0-5（硬排除）"
-    ),
     prefer_domestic: bool = typer.Option(
         False, "--domestic", help="优先国产芯片"
     ),
@@ -380,9 +373,9 @@ def chip_recommend(
 ):
     """推荐芯片方案（模型 × 场景 × 约束 → 多维度评分排序）
 
-    评分维度:
-      算力(25%) 卡效(15%) 价格(15%) 功耗(10%)
-      生态(10%) 互联(10%) SLA(10%) 数据质量(5%) 偏好
+    评分维度 v3.0:
+      算力 显存充裕度 价格经济性 能效比 互联扩展性
+      生态成熟度(无主观评分) SLA满足度 生产就绪度 实测验证度
     """
     # 1. Find model
     model_result = search_models(ModelFilters(search=model_name), limit=1)
@@ -420,7 +413,6 @@ def chip_recommend(
     for chip in candidates:
         chip_dict = dict(chip)
         vram = float(chip_dict.get("vram_gb", 1))
-        maturity = int(float(chip_dict.get("maturity_level", 0) or 0))
         price_wan = float(chip_dict.get("price_cny_wan", 0) or 0)
         cloud = int(float(chip_dict.get("cloud_available", 0) or 0))
 
@@ -456,8 +448,6 @@ def chip_recommend(
             continue
         if max_price and price_wan and price_wan > max_price:
             continue
-        if min_maturity is not None and maturity < min_maturity:
-            continue
 
         meets_sla = True
         if training_days:
@@ -468,7 +458,7 @@ def chip_recommend(
 
         score = _score_chip(
             chip_dict, recommended_cards, estimated_days, training_days,
-            prefer_domestic, prefer_vendor, fp16_val, price_wan, maturity, cloud,
+            prefer_domestic, prefer_vendor, fp16_val, price_wan, cloud,
         )
 
         scored.append({
@@ -498,7 +488,6 @@ def chip_recommend(
             "max_cards": max_cards,
             "min_cards": min_cards,
             "max_price_wan": max_price,
-            "min_maturity": min_maturity,
         },
         "candidates": [
             chip_recommend_candidate(
@@ -565,10 +554,9 @@ def _score_chip(
     prefer_vendor: Optional[str],
     fp16: float,
     price_wan: float,
-    maturity: int,
     cloud: int,
 ) -> float:
-    """9-dimension scoring, 0-50+. Higher is better."""
+    """9-dimension CLI scoring, 0-50+. (v3.0: no maturity)"""
     score = 0.0
     tdp = float(chip.get("tdp_w", 300) or 300)
     interconnect_bw = float(chip.get("interconnect_bw_gb_s", 0) or 0)
@@ -603,10 +591,11 @@ def _score_chip(
     if fp16 > 0 and tdp > 0:
         score += min(fp16 * 1000 / tdp / 500.0, 4.0)
 
-    # Ecosystem maturity (10%)
-    score += maturity * 0.8
+    # Ecosystem maturity (10%, v3.0: cloud + compat only, no subjective maturity)
     if cloud:
-        score += 1.0
+        score += 3.0
+    compat_verified = int(float(chip.get("_compat_count", 0) or 0))
+    score += min(compat_verified * 0.4, 2.0)
 
     # Interconnect quality (10%)
     if interconnect_bw > 0:

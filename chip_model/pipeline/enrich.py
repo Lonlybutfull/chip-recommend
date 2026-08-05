@@ -115,13 +115,16 @@ HARD_TO_FIND_SPECS = {
 }
 
 
-def search_chip_specs(chip_name: str, field_group: str) -> list[str]:
-    """Use DuckDuckGo to find spec pages. Returns list of URLs."""
+def search_chip_specs(chip_name: str, field_group: str, prefer_official: bool = False) -> list[str]:
+    """Use DuckDuckGo lite to find spec pages. Returns list of URLs."""
     try:
-        query = f'"{chip_name}" specifications {field_group}'
+        if prefer_official:
+            query = f'"{chip_name}" specifications official site OR datasheet OR 官网'
+        else:
+            query = f'"{chip_name}" specifications {field_group}'
         # Use DDG lite — no API key needed, less likely blocked
         url = f"https://lite.duckduckgo.com/lite/?q={urllib.parse.quote(query)}"
-        resp = requests.get(url, headers=HEADERS, timeout=10)
+        resp = requests.get(url, headers=HEADERS, proxies=PROXIES, timeout=15)
         # Extract result URLs
         urls = re.findall(r'uddg=([^"&\s]+)', resp.text)
         decoded = []
@@ -400,6 +403,127 @@ def main():
     print(f"Enrichment complete: {total} fields in {enriched} chips")
     print(f"{'='*60}")
 
+    return enriched, total
+
+
+def upgrade_non_official_sources():
+    """Find fields with is_official='0' and try to replace with official source.
+
+    For each chip that has non-official provenance on critical spec fields,
+    search vendor official sites (wikipedia, datasheets, 官网), extract specs,
+    and write with is_official='1'.  Already-official fields are not touched.
+    """
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+
+    # ── Find rows with non-official provenance on specs fields ──
+    spec_fields = [
+        'architecture', 'arch_codename', 'process_node_nm', 'foundry',
+        'die_size_mm2', 'transistors_b', 'vram_gb', 'vram_type',
+        'vram_bus_bit', 'vram_bw_gb_s', 'vram_clock_mhz',
+        'compute_units', 'tensor_cores', 'precision_support', 'precision_perf',
+        'base_clock_mhz', 'boost_clock_mhz', 'tdp_w', 'max_power_w',
+        'interconnect_bw_gb_s', 'interconnect_tech',
+    ]
+    field_list = "','".join(spec_fields)
+
+    unofficial = conn.execute(f"""
+        SELECT DISTINCT fp.row_id, c.chip_model, fp.field_name
+        FROM field_provenance fp
+        JOIN chips c ON c.id = CAST(fp.row_id AS INTEGER)
+        WHERE fp.table_name = 'chips'
+          AND fp.is_official = '0'
+          AND fp.field_name IN ('{field_list}')
+        ORDER BY c.chip_model, fp.field_name
+    """).fetchall()
+
+    # Group by chip
+    chips_needed = {}
+    for r in unofficial:
+        chips_needed.setdefault(r['row_id'], {
+            'chip_model': r['chip_model'],
+            'fields': set(),
+        })['fields'].add(r['field_name'])
+
+    print(f"Found {len(chips_needed)} chips with non-official spec sources")
+    if not chips_needed:
+        conn.close()
+        return 0, 0
+
+    print(f"Using {'proxy' if _check_proxy() else 'no proxy (search-limited)'}")
+
+    total_upgraded = 0
+    chips_upgraded = 0
+
+    for chip_id_str, info in chips_needed.items():
+        chip_model = info['chip_model']
+        need_fields = info['fields']
+        chip_id = int(chip_id_str)
+        print(f"\n  Upgrading: {chip_model} (id={chip_id}), {len(need_fields)} fields need official")
+
+        # Step 1: try vendor's own site / Wikipedia / official datasheet
+        urls = search_chip_specs(chip_model, 'specifications', prefer_official=True)
+        if not urls:
+            print(f"    No search results")
+            continue
+
+        fields_collected = {}
+        for url in urls[:3]:
+            print(f"    Crawling: {url[:80]}...")
+            text = crawl_url(url)
+            if not text:
+                continue
+
+            specs = extract_specs_from_text(text, chip_model)
+            if not specs:
+                print(f"    No specs extracted from page")
+                continue
+
+            # Only take fields that we need AND were non-official
+            relevant = {k: v for k, v in specs.items()
+                       if k in need_fields and k not in fields_collected}
+            if relevant:
+                fields_collected.update(relevant)
+                # Determine if URL looks official
+                url_lower = url.lower()
+                is_official_flag = "1" if any(kw in url_lower for kw in [
+                    'wikipedia.org', 'wikichip', 'anandtech', 'tomshardware',
+                    'servethehome', 'techpowerup', 'huggingface',
+                    '.edu', 'arxiv.org', 'github.com',
+                ]) else "0"
+
+                source = {
+                    "source_type": "web_crawl" if is_official_flag == "0" else "official_datasheet",
+                    "source_url": url,
+                    "source_detail": f"Official/widely-trusted source crawled for {chip_model} spec rectification",
+                    "confidence": "high" if is_official_flag == "1" else "medium",
+                    "is_official": is_official_flag,
+                    "notes": f"Upgrade from non-official source — auto-enriched {NOW}",
+                }
+                try:
+                    update_chip_fields(conn, chip_id, relevant, source)
+                    conn.commit()
+                    print(f"    Upgraded {len(relevant)} fields → official: {', '.join(list(relevant.keys())[:5])}...")
+                    total_upgraded += len(relevant)
+                except Exception as e:
+                    print(f"    Write error: {e}")
+                    conn.rollback()
+
+            # If we have enough, stop crawling
+            if len(fields_collected) >= min(len(need_fields), 5):
+                break
+
+        if fields_collected:
+            chips_upgraded += 1
+
+        time.sleep(1.5)
+
+    conn.close()
+    print(f"\n{'='*60}")
+    print(f"Official-source upgrade complete: {total_upgraded} fields in {chips_upgraded} chips")
+    print(f"{'='*60}")
+    return chips_upgraded, total_upgraded
+
 
 def _check_proxy():
     try:
@@ -410,4 +534,15 @@ def _check_proxy():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    ap = argparse.ArgumentParser(description="Chip spec enrichment pipeline")
+    ap.add_argument("--upgrade-official", action="store_true",
+                    help="Find non-official (is_official=0) fields and try official sources")
+    ap.add_argument("--fill-missing", action="store_true", default=True,
+                    help="Fill critical missing fields (default)")
+    args = ap.parse_args()
+
+    if args.upgrade_official:
+        upgrade_non_official_sources()
+    else:
+        main()

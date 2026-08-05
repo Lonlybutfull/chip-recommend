@@ -1,8 +1,15 @@
 """
-AISHPerf Chip Recommendation Scoring Engine v2.0
+AISHPerf Chip Recommendation Scoring Engine v3.0
 
 10-dimension scoring with each dimension outputting 0.0-10.0,
 weighted sum yields total 0-100.
+
+v3.0 changes:
+  - Removed maturity_level dimension (too abstract for chip selection)
+  - Added fine-grained scenarios: train stage (CPT/SFT/RL) × method (full_param/LoRA/QLoRA)
+  - Added quantization-aware inference (INT8/INT4/GPTQ/AWQ/GGUF)
+  - VRAM formulas per scenario with different bytes-per-param coefficients
+  - 7 scenario-specific weight presets replacing old TRAIN/INFERENCE dichotomy
 
 All formulas have clear physical meaning, documented constants,
 and return traces for transparency.
@@ -13,11 +20,104 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Literal
 
 
 # ═══════════════════════════════════════════════════════════
-# Configuration — scoring weights
+# Enums for fine-grained scenarios
+# ═══════════════════════════════════════════════════════════
+
+TrainStage = Literal["cpt", "sft", "rl"]
+TrainMethod = Literal["full_param", "lora", "qlora"]
+InferenceQuant = Literal["fp16", "int8", "int4_gptq", "int4_awq", "gguf_q4", "gguf_q8"]
+
+
+# ═══════════════════════════════════════════════════════════
+# VRAM estimation formulas per scenario
+# ═══════════════════════════════════════════════════════════
+
+def estimate_vram_total(
+    params_B: float,
+    scenario: str,                    # "train" | "inference"
+    stage: TrainStage = "sft",
+    method: TrainMethod = "full_param",
+    quant: InferenceQuant = "fp16",
+    moe_activated_B: float | None = None,
+) -> tuple[float, str]:
+    """Estimate total VRAM needed (GB) for a model under a scenario.
+
+    Returns (vram_gb, formula_description).
+    """
+    P = params_B
+
+    if scenario == "train":
+        safety = 1.25
+        if stage == "cpt":
+            # CPT: weights(2) + gradients(2) + Adam m+v(8) + activations(6-8) ≈ 20 bytes/param
+            bytes_per = 20.0
+            label = "CPT"
+        elif stage == "sft":
+            if method == "full_param":
+                # SFT full-param: same as CPT — optimizer states + gradients
+                bytes_per = 20.0
+                label = "SFT(全参)"
+            elif method == "lora":
+                # LoRA: load full frozen weights(2) + tiny trainable adapter + no optimizer for base
+                # ~2.5 bytes/param for the frozen base + LoRA overhead
+                bytes_per = 2.5
+                label = "SFT(LoRA)"
+            elif method == "qlora":
+                # QLoRA: NF4 quantized base(0.5) + LoRA adapters + overhead
+                bytes_per = 0.9
+                label = "SFT(QLoRA)"
+            else:
+                bytes_per = 20.0
+                label = "SFT(full_param)"
+        elif stage == "rl":
+            # RL (PPO/GRPO): Actor(2) + Critic(2) + Ref model(2) + optimizer states(8-12)
+            # ≈ 22-30 bytes/param for 2-3 model copies + optimizer
+            bytes_per = 25.0
+            label = "RL(PPO/GRPO)"
+        else:
+            bytes_per = 20.0
+            label = "训练(full)"
+
+        # MoE training: all experts need to be loaded
+        effective_P = P
+        if moe_activated_B and moe_activated_B < P:
+            effective_P = min(P, moe_activated_B * 2.0)  # compromise for MoE training
+
+        vram = effective_P * bytes_per * safety
+        return round(vram, 1), f"{label}: {effective_P:.1f}B × {bytes_per} bytes/param × {safety} = {vram:.0f}GB"
+
+    else:  # inference
+        safety = 1.25
+        quant_bytes = {
+            "fp16": 2.0, "int8": 1.0,
+            "int4_gptq": 0.5, "int4_awq": 0.5,
+            "gguf_q4": 0.5, "gguf_q8": 1.0,
+        }
+        bytes_per = quant_bytes.get(quant, 2.0)
+        quant_label = {"fp16": "FP16", "int8": "INT8", "int4_gptq": "INT4-GPTQ",
+                       "int4_awq": "INT4-AWQ", "gguf_q4": "GGUF Q4", "gguf_q8": "GGUF Q8"}.get(quant, quant)
+
+        # MoE inference: only activated experts
+        effective_P = moe_activated_B if moe_activated_B and moe_activated_B < P else P
+
+        vram = effective_P * bytes_per * safety
+        return round(vram, 1), f"推理({quant_label}): {effective_P:.1f}B × {bytes_per} bytes/param × {safety} = {vram:.0f}GB"
+
+
+def estimate_training_flops(params_B: float, tokens_T: float) -> float:
+    """Total FLOPs for training: 6 × P × tokens.
+
+    Returns FLOPs (float).
+    """
+    return 6 * (params_B * 1e9) * (tokens_T * 1e12)
+
+
+# ═══════════════════════════════════════════════════════════
+# Configuration — scoring weights (v3.0: 7 scenario presets)
 # ═══════════════════════════════════════════════════════════
 
 @dataclass
@@ -31,7 +131,7 @@ class ScoringWeights:
     sla_satisfaction: float = 0.10
     production_readiness: float = 0.05
     benchmark_evidence: float = 0.08
-    total_cost_ownership: float = 0.00  # default off
+    total_cost_ownership: float = 0.00
 
     def scale_other_weights(self, tco_weight: float) -> "ScoringWeights":
         """Apply TCO weight and scale remaining to sum to 1.0."""
@@ -51,20 +151,106 @@ class ScoringWeights:
         )
 
 
-# 场景自适应权重
-TRAIN_WEIGHTS = ScoringWeights(
-    compute_perf=0.20, vram_sufficiency=0.15, cost_efficiency=0.12,
-    power_efficiency=0.08, interconnect_quality=0.12, ecosystem_maturity=0.10,
+# ── v3.0 Scenario-specific weight presets ──
+# Each preset adjusts which dimensions matter most for that use case.
+
+# CPT: heavy compute + interconnect (distributed training)
+WEIGHTS_CPT = ScoringWeights(
+    compute_perf=0.22, vram_sufficiency=0.15, cost_efficiency=0.10,
+    power_efficiency=0.07, interconnect_quality=0.15, ecosystem_maturity=0.08,
     sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.08,
-    total_cost_ownership=0.00,
 )
 
-INFERENCE_WEIGHTS = ScoringWeights(
+# SFT full-param: balanced training
+WEIGHTS_SFT_FULL = ScoringWeights(
+    compute_perf=0.18, vram_sufficiency=0.18, cost_efficiency=0.12,
+    power_efficiency=0.08, interconnect_quality=0.10, ecosystem_maturity=0.10,
+    sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.09,
+)
+
+# SFT LoRA: VRAM-light, more weight on cost + ecosystem
+WEIGHTS_SFT_LORA = ScoringWeights(
+    compute_perf=0.12, vram_sufficiency=0.25, cost_efficiency=0.15,
+    power_efficiency=0.08, interconnect_quality=0.05, ecosystem_maturity=0.12,
+    sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.08,
+)
+
+# SFT QLoRA: same as LoRA but even more VRAM-oriented
+WEIGHTS_SFT_QLORA = ScoringWeights(
+    compute_perf=0.10, vram_sufficiency=0.25, cost_efficiency=0.17,
+    power_efficiency=0.08, interconnect_quality=0.05, ecosystem_maturity=0.12,
+    sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.08,
+)
+
+# RL: multi-model copies → VRAM + interconnect critical
+WEIGHTS_RL = ScoringWeights(
+    compute_perf=0.17, vram_sufficiency=0.22, cost_efficiency=0.10,
+    power_efficiency=0.08, interconnect_quality=0.12, ecosystem_maturity=0.08,
+    sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.08,
+)
+
+# Inference FP16: VRAM + ecosystem + cost
+WEIGHTS_INFER_FP16 = ScoringWeights(
     compute_perf=0.15, vram_sufficiency=0.20, cost_efficiency=0.15,
     power_efficiency=0.08, interconnect_quality=0.08, ecosystem_maturity=0.12,
     sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.07,
-    total_cost_ownership=0.00,
 )
+
+# Inference quantized (INT8/INT4): VRAM light, cost + ecosystem dominant
+WEIGHTS_INFER_QUANT = ScoringWeights(
+    compute_perf=0.10, vram_sufficiency=0.25, cost_efficiency=0.17,
+    power_efficiency=0.08, interconnect_quality=0.05, ecosystem_maturity=0.13,
+    sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.07,
+)
+
+# Legacy backward-compat aliases
+TRAIN_WEIGHTS = WEIGHTS_SFT_FULL    # default train = SFT full-param
+INFERENCE_WEIGHTS = WEIGHTS_INFER_FP16
+
+# ── Lookup table ──
+_SCENARIO_KEY_MAP = {
+    ("train", "cpt", "full_param"): WEIGHTS_CPT,
+    ("train", "sft", "full_param"): WEIGHTS_SFT_FULL,
+    ("train", "sft", "lora"): WEIGHTS_SFT_LORA,
+    ("train", "sft", "qlora"): WEIGHTS_SFT_QLORA,
+    ("train", "rl", "full_param"): WEIGHTS_RL,
+    ("inference", "fp16"): WEIGHTS_INFER_FP16,
+    ("inference", "int8"): WEIGHTS_INFER_QUANT,
+    ("inference", "int4_gptq"): WEIGHTS_INFER_QUANT,
+    ("inference", "int4_awq"): WEIGHTS_INFER_QUANT,
+    ("inference", "gguf_q4"): WEIGHTS_INFER_QUANT,
+    ("inference", "gguf_q8"): WEIGHTS_INFER_QUANT,
+}
+
+_SCENARIO_LABEL_MAP = {
+    ("train", "cpt", "full_param"): "训练·CPT·全参",
+    ("train", "sft", "full_param"): "训练·SFT·全参",
+    ("train", "sft", "lora"): "训练·SFT·LoRA",
+    ("train", "sft", "qlora"): "训练·SFT·QLoRA",
+    ("train", "rl", "full_param"): "训练·RL·全参",
+    ("inference", "fp16"): "推理·FP16",
+    ("inference", "int8"): "推理·INT8",
+    ("inference", "int4_gptq"): "推理·INT4-GPTQ",
+    ("inference", "int4_awq"): "推理·INT4-AWQ",
+    ("inference", "gguf_q4"): "推理·GGUF Q4",
+    ("inference", "gguf_q8"): "推理·GGUF Q8",
+}
+
+def get_scenario_weights(
+    scenario: str,
+    stage: TrainStage = "sft",
+    method: TrainMethod = "full_param",
+    quant: InferenceQuant = "fp16",
+) -> tuple[ScoringWeights, str]:
+    """Return (weights, display_label) for a given scenario configuration."""
+    if scenario == "train":
+        key = ("train", stage, method)
+    else:
+        key = ("inference", quant)
+    return (
+        _SCENARIO_KEY_MAP.get(key, TRAIN_WEIGHTS if scenario == "train" else INFERENCE_WEIGHTS),
+        _SCENARIO_LABEL_MAP.get(key, scenario),
+    )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -85,7 +271,7 @@ class ScoringResult:
     total_score: float = 0.0     # 0–100
     dimensions: dict[str, DimensionResult] = field(default_factory=dict)
     weights: ScoringWeights = field(default_factory=ScoringWeights)
-    version: str = "2.0.0"
+    version: str = "3.0.0"
 
 
 @dataclass
@@ -94,18 +280,22 @@ class RecommendContext:
     chip: dict
     model_params_B: float
     scenario: str                     # "train" | "inference"
-    min_vram_total: float             # total VRAM needed for the model
-    vram_cards: int                   # VRAM-only cards (for sufficiency calc)
-    recommended_cards: int
-    fp16_tflops: float
-    training_tokens_T: float          # T tokens
-    target_training_days: Optional[float]
-    target_tps: Optional[float]
-    estimated_training_days: Optional[float]
-    benchmark_count: int              # total relevant benchmark rows
-    max_benchmark_mfu: Optional[float]  # best training MFU from benchmarks
-    max_benchmark_tps: Optional[float]  # best inference throughput from benchmarks
-    compat_verified_count: int        # verified compat rows
+    stage: str = "sft"                # "cpt" | "sft" | "rl"
+    method: str = "full_param"        # "full_param" | "lora" | "qlora"
+    quant: str = "fp16"               # "fp16" | "int8" | "int4_gptq" | "int4_awq" | "gguf_q4" | "gguf_q8"
+    min_vram_total: float = 0.0
+    vram_formula: str = ""            # human-readable formula
+    vram_cards: int = 0
+    recommended_cards: int = 0
+    fp16_tflops: float = 0.0
+    training_tokens_T: float = 0.0
+    target_training_days: Optional[float] = None
+    target_tps: Optional[float] = None
+    estimated_training_days: Optional[float] = None
+    benchmark_count: int = 0
+    max_benchmark_mfu: Optional[float] = None
+    max_benchmark_tps: Optional[float] = None
+    compat_verified_count: int = 0
 
 
 # ═══════════════════════════════════════════════════════════
@@ -313,34 +503,33 @@ def score_interconnect_quality(bw_gb_s: float, tech: str) -> DimensionResult:
 
 
 # ═══════════════════════════════════════════════════════════
-# Dimension #6: 生态成熟度 (Ecosystem Maturity) — weight 10-12%
+# Dimension #6: 生态成熟度 (Ecosystem Maturity) — weight 8-13%
 # ═══════════════════════════════════════════════════════════
 
-def score_ecosystem_maturity(maturity: float, cloud: int, compat_verified: int,
+def score_ecosystem_maturity(cloud: int, compat_verified: int,
                              has_frameworks: bool = False) -> DimensionResult:
-    """Composite: maturity_level (0-5) × 1.2 + cloud (+2) + compat (+2 max).
+    """Composite: cloud support (+3) + verified compat (+4 max, 0.8/ea) + frameworks (+3).
 
-    Max: 5×1.2=6 + 2 + 10/5=2 = 10.0.
+    Max: 3 + 4 + 3 = 10.0. (v3.0: removed maturity_level — too abstract)
     """
-    mat = float(maturity or 0)
     cloud_val = int(float(cloud or 0))
-    mat_score = min(mat * 1.2, 6.0)
-    cloud_score = 2.0 if cloud_val >= 1 else 0.0
-    compat_score = min(compat_verified / 5.0, 2.0)
-    fw_score = 0.5 if has_frameworks else 0.0
+    cloud_score = 3.0 if cloud_val >= 1 else 0.0
+    compat_score = min(compat_verified * 0.8, 4.0)
+    fw_score = 3.0 if has_frameworks else 0.0
 
-    score = min(mat_score + cloud_score + compat_score + fw_score, 10.0)
-    parts = [f"成熟度{mat:.0f}/5→{mat_score:.1f}"]
+    score = min(cloud_score + compat_score + fw_score, 10.0)
+    parts = []
     if cloud_score: parts.append(f"云可用+{cloud_score:.0f}")
     if compat_score > 0: parts.append(f"兼容{compat_verified}条→+{compat_score:.1f}")
-    if fw_score: parts.append(f"框架+{fw_score:.1f}")
-    detail = " + ".join(parts) + f" = {score:.1f}/10"
+    if fw_score: parts.append(f"框架+{fw_score:.0f}")
+    detail = " + ".join(parts) + f" = {score:.1f}/10" if parts else "无生态数据 → 0/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
-            "maturity_level": mat, "cloud_available": cloud_val,
-            "compat_verified_count": compat_verified, "has_frameworks": has_frameworks,
-            "formula": "min(maturity*1.2 + cloud*2 + min(compat/5,2), 10)",
+            "cloud_available": cloud_val,
+            "compat_verified_count": compat_verified,
+            "has_frameworks": has_frameworks,
+            "formula": "min(cloud*3 + min(compat*0.8,4) + fw*3, 10)",
         },
     )
 
@@ -584,11 +773,10 @@ def aggregate_score(
         str(chip.get("interconnect_tech", "") or ""),
     )
 
-    # D6: 生态成熟度
+    # D6: 生态成熟度 (v3.0: no maturity_level)
     has_fw = bool((chip.get("software_stack") or "").strip() or
                   (chip.get("compatible_frameworks") or "").strip())
     dims["ecosystem_maturity"] = score_ecosystem_maturity(
-        float(chip.get("maturity_level", 0) or 0),
         int(float(chip.get("cloud_available", 0) or 0)),
         ctx.compat_verified_count,
         has_frameworks=has_fw,
@@ -711,7 +899,7 @@ DIMENSION_META = [
     {"id": "interconnect_quality",  "name_cn": "互联扩展性",   "name_en": "Interconnect Quality",
      "desc": "多卡互联带宽+技术等级", "unit": "GB/s + 技术分", "train_weight": 0.12, "infer_weight": 0.08},
     {"id": "ecosystem_maturity",    "name_cn": "生态成熟度",   "name_en": "Ecosystem Maturity",
-     "desc": "成熟度评分+云可用+兼容模型数", "unit": "综合分", "train_weight": 0.10, "infer_weight": 0.12},
+     "desc": "云平台可用+已验证兼容模型数+框架支持 (v3.0移除成熟度主观评分)", "unit": "综合分", "train_weight": 0.10, "infer_weight": 0.12},
     {"id": "sla_satisfaction",      "name_cn": "SLA满足度",    "name_en": "SLA Satisfaction",
      "desc": "训练天数/推理吞吐是否满足目标", "unit": "SLA分", "train_weight": 0.10, "infer_weight": 0.10},
     {"id": "production_readiness",  "name_cn": "生产就绪度",   "name_en": "Production Readiness",
