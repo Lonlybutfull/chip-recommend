@@ -2,10 +2,11 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# Install uv, then Python dependencies via uv
+# Install uv + Python deps via domestic mirrors (for servers in China)
 COPY requirements.txt .
-RUN pip install --no-cache-dir uv && \
-    uv pip install --system --no-cache -r requirements.txt
+RUN pip install --no-cache-dir uv -i https://pypi.tuna.tsinghua.edu.cn/simple && \
+    uv pip install --system --no-cache -r requirements.txt \
+      --index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Copy application package
 COPY chip_model/ ./chip_model/
