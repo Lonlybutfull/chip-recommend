@@ -419,17 +419,19 @@ def round_up_pow2(n: int) -> int:
 def score_compute_perf(fp16_tflops: float) -> DimensionResult:
     """Single-card FP16/BF16 compute throughput.
 
-    1000 TFLOPS = 10/10 (reference: B200 ~2250 TFLOPS via FP8).
+    1000 TFLOPS = 10/10 (reference: B200 ~2250 TFLOPS via FP8, ~44% for FP16 ceiling).
+    Missing data → neutral 5.0 (don't penalize chips without published perf data).
     """
     if fp16_tflops > 0:
         score = min(fp16_tflops / 100.0, 10.0)
         detail = f"FP16={fp16_tflops:.0f}TFLOPS → {score:.1f}/10 (满分1000T)"
     else:
-        score = 0.0
-        detail = "无FP16/BF16算力数据 → 0/10"
+        score = 5.0
+        detail = "无FP16/BF16算力数据 → 中性分 5.0/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
-        raw_values={"fp16_tflops": fp16_tflops, "formula": "min(fp16/100, 10)"},
+        raw_values={"fp16_tflops": fp16_tflops, "formula": "min(fp16/100, 10)",
+                    "source": "chip.precision_perf", "missing": fp16_tflops <= 0},
     )
 
 
@@ -442,21 +444,30 @@ def score_vram_sufficiency(vram_gb: float, model_vram_total: float, vram_cards: 
 
     Uses `vram_cards` (VRAM-only constraint) to compute per-card need,
     NOT recommended_cards (which may include compute constraint amplification).
+
+    Missing data → neutral 5.0.
     """
+    if vram_gb <= 0 or model_vram_total <= 0:
+        return DimensionResult(
+            score=5.0, detail="无显存数据 → 中性分 5.0/10",
+            raw_values={"vram_gb": vram_gb, "model_vram_total": model_vram_total,
+                        "source": "chip.vram_gb", "missing": True},
+        )
     per_card_need = model_vram_total / max(vram_cards, 1)
     ratio = vram_gb / max(per_card_need, 0.1)
     if ratio > 0:
         score = 10.0 * (1.0 - math.exp(-0.5 * ratio))
         detail = f"显存{vram_gb:.0f}GB / 需求{per_card_need:.0f}GB = {ratio:.1f}× → {score:.1f}/10"
     else:
-        score = 0.0
-        detail = "无法计算显存充裕度"
+        score = 5.0
+        detail = "无法计算显存充裕度 → 中性分 5.0/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
             "vram_gb": vram_gb, "per_card_need_gb": round(per_card_need, 1),
             "vram_cards": vram_cards, "headroom_ratio": round(ratio, 2),
             "formula": "10*(1-exp(-0.5*headroom_ratio))",
+            "source": "chip.vram_gb",
         },
     )
 
@@ -468,26 +479,24 @@ def score_vram_sufficiency(vram_gb: float, model_vram_total: float, vram_cards: 
 def score_cost_efficiency(fp16_tflops: float, price_cny_wan: float) -> DimensionResult:
     """TFLOPS per 万 CNY. 5 TFLOPS/万 = 10/10.
 
-    No price → neutral 5.0 (don't penalize unlisted chips).
+    No price or no compute → neutral 5.0 (don't penalize unlisted/unpriced chips).
     """
     price = float(price_cny_wan or 0)
     if price > 0 and fp16_tflops > 0:
         tflops_per_wan = fp16_tflops / price
         score = min(tflops_per_wan / 5.0, 10.0)
         detail = f"{fp16_tflops:.0f}T / {price:.1f}万元 = {tflops_per_wan:.1f} TFLOPS/万元 → {score:.1f}/10"
-    elif fp16_tflops > 0:
+    else:
         score = 5.0
         tflops_per_wan = None
-        detail = "无价格数据 → 中性分 5.0/10"
-    else:
-        score = 0.0
-        tflops_per_wan = None
-        detail = "无算力+无价格 → 0/10"
+        detail = "无价格或算力数据 → 中性分 5.0/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
             "tflops_per_wan": round(tflops_per_wan, 2) if tflops_per_wan else None,
             "price_cny_wan": price, "formula": "min(tflops_per_wan/5, 10)",
+            "source": "chip.price_cny_wan + chip.precision_perf",
+            "missing": price <= 0 or fp16_tflops <= 0,
         },
     )
 
@@ -497,28 +506,27 @@ def score_cost_efficiency(fp16_tflops: float, price_cny_wan: float) -> Dimension
 # ═══════════════════════════════════════════════════════════
 
 def score_power_efficiency(fp16_tflops: float, tdp_w: float) -> DimensionResult:
-    """GFLOPS per Watt. 700 GFLOPS/W = 10/10.
+    """GFLOPS per Watt. 700 GFLOPS/W = 10/10 (≈ H100 989T/700W level).
 
     Reference: B200 2250T/1000W = 2250 GFLOPS/W (capped), H100 989T/700W = 1413 GFLOPS/W.
+    Missing data → neutral 5.0.
     """
     tdp = float(tdp_w or 0)
     if fp16_tflops > 0 and tdp > 0:
         flops_per_watt = fp16_tflops * 1000 / tdp  # GFLOPS/W
         score = min(flops_per_watt / 700.0, 10.0)
         detail = f"{fp16_tflops:.0f}T / {tdp:.0f}W = {flops_per_watt:.0f} GFLOPS/W → {score:.1f}/10"
-    elif fp16_tflops > 0:
-        score = 3.0
-        flops_per_watt = 0.0
-        detail = "无功耗数据 → 保守 3.0/10"
     else:
-        score = 0.0
+        score = 5.0
         flops_per_watt = 0.0
-        detail = "无算力+无功耗 → 0/10"
+        detail = "无功耗或算力数据 → 中性分 5.0/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
             "gflops_per_watt": round(flops_per_watt, 1), "tdp_w": tdp,
             "formula": "min(fp16*1000/tdp/700, 10)",
+            "source": "chip.tdp_w + chip.precision_perf",
+            "missing": tdp <= 0 or fp16_tflops <= 0,
         },
     )
 
@@ -531,10 +539,17 @@ def score_interconnect_quality(bw_gb_s: float, tech: str) -> DimensionResult:
     """Multi-card scalability via interconnect bandwidth + technology tier.
 
     BW: 200 GB/s → 1pt, 1400 GB/s → 7pt (capped).
+        200 GB/s ≈ PCIe 4.0 x16 single card reference.
     Tech: NVLink +3, HCCS +2.5, Infinity Fabric/ICI/MatrixLink/C2C +2, other +1.
+    Missing data → neutral 5.0.
     """
     bw = float(bw_gb_s or 0)
     tech = (tech or "").strip()
+    if bw <= 0 and not tech:
+        return DimensionResult(
+            score=5.0, detail="无互联数据 → 中性分 5.0/10",
+            raw_values={"interconnect_bw_gb_s": 0, "tech": "", "source": "chip.interconnect_bw_gb_s + chip.interconnect_tech", "missing": True},
+        )
     bw_score = min(bw / 200.0, 7.0)
 
     tech_lower = tech.lower()
@@ -562,6 +577,7 @@ def score_interconnect_quality(bw_gb_s: float, tech: str) -> DimensionResult:
             "interconnect_bw_gb_s": bw, "bw_score": round(bw_score, 2),
             "tech": tech, "tech_bonus": tech_bonus,
             "formula": "min(bw/200 + tech_bonus, 10)",
+            "source": "chip.interconnect_bw_gb_s + chip.interconnect_tech",
         },
     )
 
@@ -575,6 +591,7 @@ def score_ecosystem_maturity(cloud: int, compat_verified: int,
     """Composite: cloud support (+3) + verified compat (+4 max, 0.8/ea) + frameworks (+3).
 
     Max: 3 + 4 + 3 = 10.0. (v3.0: removed maturity_level — too abstract)
+    Missing data → neutral 5.0.
     """
     cloud_val = int(float(cloud or 0))
     cloud_score = 3.0 if cloud_val >= 1 else 0.0
@@ -586,7 +603,11 @@ def score_ecosystem_maturity(cloud: int, compat_verified: int,
     if cloud_score: parts.append(f"云可用+{cloud_score:.0f}")
     if compat_score > 0: parts.append(f"兼容{compat_verified}条→+{compat_score:.1f}")
     if fw_score: parts.append(f"框架+{fw_score:.0f}")
-    detail = " + ".join(parts) + f" = {score:.1f}/10" if parts else "无生态数据 → 0/10"
+    if parts:
+        detail = " + ".join(parts) + f" = {score:.1f}/10"
+    else:
+        score = 5.0
+        detail = "无生态数据 → 中性分 5.0/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
@@ -594,6 +615,8 @@ def score_ecosystem_maturity(cloud: int, compat_verified: int,
             "compat_verified_count": compat_verified,
             "has_frameworks": has_frameworks,
             "formula": "min(cloud*3 + min(compat*0.8,4) + fw*3, 10)",
+            "source": "chip.cloud_available + chip_model_compatibility + chip.software_stack",
+            "missing": score <= 0 and not parts,
         },
     )
 
@@ -611,8 +634,8 @@ def score_sla_train(estimated_days: Optional[float], target_days: float) -> Dime
         return DimensionResult(score=5.0, detail="无训练天数SLA → 中性 5.0/10",
                                raw_values={"note": "no_target"})
     if estimated_days is None:
-        return DimensionResult(score=0.0, detail=f"无法估算训练天数 → 0/10",
-                               raw_values={"target_days": target_days})
+        return DimensionResult(score=5.0, detail=f"无法估算训练天数 → 中性分 5.0/10",
+                               raw_values={"target_days": target_days, "source": "server.py effective_per_card_day calculation", "missing": True})
     if estimated_days <= target_days:
         margin = (target_days - estimated_days) / target_days
         score = min(5.0 + margin * 5.0, 10.0)
@@ -634,8 +657,8 @@ def score_sla_inference(estimated_tps: Optional[float], target_tps: float) -> Di
         return DimensionResult(score=5.0, detail="无推理吞吐SLA → 中性 5.0/10",
                                raw_values={"note": "no_target"})
     if estimated_tps is None:
-        return DimensionResult(score=0.0, detail=f"无法估算推理吞吐 → 0/10",
-                               raw_values={"target_tps": target_tps})
+        return DimensionResult(score=5.0, detail=f"无法估算推理吞吐 → 中性分 5.0/10",
+                               raw_values={"target_tps": target_tps, "source": "benchmark or estimate_inference_tps()", "missing": True})
     if estimated_tps >= target_tps:
         margin = (estimated_tps - target_tps) / target_tps
         score = min(5.0 + margin * 5.0, 10.0)
@@ -675,7 +698,9 @@ def estimate_inference_tps(fp16_tflops: float, vram_bw_gb_s: float, total_params
 # ═══════════════════════════════════════════════════════════
 
 def score_production_readiness(status: str, is_released: str) -> DimensionResult:
-    """How ready this chip is for production deployment."""
+    """How ready this chip is for production deployment.
+    Unknown status → neutral 5.0.
+    """
     s = str(status or "")
     r = str(is_released or "")
     if "量产" in s:
@@ -687,10 +712,11 @@ def score_production_readiness(status: str, is_released: str) -> DimensionResult
     elif "待发布" in s:
         score, detail = 4.0, "待发布 → 4/10"
     else:
-        score, detail = 2.0, "未公开发布/传闻 → 2/10"
+        score, detail = 5.0, "状态未知 → 中性分 5.0/10"
     return DimensionResult(
         score=score, detail=detail,
-        raw_values={"production_status": s, "is_released": r},
+        raw_values={"production_status": s, "is_released": r,
+                    "source": "chip.production_status + chip.is_released"},
     )
 
 
@@ -705,13 +731,16 @@ _MINOR_FRAMEWORKS = ["deepspeed", "megatron", "fsdp", "tensorrt", "openvino", "t
 
 
 def score_software_compat(software_stack: str, compatible_frameworks: str) -> DimensionResult:
-    """Framework support breadth. 7 major × 2.5 = 17.5, capped at 10."""
+    """Framework support breadth. 7 major × 2.5 = 17.5, capped at 10.
+    Missing data → neutral 5.0 (D9 is bonus, weight=0.0).
+    """
     fw_text = (str(software_stack or "") + " " + str(compatible_frameworks or "")).lower()
     major_hits = sum(1 for fw in _MAJOR_FRAMEWORKS if fw in fw_text)
     minor_hits = sum(1 for fw in _MINOR_FRAMEWORKS if fw in fw_text)
     score = min(major_hits * 2.5 + minor_hits * 1.0, 10.0)
     if major_hits == 0 and minor_hits == 0:
-        detail = "未检测到主流框架支持 → 0/10"
+        score = 5.0
+        detail = "未检测到主流框架支持 → 中性分 5.0/10"
     else:
         detail = f"主流框架×{major_hits} (+{major_hits*2.5}) + 工具链×{minor_hits} (+{minor_hits}) = {score:.1f}/10"
     return DimensionResult(
@@ -719,6 +748,8 @@ def score_software_compat(software_stack: str, compatible_frameworks: str) -> Di
         raw_values={
             "major_frameworks_found": major_hits, "minor_tools_found": minor_hits,
             "formula": "min(major*2.5 + minor*1.0, 10)",
+            "source": "chip.software_stack + chip.compatible_frameworks",
+            "missing": major_hits == 0 and minor_hits == 0,
         },
     )
 
@@ -729,10 +760,15 @@ def score_software_compat(software_stack: str, compatible_frameworks: str) -> Di
 
 def score_benchmark_evidence(benchmark_count: int, max_mfu: Optional[float],
                               max_tps: Optional[float], scenario: str) -> DimensionResult:
-    """Reward chips with real benchmark data. No benchmarks → 0."""
+    """Reward chips with real benchmark data.
+
+    60% MFU = 5.0 (excellent large-scale training efficiency).
+    5000 tok/s = 5.0 (strong single-card inference throughput).
+    No benchmarks → neutral 5.0 (don't penalize untested chips).
+    """
     if benchmark_count == 0:
-        return DimensionResult(score=0.0, detail="无实测benchmark数据 → 0/10",
-                               raw_values={"benchmark_count": 0})
+        return DimensionResult(score=5.0, detail="无实测benchmark数据 → 中性分 5.0/10",
+                               raw_values={"benchmark_count": 0, "source": "chip_model_benchmarks table", "missing": True})
 
     # MFU sub-score (training-relevant)
     mfu = float(max_mfu or 0)
@@ -765,6 +801,7 @@ def score_benchmark_evidence(benchmark_count: int, max_mfu: Optional[float],
             "max_throughput_tok_s": tps, "mfu_score": round(mfu_score, 2),
             "tps_score": round(tps_score, 2), "count_score": round(count_score, 2),
             "formula": "mfu_score*0.6 + tps_score*0.2 + count_score*0.2",
+            "source": "chip_model_benchmarks (MAX aggregation across models)",
         },
     )
 

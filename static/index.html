@@ -1070,6 +1070,40 @@ async function searchChips(){
 }
 
 /* ── Chip detail ── */
+const FIELD_LABELS = {
+  vendor:'厂商', vendor_display:'厂商显示名', vendor_region:'厂商地区', chip_series:'芯片系列',
+  chip_model:'芯片型号', chip_type:'芯片类型', usage:'用途', tier:'等级',
+  architecture:'架构', arch_codename:'架构代号', generation:'代际', process_node_nm:'制程(nm)',
+  foundry:'代工厂', die_size_mm2:'芯片面积(mm²)', transistors_b:'晶体管数(B)',
+  package_type:'封装类型', is_chiplet:'Chiplet',
+  vram_gb:'显存(GB)', vram_type:'显存类型', vram_bus_bit:'显存位宽(bit)',
+  vram_bw_gb_s:'显存带宽(GB/s)', vram_clock_mhz:'显存频率(MHz)',
+  compute_units:'计算单元', tensor_cores:'Tensor Core', rt_cores:'RT Core',
+  shading_units:'着色单元', sm_count:'SM数量',
+  l1_cache_kb:'L1缓存(KB)', l2_cache_mb:'L2缓存(MB)', on_chip_sram_mb:'片上SRAM(MB)',
+  precision_support:'精度支持', precision_perf:'精度性能',
+  base_clock_mhz:'基础频率(MHz)', boost_clock_mhz:'加速频率(MHz)', tdp_w:'TDP(W)',
+  max_power_w:'最大功耗(W)', psu_w:'建议电源(W)', power_connector:'电源接口',
+  board_length_mm:'板长(mm)', board_width_mm:'板宽(mm)', slot_width:'槽位宽度',
+  form_factor:'板型', bus_interface:'总线接口',
+  interconnect_bw_gb_s:'互联带宽(GB/s)', interconnect_tech:'互联技术', network_interface:'网络接口',
+  software_stack:'软件栈', driver_support:'驱动支持', framework_support:'框架支持',
+  cloud_available:'云端可用',
+  price_usd:'价格(USD)', price_cny_wan:'价格(万元)', price_period:'价格周期', price_notes:'价格备注',
+  release_date:'发布日期', production_status:'量产状态', eol_date:'EOL日期',
+  target_market:'目标市场', is_released:'已发布', expected_release_date:'预计发布日期',
+  known_specs:'已知规格', unconfirmed_items:'未确认项',
+  description:'芯片描述', highlights:'亮点', limitations:'局限',
+  target_workloads:'目标负载', typical_deployment:'典型部署', competitor_comparison:'竞品对比',
+  ecosystem:'生态评估', maturity_level:'成熟度', developer_community:'开发者社区',
+  documentation_quality:'文档质量', toolchain:'工具链', is_opensource:'开源',
+  model_id:'模型ID', author:'作者', pipeline_tag:'任务类型', library_name:'框架',
+  tags:'标签', downloads:'下载量', likes:'点赞', last_modified:'最后更新',
+  private:'私有', gated:'访问限制', architecture_family:'架构族',
+  total_params_b:'参数量(B)', config_json:'配置JSON', card_data_json:'模型卡JSON',
+  api_response_json:'API原始响应', created_at:'创建时间', updated_at:'更新时间',
+};
+
 const CHIP_GROUPS = [
   ['identity','标识'],['architecture','架构与制程'],['memory','显存'],
   ['compute_units','计算单元'],['cache','缓存'],['precision','精度性能'],
@@ -1106,7 +1140,7 @@ async function openChipProfile(id){
             ${prov.update_count>1?`<div class="pt-meta" style="margin-top:2px">${prov.update_count}次变更</div>`:''}
           </div>`;
         }
-        return `<div class="group-field"><span class="key">${esc(k)}</span><span class="val${hasProv?' val-has-provenance':''}">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}${tooltipHtml}</span></div>`;
+        return `<div class="group-field"><span class="key">${esc(FIELD_LABELS[k]||k)}</span><span class="val${hasProv?' val-has-provenance':''}">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}${tooltipHtml}</span></div>`;
       })
       .join('');
     return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${label}</div><div class="group-body">${fields}</div></div>`:'';
@@ -1136,7 +1170,7 @@ async function openChipProfile(id){
               ${prov.update_count>1?`<div class="pt-meta" style="margin-top:2px">${prov.update_count}次变更</div>`:''}
             </div>`;
           }
-          return `<div class="group-field"><span class="key">${esc(k)}</span><span class="val${hasProv?' val-has-provenance':''}">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}${tooltipHtml}</span></div>`;
+          return `<div class="group-field"><span class="key">${esc(FIELD_LABELS[k]||k)}</span><span class="val${hasProv?' val-has-provenance':''}">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}${tooltipHtml}</span></div>`;
         })
         .join('');
       return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${label}</div><div class="group-body">${fields}</div></div>`:'';
@@ -1196,6 +1230,7 @@ async function openChipProfile(id){
       <button class="detail-tab" onclick="switchDetailTab(event,'tab-physical')">🔧 物理信息</button>
       <button class="detail-tab" onclick="switchDetailTab(event,'tab-bench')">📊 兼容评测</button>
       <button class="detail-tab" onclick="switchDetailTab(event,'tab-provenance')">📝 溯源记录</button>
+	      <button class="detail-tab" onclick="switchDetailTab(event,'tab-reference')">🔗 部署参考</button>
     </div>
     <div class="detail-body" id="detail-body">
       <div class="detail-tab-panel active" id="tab-basic">${renderDetailGroups(['identity','architecture','memory','interconnect','price','status'])}</div>
@@ -1203,6 +1238,7 @@ async function openChipProfile(id){
       <div class="detail-tab-panel" id="tab-physical">${renderDetailGroups(['physical','cache','package'])}</div>
       <div class="detail-tab-panel" id="tab-bench">${bmHtml}${compHtml}</div>
       <div class="detail-tab-panel" id="tab-provenance">${provHtml}</div>
+	            <div class="detail-tab-panel" id="tab-reference" style="padding:16px"><div style="padding:12px;background:var(--bg3);border-radius:6px;font-size:0.85rem;display:flex;align-items:center;gap:8px"><span style="font-size:1.2rem">🔗</span><a href="https://docs.vllm.ai/projects/ascend/zh-cn/v0.18.0/tutorials/models/Qwen3.6-35B-A3B.html#deployment" target="_blank" rel="noopener" style="color:var(--accent)">vLLM Ascend 部署参考 — Qwen3.6-35B-A3B</a></div></div>
     </div>
   `;
 }
@@ -1280,6 +1316,11 @@ async function searchModels(){
   results.innerHTML += buildPager(MODEL_PAGE_STATE.page, MODEL_PAGE_STATE.limit, data.count, 'MODEL_PAGE_STATE.page');
 }
 
+const MODEL_GROUP_LABELS = {
+  identity:'标识', stats:'统计', access:'访问信息',
+  architecture:'架构', raw:'原始数据'
+};
+
 async function openModelProfile(id){
   const overlay=$('detail-overlay'), panel=$('detail-panel');
   panel.innerHTML='<div class="loading"><div class="spinner"></div></div>';
@@ -1289,15 +1330,15 @@ async function openModelProfile(id){
   if(data._error){panel.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
   const model = data.model || {};
 
-  const groups = ['identity','stats','access','architecture','raw'];
-  const groupsHtml = groups.map(key=>{
+  const _renderGroups = (...keys) => keys.map(key=>{
     const g = model[key];
     if(!g||Object.keys(g).length===0)return'';
+    const label = MODEL_GROUP_LABELS[key] || key;
     const fields = Object.entries(g)
       .filter(([k])=>k!=='id'&&!k.startsWith('_'))
-      .map(([k,v])=>`<div class="group-field"><span class="key">${esc(k)}</span><span class="val">${v!=null?esc(String(v).slice(0,300)):'<i style="color:var(--text3)">—</i>'}</span></div>`)
+      .map(([k,v])=>`<div class="group-field"><span class="key">${esc(FIELD_LABELS[k]||k)}</span><span class="val">${v!=null?esc(String(v).slice(0,300)):'<i style="color:var(--text3)">—</i>'}</span></div>`)
       .join('');
-    return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${esc(key)}</div><div class="group-body">${fields}</div></div>`:'';
+    return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${label}</div><div class="group-body">${fields}</div></div>`:'';
   }).join('');
 
   let compHtml = '';
@@ -1321,7 +1362,18 @@ async function openModelProfile(id){
       <h2>${esc(model.identity?.model_id||'Model')} <small style="color:var(--text3);font-weight:400;font-size:0.85rem">ID:${id}</small></h2>
       <button class="detail-close" onclick="closeDetail()">✕</button>
     </div>
-    <div class="detail-body">${groupsHtml}${compHtml}${provHtml}</div>
+    <div class="detail-tabs" id="detail-tabs">
+      <button class="detail-tab active" onclick="switchDetailTab(event,'tab-model-basic')">📋 基本信息</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-model-tech')">⚡ 技术参数</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-model-compat')">🔗 兼容芯片</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-model-prov')">📝 溯源记录</button>
+    </div>
+    <div class="detail-body" id="detail-body">
+      <div class="detail-tab-panel active" id="tab-model-basic">${_renderGroups('identity','stats','access')||'<div class="empty">暂无数据</div>'}</div>
+      <div class="detail-tab-panel" id="tab-model-tech">${_renderGroups('architecture','raw')||'<div class="empty">暂无数据</div>'}</div>
+      <div class="detail-tab-panel" id="tab-model-compat">${compHtml||'<div class="empty">暂无兼容芯片数据</div>'}</div>
+      <div class="detail-tab-panel" id="tab-model-prov">${provHtml||'<div class="empty">暂无溯源记录</div>'}</div>
+    </div>
   `;
 }
 
@@ -1338,7 +1390,7 @@ function renderFieldProvenance(fp) {
   });
   const allFields = [...officialFields, ...unofficialFields];
   const fieldsHtml = allFields.map(([fn, fi]) => {
-    const label = fi.field_label || fn;
+    const label = fi.field_label || FIELD_LABELS[fn] || fn;
     const isOfficial = fi.history && fi.history[0] && fi.history[0].is_official === '1';
     const historyRows = fi.history.map(h => `
       <div class="prov-history-row">
@@ -1503,6 +1555,7 @@ async function runRecommend(){
   results.innerHTML = `
     <div class="info" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <span>模型: <b>${esc(data.model||'')}</b> · 场景: <b>${req.scenario_label||(req.scenario==='train'?'训练':'推理')}</b>
+      <a href="https://docs.vllm.ai/projects/ascend/zh-cn/v0.18.0/quick_start.html" target="_blank" rel="noopener" style="margin-left:8px;font-size:0.75rem;color:var(--accent);white-space:nowrap">📖 vLLM Ascend 部署指南 →</a>
       · VRAM: <b>${req.min_vram_gb} GB</b>
       ${req.vram_formula ? `· <span style="font-size:0.7rem;color:var(--text2)" title="${esc(req.vram_formula)}">${esc(req.vram_formula.substring(0,60))}…</span>` : ''}
       · 候选: <b>${data.candidates?.length||0}</b> · 排除: <b>${data.rejected||0}</b></span>
@@ -1584,10 +1637,12 @@ function getTooltip(){
 function showScoreTooltip(ev, data){
   const tt = getTooltip();
   const rawEntries = Object.entries(data.raw||{}).filter(([,v])=>v!=null&&v!==''&&String(v)!=='undefined');
+  const src = data.raw?.source || data.raw?.note;
   tt.innerHTML = `
     <div class="tt-title"><span>${esc(data.name)}</span><span class="tt-score">${data.score}<span style="font-size:0.65rem;color:var(--text3)">/10</span></span></div>
     <div class="tt-formula">${esc(data.detail)}</div>
     ${rawEntries.length ? '<div class="tt-raw">'+rawEntries.map(([k,v])=>`<span>${esc(k)}: <b>${esc(typeof v==='number'?v.toFixed(2):String(v))}</b></span>`).join(' ')+'</div>' : ''}
+    ${src ? '<div class="tt-raw" style="margin-top:3px;font-size:0.6rem;color:var(--text3)">📂 '+esc(String(src).slice(0,120))+'</div>' : ''}
     <div class="tt-weight">权重: ${data.weight.toFixed(2)} · 加权: ${(data.score*data.weight).toFixed(2)}</div>
   `;
   tt.classList.add('visible');

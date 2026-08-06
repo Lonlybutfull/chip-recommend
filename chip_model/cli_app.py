@@ -412,7 +412,7 @@ def chip_recommend(
     scored: list[dict] = []
     for chip in candidates:
         chip_dict = dict(chip)
-        vram = float(chip_dict.get("vram_gb", 1))
+        vram = float(chip_dict.get("vram_gb", 0) or 0)
         price_wan = float(chip_dict.get("price_cny_wan", 0) or 0)
         cloud = int(float(chip_dict.get("cloud_available", 0) or 0))
 

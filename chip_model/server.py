@@ -49,6 +49,13 @@ from chip_model.scoring import (  # v3.0 scoring engine
     ScoringWeights,
     TRAIN_WEIGHTS,
     INFERENCE_WEIGHTS,
+    WEIGHTS_CPT,
+    WEIGHTS_SFT_FULL,
+    WEIGHTS_SFT_LORA,
+    WEIGHTS_RL,
+    WEIGHTS_QUANTIZE,
+    WEIGHTS_INFER_FP16,
+    WEIGHTS_INFER_QUANT,
     get_scenario_weights,
     estimate_vram_total,
     estimate_training_flops,
@@ -312,7 +319,7 @@ def api_chip_recommend(
 
     for chip in candidates:
         chip_dict = dict(chip)
-        vram = float(chip_dict.get("vram_gb", 1))
+        vram = float(chip_dict.get("vram_gb", 0) or 0)
         price_wan = float(chip_dict.get("price_cny_wan", 0) or 0)
         chip_model_name = str(chip_dict.get("chip_model", "") or "")
 
@@ -486,6 +493,14 @@ def chip_recommend_candidate_v2(
 @app.get("/api/v1/methodology")
 def api_methodology():
     """Return scoring methodology documentation for the UI."""
+    # Build weights dynamically from actual WEIGHTS_* constants (single source of truth)
+    _ws = lambda w: {
+        "compute_perf": w.compute_perf, "vram_sufficiency": w.vram_sufficiency,
+        "cost_efficiency": w.cost_efficiency, "power_efficiency": w.power_efficiency,
+        "interconnect_quality": w.interconnect_quality, "ecosystem_maturity": w.ecosystem_maturity,
+        "sla_satisfaction": w.sla_satisfaction, "production_readiness": w.production_readiness,
+        "benchmark_evidence": w.benchmark_evidence,
+    }
     return {
         "version": "3.1.0",
         "description": "AISHPerf 芯片推荐引擎 — 10维量化评分方法 (v3.1: 量化场景独立)",
@@ -509,13 +524,13 @@ def api_methodology():
             "inference_throughput_formula": "min(compute_bound, memory_bound) × 0.30 效率因子",
         },
         "scenario_weights": {
-            "train_sft_full": {"compute_perf": 0.20, "vram_sufficiency": 0.15, "cost_efficiency": 0.12, "power_efficiency": 0.08, "interconnect_quality": 0.12, "ecosystem_maturity": 0.10, "sla_satisfaction": 0.10, "production_readiness": 0.05, "benchmark_evidence": 0.08},
-            "train_sft_lora": {"compute_perf": 0.10, "vram_sufficiency": 0.25, "cost_efficiency": 0.17, "power_efficiency": 0.08, "interconnect_quality": 0.05, "ecosystem_maturity": 0.12, "sla_satisfaction": 0.10, "production_readiness": 0.05, "benchmark_evidence": 0.08},
-            "train_cpt":     {"compute_perf": 0.22, "vram_sufficiency": 0.17, "cost_efficiency": 0.14, "power_efficiency": 0.08, "interconnect_quality": 0.12, "ecosystem_maturity": 0.10, "sla_satisfaction": 0.07, "production_readiness": 0.03, "benchmark_evidence": 0.07},
-            "train_rl":      {"compute_perf": 0.15, "vram_sufficiency": 0.18, "cost_efficiency": 0.10, "power_efficiency": 0.08, "interconnect_quality": 0.18, "ecosystem_maturity": 0.10, "sla_satisfaction": 0.10, "production_readiness": 0.05, "benchmark_evidence": 0.06},
-            "quantize":      {"compute_perf": 0.12, "vram_sufficiency": 0.28, "cost_efficiency": 0.12, "power_efficiency": 0.06, "interconnect_quality": 0.08, "ecosystem_maturity": 0.12, "sla_satisfaction": 0.08, "production_readiness": 0.06, "benchmark_evidence": 0.08},
-            "inference_fp16": {"compute_perf": 0.15, "vram_sufficiency": 0.20, "cost_efficiency": 0.15, "power_efficiency": 0.08, "interconnect_quality": 0.08, "ecosystem_maturity": 0.12, "sla_satisfaction": 0.10, "production_readiness": 0.05, "benchmark_evidence": 0.07},
-            "inference_quant": {"compute_perf": 0.10, "vram_sufficiency": 0.25, "cost_efficiency": 0.16, "power_efficiency": 0.08, "interconnect_quality": 0.06, "ecosystem_maturity": 0.12, "sla_satisfaction": 0.10, "production_readiness": 0.05, "benchmark_evidence": 0.08},
+            "train_sft_full":  _ws(WEIGHTS_SFT_FULL),
+            "train_sft_lora":  _ws(WEIGHTS_SFT_LORA),
+            "train_cpt":       _ws(WEIGHTS_CPT),
+            "train_rl":        _ws(WEIGHTS_RL),
+            "quantize":        _ws(WEIGHTS_QUANTIZE),
+            "inference_fp16":  _ws(WEIGHTS_INFER_FP16),
+            "inference_quant": _ws(WEIGHTS_INFER_QUANT),
         },
         "scoring_dimensions": DIMENSION_META,
         "total_score_formula": "Σ(维度得分 × 权重) × 10 → 0~100 分制",
