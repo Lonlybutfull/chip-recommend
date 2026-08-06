@@ -1693,7 +1693,7 @@ function renderCalcRow(req, rec, chip){
   return items.map(it=>`
     <div class="rec-calc-item">
       <div class="rcl">${it.label}</div>
-      <div class="rcv${it.cls?'" style="'+it.cls:'"'}>${esc(it.value)}</div>
+      <div class="rcv"${it.cls?` style="${it.cls}"`:''}>${esc(it.value)}</div>
       ${it.detail ? `<div class="rcd">${esc(it.detail)}</div>` : ''}
     </div>
   `).join('');
