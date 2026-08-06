@@ -270,6 +270,53 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 .rec-stat .label{font-size:0.68rem;color:var(--text3)}
 .rec-stat .value{font-size:0.85rem;font-weight:600}
 .rec-rationale{font-size:0.75rem;color:var(--text2);font-style:italic}
+/* ── Three-column recommend layout ── */
+.rec-three-col{
+  display:grid;grid-template-columns:210px 1fr 230px;gap:14px;margin:10px 0;
+}
+@media(max-width:900px){
+  .rec-three-col{grid-template-columns:1fr;gap:10px}
+}
+.rec-col-left,.rec-col-center,.rec-col-right{
+  background:var(--bg3);border-radius:var(--radius-sm);padding:10px 12px;
+  overflow:hidden;
+}
+.rec-col-left .rec-chip-name{
+  font-weight:700;font-size:0.88rem;color:var(--text);margin-bottom:2px;
+}
+.rec-col-left .rec-chip-sub{
+  font-size:0.68rem;color:var(--text2);margin-bottom:8px;line-height:1.4;
+}
+.rec-spec-row{
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-size:0.7rem;padding:2px 0;border-bottom:1px dotted var(--bg4);
+}
+.rec-spec-row .spec-label{color:var(--text3);white-space:nowrap;min-width:72px}
+.rec-spec-row .spec-value{color:var(--text);font-weight:500;text-align:right;white-space:nowrap}
+.rec-col-header{
+  font-size:0.7rem;font-weight:700;color:var(--accent);margin-bottom:7px;
+  letter-spacing:0.04em;border-bottom:1px solid var(--bg4);padding-bottom:4px;
+}
+.rec-col-right .calc-row{
+  display:flex;justify-content:space-between;align-items:baseline;
+  font-size:0.7rem;padding:3px 0;border-bottom:1px dotted var(--bg4);
+}
+.rec-col-right .calc-label{color:var(--text3);white-space:nowrap}
+.rec-col-right .calc-value{color:var(--text);font-weight:600;text-align:right}
+.rec-col-right .calc-detail{font-size:0.6rem;color:var(--text3);word-break:break-all}
+.rec-profile-btn{
+  display:inline-block;margin-top:8px;font-size:0.68rem;color:var(--accent);
+  cursor:pointer;padding:3px 8px;border:1px solid var(--accent);border-radius:4px;
+  transition:var(--transition);background:transparent;
+}
+.rec-profile-btn:hover{background:var(--accent);color:#fff}
+/* Three-col scoring category bars */
+.rec-col-center .dim-breakdown{margin-top:0;border-top:none;padding-top:0}
+.rec-col-center .dim-breakdown > div:first-child{font-size:0.65rem;margin-bottom:2px}
+.rec-col-center .dim-row{font-size:0.62rem!important;padding:1px 2px!important;margin:0 0 0 8px!important}
+.rec-col-center .dim-row span[style*="width:58px"]{width:50px!important;font-size:0.6rem!important}
+.rec-col-center .dim-row span[style*="width:20px"]{width:18px!important;font-size:0.62rem!important}
+.rec-col-center .dim-row span[style*="width:46px"]{width:40px!important;font-size:0.55rem!important}
 .score-bar{height:5px;background:var(--bg4);border-radius:3px;margin-top:6px;overflow:hidden;}
 .score-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent2),var(--accent));border-radius:3px}
 .scoring-details{margin-top:8px}
@@ -1583,22 +1630,27 @@ async function runRecommend(){
       return `
         <div class="rec-card ${i===0?'best':''}">
           <div class="rec-rank">#${i+1} · 综合评分 ${scoring.total!=null?scoring.total:rec.score} / 100</div>
-          <div class="rec-header">
-            <h3>${esc(c.chip_model)} <small style="color:var(--text2);font-size:0.75rem">${esc(c.vendor_display||'')}</small></h3>
-            <div class="rec-score">${scoring.total!=null?scoring.total:rec.score}</div>
-          </div>
-          <div class="rec-stats">
-            <div class="rec-stat"><div class="label">推荐卡数</div><div class="value">${rec.recommended_cards} 卡</div></div>
-            <div class="rec-stat"><div class="label">显存约束卡数</div><div class="value">${rec.vram_cards} 卡</div></div>
-            <div class="rec-stat"><div class="label">预计训练天数</div><div class="value">${rec.estimated_training_days!=null?rec.estimated_training_days+' 天':'—'}</div></div>
-            <div class="rec-stat"><div class="label">满足SLA</div><div class="value" style="color:${rec.meets_sla==='true'||rec.meets_sla===true?'var(--green)':'var(--red)'}">${rec.meets_sla==='true'||rec.meets_sla===true?'✓ 是':'✗ 否'}</div></div>
-            <div class="rec-stat"><div class="label">总价</div><div class="value">${rec.total_cost_wan!=null?rec.total_cost_wan+' 万':'—'}</div></div>
-            <div class="rec-stat"><div class="label">显存</div><div class="value">${c.vram_gb||'?'} GB</div></div>
+          <div class="rec-three-col">
+            <!-- ── 左栏：芯片画像 ── -->
+            <div class="rec-col-left">
+              <div class="rec-chip-name">${esc(c.chip_model)}</div>
+              <div class="rec-chip-sub">${esc(c.vendor_display||'')} · ${esc(c.vendor_region||'')} · ${esc(c.chip_type||'')}</div>
+              ${renderChipSpecs(c)}
+              <button class="rec-profile-btn" onclick="openChipProfile('${esc(c.id||c.chip_model)}')">📋 完整画像</button>
+            </div>
+            <!-- ── 中栏：评分明细 ── -->
+            <div class="rec-col-center">
+              <div class="rec-col-header">📊 评分明细</div>
+              ${renderDimensionBreakdown(scoring, dimNameMap)}
+            </div>
+            <!-- ── 右栏：计算与推荐 ── -->
+            <div class="rec-col-right">
+              <div class="rec-col-header">🧮 计算与推荐</div>
+              ${renderRightCalc(req, rec, c, scoring)}
+            </div>
           </div>
           <div class="rec-rationale">${esc(rec.rationale||'')}</div>
-          ${renderCalcBreakdown(req, rec, c, scoring)}
           <div class="score-bar"><div class="score-bar-fill" style="width:${scoreBarPct}%"></div></div>
-          ${renderDimensionBreakdown(scoring, dimNameMap)}
         </div>
       `;
     }).join('')}
@@ -1618,6 +1670,81 @@ function renderDimensionBreakdown(scoring, dimNameMap) {
   const dims = scoring.dimensions;
   if (!dims) return '';
   return renderFlatDimensionBreakdown(dims, dimNameMap);
+}
+
+// ── Recommend left column: chip quick profile ──
+function renderChipSpecs(chip){
+  const specs = [
+    {key:'vram_gb', label:'显存', fmt:v=>v!=null?`${v} GB`:null},
+    {key:'tdp_w', label:'TDP', fmt:v=>v!=null?`${v} W`:null},
+    {key:'architecture', label:'架构', fmt:v=>v||null},
+    {key:'process_node_nm', label:'制程', fmt:v=>v!=null?`${v} nm`:null},
+    {key:'vram_bw_gb_s', label:'带宽', fmt:v=>v!=null?`${v} GB/s`:null},
+    {key:'precision_perf', label:'精度性能', fmt:v=>v||null},
+    {key:'price_cny_wan', label:'单价', fmt:v=>v!=null?`~${v} 万`:null},
+    {key:'interconnect_tech', label:'互联', fmt:v=>v||null},
+    {key:'maturity_level', label:'成熟度', fmt:v=>v||null},
+  ];
+  return specs.map(s=>{
+    const val = s.fmt(chip[s.key]);
+    if(!val) return '';
+    return `<div class="rec-spec-row"><span class="spec-label">${s.label}</span><span class="spec-value">${esc(val)}</span></div>`;
+  }).join('');
+}
+
+// ── Recommend right column: calculation + recommendation params ──
+function renderRightCalc(req, rec, chip, scoring){
+  const rows = [];
+
+  // VRAM requirement
+  if(req.min_vram_gb != null){
+    const formula = req.vram_formula || '';
+    const shortFormula = formula.length > 80 ? formula.substring(0,77)+'…' : formula;
+    rows.push({label:'显存需求', value:`${req.min_vram_gb.toFixed(1)} GB`, detail:shortFormula});
+  }
+
+  // Recommended cards
+  rows.push({label:'推荐卡数', value:`${rec.recommended_cards} 卡`, detail:`单卡${chip.vram_gb||'?'}GB · 最小${rec.vram_cards}卡`});
+  if(rec.recommended_cards != null && rec.vram_cards != null && rec.recommended_cards !== rec.vram_cards){
+    rows[rows.length-1].detail = `显存约束${rec.vram_cards}卡 → 算力约束${rec.recommended_cards}卡`;
+  }
+
+  // Training time
+  if(rec.estimated_training_days != null){
+    const target = req.target_training_days ? `目标${req.target_training_days}天` : '';
+    const tokens = req.training_tokens_T ? `${req.training_tokens_T}T tokens` : '';
+    rows.push({label:'预计训练', value:`${rec.estimated_training_days.toFixed(1)} 天`, detail:[target,tokens].filter(Boolean).join(' · ')});
+  }
+
+  // SLA
+  const meetsSla = rec.meets_sla==='true'||rec.meets_sla===true;
+  rows.push({label:'满足SLA', value:meetsSla?'✓ 是':'✗ 否', cls:meetsSla?'color:var(--green)':'color:var(--red)'});
+
+  // Total price
+  if(rec.total_cost_wan != null){
+    rows.push({label:'总价', value:`${rec.total_cost_wan} 万`, detail:`${rec.recommended_cards||rec.vram_cards}卡 × ${chip.price_cny_wan||'?'}万/卡`});
+  }
+
+  // Category weights
+  const w = rec.scenario_weights || (scoring && scoring.category_weights);
+  if(w){
+    const catNames = {compute_power:'算力', cost_effectiveness:'性价比', ecosystem_maturity:'生态'};
+    const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${catNames[k]||k} ${(v*100).toFixed(0)}%`).join(' · ');
+    rows.push({label:'大类权重', value:parts, detail:'3大类分层加权汇总'});
+  }
+
+  if(!rows.length) return '';
+
+  return rows.map(r=>`
+    <div class="calc-row">
+      <span class="calc-label">${r.label}</span>
+      <div style="text-align:right">
+        <span class="calc-value" style="${r.cls||''}">${esc(r.value)}</span>
+        ${r.detail ? `<div class="calc-detail">${esc(r.detail)}</div>` : ''}
+      </div>
+    </div>
+  `).join('')
+   + renderCalcBreakdown(req, rec, chip, scoring);
 }
 
 function renderCategoryBreakdown(cats, dimNameMap) {
