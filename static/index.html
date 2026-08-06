@@ -270,53 +270,66 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 .rec-stat .label{font-size:0.68rem;color:var(--text3)}
 .rec-stat .value{font-size:0.85rem;font-weight:600}
 .rec-rationale{font-size:0.75rem;color:var(--text2);font-style:italic}
-/* ── Three-column recommend layout ── */
-.rec-three-col{
-  display:grid;grid-template-columns:210px 1fr 230px;gap:14px;margin:10px 0;
+/* ── Recommend card layout (3 rows) ── */
+.rec-calc-row{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;
+  background:var(--bg3);border-radius:var(--radius-sm);padding:10px 14px;
 }
-@media(max-width:900px){
-  .rec-three-col{grid-template-columns:1fr;gap:10px}
+@media(max-width:700px){.rec-calc-row{grid-template-columns:1fr}}
+.rec-calc-item{font-size:0.73rem;padding:2px 0}
+.rec-calc-item .rcl{color:var(--text3);font-size:0.68rem}
+.rec-calc-item .rcv{color:var(--text);font-weight:600}
+.rec-calc-item .rcd{color:var(--text3);font-size:0.63rem;word-break:break-all}
+.rec-chip-row{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--bg3);border-radius:var(--radius-sm);padding:8px 14px;margin-bottom:10px;
+  font-size:0.75rem;
 }
-.rec-col-left,.rec-col-center,.rec-col-right{
-  background:var(--bg3);border-radius:var(--radius-sm);padding:10px 12px;
-  overflow:hidden;
-}
-.rec-col-left .rec-chip-name{
-  font-weight:700;font-size:0.88rem;color:var(--text);margin-bottom:2px;
-}
-.rec-col-left .rec-chip-sub{
-  font-size:0.68rem;color:var(--text2);margin-bottom:8px;line-height:1.4;
-}
-.rec-spec-row{
-  display:flex;justify-content:space-between;align-items:baseline;
-  font-size:0.7rem;padding:2px 0;border-bottom:1px dotted var(--bg4);
-}
-.rec-spec-row .spec-label{color:var(--text3);white-space:nowrap;min-width:72px}
-.rec-spec-row .spec-value{color:var(--text);font-weight:500;text-align:right;white-space:nowrap}
-.rec-col-header{
-  font-size:0.7rem;font-weight:700;color:var(--accent);margin-bottom:7px;
-  letter-spacing:0.04em;border-bottom:1px solid var(--bg4);padding-bottom:4px;
-}
-.rec-col-right .calc-row{
-  display:flex;justify-content:space-between;align-items:baseline;
-  font-size:0.7rem;padding:3px 0;border-bottom:1px dotted var(--bg4);
-}
-.rec-col-right .calc-label{color:var(--text3);white-space:nowrap}
-.rec-col-right .calc-value{color:var(--text);font-weight:600;text-align:right}
-.rec-col-right .calc-detail{font-size:0.6rem;color:var(--text3);word-break:break-all}
+.rec-chip-row .chip-name{font-weight:700;font-size:0.88rem;color:var(--text)}
+.rec-chip-row .chip-meta{color:var(--text2);font-size:0.7rem}
+.rec-chip-row .chip-spec{color:var(--text);font-weight:500;font-size:0.72rem;white-space:nowrap}
+.rec-chip-row .chip-spec-sep{color:var(--bg4)}
 .rec-profile-btn{
-  display:inline-block;margin-top:8px;font-size:0.68rem;color:var(--accent);
-  cursor:pointer;padding:3px 8px;border:1px solid var(--accent);border-radius:4px;
-  transition:var(--transition);background:transparent;
+  display:inline-block;margin-left:auto;font-size:0.68rem;color:var(--accent);
+  cursor:pointer;padding:4px 10px;border:1px solid var(--accent);border-radius:4px;
+  transition:var(--transition);background:transparent;white-space:nowrap;flex-shrink:0;
 }
 .rec-profile-btn:hover{background:var(--accent);color:#fff}
-/* Three-col scoring category bars */
-.rec-col-center .dim-breakdown{margin-top:0;border-top:none;padding-top:0}
-.rec-col-center .dim-breakdown > div:first-child{font-size:0.65rem;margin-bottom:2px}
-.rec-col-center .dim-row{font-size:0.62rem!important;padding:1px 2px!important;margin:0 0 0 8px!important}
-.rec-col-center .dim-row span[style*="width:58px"]{width:50px!important;font-size:0.6rem!important}
-.rec-col-center .dim-row span[style*="width:20px"]{width:18px!important;font-size:0.62rem!important}
-.rec-col-center .dim-row span[style*="width:46px"]{width:40px!important;font-size:0.55rem!important}
+/* ── Scoring detail panel (collapsible) ── */
+.rec-scoring-toggle{
+  display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;font-weight:600;
+  color:var(--accent);cursor:pointer;user-select:none;padding:6px 0;
+}
+.rec-scoring-toggle .arrow{transition:transform 0.2s;font-size:0.65rem}
+.rec-scoring-toggle.open .arrow{transform:rotate(90deg)}
+.rec-scoring-panel{
+  display:none;margin-top:4px;border-top:var(--border);padding-top:8px;
+}
+.rec-scoring-panel.open{display:block}
+.rec-scoring-cat{
+  margin-bottom:8px;border:1px solid var(--bg4);border-radius:var(--radius-sm);
+  overflow:hidden;
+}
+.rec-scoring-cat-header{
+  padding:6px 10px;background:var(--bg4);font-size:0.74rem;font-weight:600;
+  display:flex;align-items:center;gap:8px;
+}
+.rec-scoring-cat-header .cat-score{color:var(--accent);margin-left:auto}
+.rec-scoring-dim{
+  padding:5px 10px 5px 18px;font-size:0.7rem;border-bottom:1px solid var(--bg4);
+  line-height:1.5;
+}
+.rec-scoring-dim:last-child{border-bottom:none}
+.rec-scoring-dim .dim-head{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+}
+.rec-scoring-dim .dim-name{font-weight:600;color:var(--text);font-size:0.73rem}
+.rec-scoring-dim .dim-wbar{font-size:0.62rem;color:var(--text3)}
+.rec-scoring-dim .dim-calc{font-size:0.65rem;color:var(--text2);margin-top:2px}
+.rec-scoring-dim .dim-formula{font-size:0.62rem;color:var(--text3);font-family:monospace;margin-top:1px}
+.rec-scoring-dim .dim-raw{font-size:0.6rem;color:var(--text3);margin-top:1px}
+.dim-row{cursor:pointer;transition:background 0.15s;padding:3px 4px;border-radius:4px;margin:0 -4px}
+.dim-row:hover{background:rgba(255,255,255,0.04)}
 .scoring-details{margin-top:8px}
 .scoring-details summary{font-size:0.75rem;color:var(--text2);cursor:pointer;font-weight:500;user-select:none}
 .scoring-dim{font-size:0.68rem;color:var(--text3);margin-top:6px;line-height:1.5}
@@ -1626,25 +1639,24 @@ async function runRecommend(){
       dimMeta.forEach(m=>{ dimNameMap[m.id]=m; });
       return `
         <div class="rec-card ${i===0?'best':''}">
-          <div class="rec-rank">#${i+1} · 综合评分 ${scoring.total!=null?scoring.total:rec.score} / 100</div>
-          <div class="rec-three-col">
-            <!-- ── 左栏：芯片画像 ── -->
-            <div class="rec-col-left">
-              <div class="rec-chip-name">${esc(c.chip_model)}</div>
-              <div class="rec-chip-sub">${esc(c.vendor_display||'')} · ${esc(c.vendor_region||'')} · ${esc(c.chip_type||'')}</div>
-              ${renderChipSpecs(c)}
-              <button class="rec-profile-btn" onclick="openChipProfile('${esc(c.id||c.chip_model)}')">📋 完整画像</button>
-            </div>
-            <!-- ── 中栏：评分明细 ── -->
-            <div class="rec-col-center">
-              <div class="rec-col-header">📊 评分明细</div>
-              ${renderDimensionBreakdown(scoring, dimNameMap)}
-            </div>
-            <!-- ── 右栏：计算与推荐 ── -->
-            <div class="rec-col-right">
-              <div class="rec-col-header">🧮 计算与推荐</div>
-              ${renderRightCalc(req, rec, c, scoring)}
-            </div>
+          <div class="rec-rank">#${i+1} · 综合评分 ${scoring.total!=null?scoring.total:rec.score} / 100 · ${esc(c.chip_model)} <span style="color:var(--text2);font-weight:400">${esc(c.vendor_display||'')}</span></div>
+          <!-- Row 1: 计算与推荐 -->
+          <div class="rec-calc-row">
+            ${renderCalcRow(req, rec, c)}
+          </div>
+          <!-- Row 2: 芯片规格 + 完整画像按钮 -->
+          <div class="rec-chip-row">
+            <span class="chip-name">${esc(c.chip_model)}</span>
+            <span class="chip-meta">${esc(c.vendor_display||'')} · ${esc(c.vendor_region||'')} · ${esc(c.chip_type||'')}</span>
+            ${renderChipSpecInline(c)}
+            <button class="rec-profile-btn" onclick="openChipProfile('${esc(c.id||c.chip_model)}')">📋 完整画像</button>
+          </div>
+          <!-- Row 3: 评分细则 toggle -->
+          <div class="rec-scoring-toggle" id="scoring-toggle-${i}" onclick="toggleScoringDetail(${i})">
+            <span class="arrow">▶</span> 📊 评分细则
+          </div>
+          <div class="rec-scoring-panel" id="scoring-panel-${i}">
+            ${renderScoringDetail(scoring, dimNameMap)}
           </div>
           <div class="rec-rationale">${esc(rec.rationale||'')}</div>
         </div>
@@ -1653,23 +1665,42 @@ async function runRecommend(){
   `;
 }
 
-function renderDimensionBreakdown(scoring, dimNameMap) {
-  if (!scoring) return '';
-
-  // v4.0: Use nested categories structure if available
-  const cats = scoring.categories;
-  if (cats) {
-    return renderCategoryBreakdown(cats, dimNameMap);
+// ── Row 1: Calculation & recommendation params ──
+function renderCalcRow(req, rec, chip){
+  const items = [];
+  // VRAM
+  if(req.min_vram_gb != null){
+    const f = req.vram_formula || '';
+    items.push({label:'显存需求', value:`${req.min_vram_gb.toFixed(1)} GB`, detail:f.length>100?f.substring(0,97)+'…':f});
   }
-
-  // Fallback: old flat dimensions format
-  const dims = scoring.dimensions;
-  if (!dims) return '';
-  return renderFlatDimensionBreakdown(dims, dimNameMap);
+  // Cards
+  items.push({label:'推荐卡数', value:`${rec.recommended_cards} 卡`, detail:`单卡${chip.vram_gb||'?'}GB · 显存约束${rec.vram_cards}卡${rec.recommended_cards!==rec.vram_cards?' → 算力约束'+rec.recommended_cards+'卡':''}`});
+  // Training time
+  if(rec.estimated_training_days != null){
+    const parts = [];
+    if(req.target_training_days) parts.push(`目标${req.target_training_days}天`);
+    if(req.training_tokens_T) parts.push(`${req.training_tokens_T}T tokens`);
+    items.push({label:'预计训练', value:`${rec.estimated_training_days.toFixed(1)} 天`, detail:parts.join(' · ')});
+  }
+  // SLA
+  const meets = rec.meets_sla==='true'||rec.meets_sla===true;
+  items.push({label:'满足SLA', value:meets?'✓ 是':'✗ 否', cls:meets?'color:var(--green)':'color:var(--red)'});
+  // Price
+  if(rec.total_cost_wan != null){
+    items.push({label:'总价', value:`${rec.total_cost_wan} 万`, detail:`${rec.recommended_cards||rec.vram_cards}卡 × ${chip.price_cny_wan||'?'}万/卡`});
+  }
+  if(!items.length) return '';
+  return items.map(it=>`
+    <div class="rec-calc-item">
+      <div class="rcl">${it.label}</div>
+      <div class="rcv${it.cls?'" style="'+it.cls:'"'}>${esc(it.value)}</div>
+      ${it.detail ? `<div class="rcd">${esc(it.detail)}</div>` : ''}
+    </div>
+  `).join('');
 }
 
-// ── Recommend left column: chip quick profile ──
-function renderChipSpecs(chip){
+// ── Row 2: Chip specs inline (comma-separated) ──
+function renderChipSpecInline(chip){
   const specs = [
     {key:'vram_gb', label:'显存', fmt:v=>v!=null?`${v} GB`:null},
     {key:'tdp_w', label:'TDP', fmt:v=>v!=null?`${v} W`:null},
@@ -1681,69 +1712,34 @@ function renderChipSpecs(chip){
     {key:'interconnect_tech', label:'互联', fmt:v=>v||null},
     {key:'maturity_level', label:'成熟度', fmt:v=>v||null},
   ];
-  return specs.map(s=>{
+  const parts = [];
+  specs.forEach(s=>{
     const val = s.fmt(chip[s.key]);
-    if(!val) return '';
-    return `<div class="rec-spec-row"><span class="spec-label">${s.label}</span><span class="spec-value">${esc(val)}</span></div>`;
-  }).join('');
+    if(val) parts.push({key:s.key, label:s.label, val});
+  });
+  return parts.map(s=>`<span class="chip-spec">${esc(s.label)}（${esc(s.val)}）</span>`).join('<span class="chip-spec-sep">|</span>');
 }
 
-// ── Recommend right column: calculation + recommendation params ──
-function renderRightCalc(req, rec, chip, scoring){
-  const rows = [];
-
-  // VRAM requirement
-  if(req.min_vram_gb != null){
-    const formula = req.vram_formula || '';
-    const shortFormula = formula.length > 80 ? formula.substring(0,77)+'…' : formula;
-    rows.push({label:'显存需求', value:`${req.min_vram_gb.toFixed(1)} GB`, detail:shortFormula});
-  }
-
-  // Recommended cards
-  rows.push({label:'推荐卡数', value:`${rec.recommended_cards} 卡`, detail:`单卡${chip.vram_gb||'?'}GB · 最小${rec.vram_cards}卡`});
-  if(rec.recommended_cards != null && rec.vram_cards != null && rec.recommended_cards !== rec.vram_cards){
-    rows[rows.length-1].detail = `显存约束${rec.vram_cards}卡 → 算力约束${rec.recommended_cards}卡`;
-  }
-
-  // Training time
-  if(rec.estimated_training_days != null){
-    const target = req.target_training_days ? `目标${req.target_training_days}天` : '';
-    const tokens = req.training_tokens_T ? `${req.training_tokens_T}T tokens` : '';
-    rows.push({label:'预计训练', value:`${rec.estimated_training_days.toFixed(1)} 天`, detail:[target,tokens].filter(Boolean).join(' · ')});
-  }
-
-  // SLA
-  const meetsSla = rec.meets_sla==='true'||rec.meets_sla===true;
-  rows.push({label:'满足SLA', value:meetsSla?'✓ 是':'✗ 否', cls:meetsSla?'color:var(--green)':'color:var(--red)'});
-
-  // Total price
-  if(rec.total_cost_wan != null){
-    rows.push({label:'总价', value:`${rec.total_cost_wan} 万`, detail:`${rec.recommended_cards||rec.vram_cards}卡 × ${chip.price_cny_wan||'?'}万/卡`});
-  }
-
-  // Category weights
-  const w = rec.scenario_weights || (scoring && scoring.category_weights);
-  if(w){
-    const catNames = {compute_power:'算力', cost_effectiveness:'性价比', ecosystem_maturity:'生态'};
-    const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${catNames[k]||k} ${(v*100).toFixed(0)}%`).join(' · ');
-    rows.push({label:'大类权重', value:parts, detail:'3大类分层加权汇总'});
-  }
-
-  if(!rows.length) return '';
-
-  return rows.map(r=>`
-    <div class="calc-row">
-      <span class="calc-label">${r.label}</span>
-      <div style="text-align:right">
-        <span class="calc-value" style="${r.cls||''}">${esc(r.value)}</span>
-        ${r.detail ? `<div class="calc-detail">${esc(r.detail)}</div>` : ''}
-      </div>
-    </div>
-  `).join('')
-   + renderCalcBreakdown(req, rec, chip, scoring);
+// ── Row 3: Scoring detail panel (collapsible) ──
+function toggleScoringDetail(idx){
+  const toggle = document.getElementById('scoring-toggle-'+idx);
+  const panel = document.getElementById('scoring-panel-'+idx);
+  if(!toggle||!panel) return;
+  toggle.classList.toggle('open');
+  panel.classList.toggle('open');
 }
 
-function renderCategoryBreakdown(cats, dimNameMap) {
+function renderScoringDetail(scoring, dimNameMap) {
+  if (!scoring) return '<div class="empty">暂无评分数据</div>';
+
+  // v4.0: use categories structure
+  const cats = scoring.categories;
+  if (!cats) {
+    // Fallback: old flat dimensions
+    const dims = scoring.dimensions;
+    if (!dims) return '<div class="empty">暂无评分数据</div>';
+    return renderFlatScoringDetail(dims, dimNameMap);
+  }
 
   const catOrder = [
     {id:'compute_power', icon:'⚡'},
@@ -1758,60 +1754,81 @@ function renderCategoryBreakdown(cats, dimNameMap) {
     const entries = Object.entries(subDims).filter(([,v]) => v.score > 0 || v.weight > 0);
     if (!entries.length) return '';
 
-    // Category header — no bar, just icon + name + score
-    const headerHtml = `<div style="display:flex;align-items:center;gap:6px;margin:8px 0 2px;padding:4px 6px;background:var(--bg4);border-radius:4px">
-      <span style="font-weight:600;font-size:0.7rem;color:var(--text)">${icon} ${esc(cat.name_cn)}</span>
-      <span style="font-weight:700;font-size:0.75rem;color:var(--accent);margin-left:auto">${cat.score.toFixed(1)}</span>
-      <span style="color:var(--text3);font-size:0.58rem">×${(cat.weight*100).toFixed(0)}% = ${cat.weighted.toFixed(1)}</span>
+    return `<div class="rec-scoring-cat">
+      <div class="rec-scoring-cat-header">
+        ${icon} ${esc(cat.name_cn)}
+        <span style="color:var(--text2);font-size:0.65rem;font-weight:400">大类权重 ${(cat.weight*100).toFixed(0)}%</span>
+        <span class="cat-score">${cat.score.toFixed(1)} 分 · 加权 ${cat.weighted.toFixed(2)}</span>
+      </div>
+      ${entries.map(([dimId, v]) => {
+        const meta = dimNameMap[dimId] || {};
+        const name = meta.name_cn || dimId;
+        const subWt = meta.sub_weight || v.weight;
+        const catWt = cat.weight || 0;
+        const globalWt = subWt * catWt;
+        const raw = v.raw_values || {};
+        const detail = v.detail || '';
+        const formula = raw.formula || '';
+        const source = raw.source || raw.note || '';
+        const rawStr = Object.entries(raw).filter(([rk])=>rk!=='formula'&&rk!=='source'&&rk!=='note').map(([rk,rv])=>`${rk}=${typeof rv==='number'?rv.toFixed(2):rv}`).join(', ');
+
+        return `<div class="rec-scoring-dim">
+          <div class="dim-head">
+            <span class="dim-name">${esc(name)}</span>
+            <span class="dim-wbar">子权重 ${(subWt*100).toFixed(1)}% × ${(catWt*100).toFixed(0)}% = 全局 ${(globalWt*100).toFixed(1)}%</span>
+            <span style="font-weight:700;color:var(--accent);font-size:0.75rem;margin-left:auto">${v.score.toFixed(1)}<span style="font-size:0.6rem;color:var(--text3)">/10</span></span>
+            <span style="color:var(--text3);font-size:0.6rem">加权 ${v.weighted.toFixed(2)}</span>
+          </div>
+          <div class="dim-calc">${esc(detail)}</div>
+          ${formula ? `<div class="dim-formula">📐 公式: ${esc(formula)}</div>` : ''}
+          ${rawStr ? `<div class="dim-raw">📊 代入: ${esc(rawStr)}</div>` : ''}
+          ${source ? `<div class="dim-raw">📂 ${esc(source)}</div>` : ''}
+        </div>`;
+      }).join('')}
     </div>`;
-
-    // Sub-dimension rows — no bar, just name + score + weight
-    const rowsHtml = entries.map(([dimId, v]) => {
-      const meta = dimNameMap[dimId] || {};
-      const name = meta.name_cn || dimId;
-      const tooltipData = esc(JSON.stringify({
-        name, score: v.score, weight: v.weight, weighted: v.weighted,
-        detail: v.detail || '', raw: v.raw_values || {}
-      }));
-      return `<div class="dim-row" style="display:flex;align-items:center;gap:4px;font-size:0.62rem;padding:1px 4px;margin:0 0 0 10px;border-radius:3px"
-        onmouseenter="showScoreTooltip(event, ${tooltipData})"
-        onmousemove="moveScoreTooltip(event)"
-        onmouseleave="hideScoreTooltip()">
-        <span style="color:var(--text2);white-space:nowrap;font-size:0.6rem;flex:1">${esc(name)}</span>
-        <span style="font-weight:600;color:var(--text);font-size:0.65rem">${v.score.toFixed(1)}</span>
-        <span style="color:var(--text3);font-size:0.55rem">×${v.weight.toFixed(2)}=${v.weighted.toFixed(1)}</span>
-      </div>`;
-    }).join('');
-
-    return headerHtml + rowsHtml;
   }).join('');
 
-  return `<div class="dim-breakdown" style="margin-top:4px">
-    <div style="font-size:0.62rem;color:var(--text3);margin-bottom:2px">📊 3大类·11子维度（悬浮查看公式）</div>
+  // Total score formula
+  const total = scoring.total!=null ? scoring.total.toFixed(1) : '?';
+  const cw = scoring.category_weights || {};
+  const catNames2 = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度'};
+  const totalParts = Object.entries(cw).filter(([,v])=>v>0).map(([k,v])=>
+    `${catNames2[k]||k}: ${cats[k]?.score?.toFixed(1)||'?'} × ${(v*100).toFixed(0)}% = ${cats[k]?.weighted?.toFixed(2)||'?'}`
+  );
+  const totalFormula = totalParts.length ? `总分 = (${totalParts.join(' + ')}) × 10 = ${total}` : `总分 = ${total}`;
+
+  return `<div style="font-size:0.68rem;color:var(--text3);margin-bottom:6px">📊 评分明细 v${scoring.version||'4.0'} — 3大类·11子维度</div>
     ${sections}
-  </div>`;
+    <div style="margin-top:6px;padding:6px 10px;background:var(--bg4);border-radius:4px;font-size:0.7rem;color:var(--text)">
+      <b>总分计算</b>: ${esc(totalFormula)}
+    </div>`;
 }
 
-function renderFlatDimensionBreakdown(dims, dimNameMap) {
-  // Legacy fallback for data without categories
+function renderFlatScoringDetail(dims, dimNameMap) {
+  // Legacy fallback
   const entries = Object.entries(dims).filter(([,v])=>v.score>0||v.weight>0);
-  if (!entries.length) return '';
-  return `<div class="dim-breakdown" style="margin-top:4px">
-    <div style="font-size:0.62rem;color:var(--text3);margin-bottom:2px">📊 评分明细（悬浮查看公式）</div>
-    ${entries.map(([id,v])=>{
-      const meta = dimNameMap[id] || {};
-      const name = meta.name_cn || id;
-      const tooltipData = esc(JSON.stringify({name, score:v.score, weight:v.weight, weighted:v.weighted, detail:v.detail||'', raw:v.raw_values||{}}));
-      return `<div class="dim-row" style="display:flex;align-items:center;gap:6px;font-size:0.62rem;padding:1px 4px;margin:0 0 0 10px;border-radius:4px"
-        onmouseenter="showScoreTooltip(event, ${tooltipData})"
-        onmousemove="moveScoreTooltip(event)"
-        onmouseleave="hideScoreTooltip()">
-        <span style="color:var(--text2);font-size:0.6rem;flex:1">${esc(name)}</span>
-        <span style="font-weight:600;color:var(--text);font-size:0.65rem">${v.score.toFixed(1)}</span>
-        <span style="color:var(--text3);font-size:0.55rem">×${v.weight.toFixed(2)}=${v.weighted.toFixed(1)}</span>
+  if (!entries.length) return '<div class="empty">暂无评分数据</div>';
+  return `<div style="font-size:0.68rem;color:var(--text3);margin-bottom:4px">📊 评分明细（旧版，无分类层级）</div>
+    ${entries.map(([dimId, v]) => {
+      const meta = dimNameMap[dimId] || {};
+      const name = meta.name_cn || dimId;
+      const raw = v.raw_values || {};
+      const detail = v.detail || '';
+      const formula = raw.formula || '';
+      const source = raw.source || raw.note || '';
+      const rawStr = Object.entries(raw).filter(([rk])=>rk!=='formula'&&rk!=='source'&&rk!=='note').map(([rk,rv])=>`${rk}=${typeof rv==='number'?rv.toFixed(2):rv}`).join(', ');
+      return `<div class="rec-scoring-dim">
+        <div class="dim-head">
+          <span class="dim-name">${esc(name)}</span>
+          <span style="font-weight:700;color:var(--accent);margin-left:auto">${v.score.toFixed(1)}<span style="font-size:0.6rem;color:var(--text3)">/10</span></span>
+          <span style="color:var(--text3);font-size:0.6rem">×${v.weight.toFixed(2)} = ${v.weighted.toFixed(1)}</span>
+        </div>
+        ${detail ? `<div class="dim-calc">${esc(detail)}</div>` : ''}
+        ${formula ? `<div class="dim-formula">📐 公式: ${esc(formula)}</div>` : ''}
+        ${rawStr ? `<div class="dim-raw">📊 代入: ${esc(rawStr)}</div>` : ''}
+        ${source ? `<div class="dim-raw">📂 ${esc(source)}</div>` : ''}
       </div>`;
-    }).join('')}
-  </div>`;
+    }).join('')}`;
 }
 
 // ── Score Tooltip (floating) ──
