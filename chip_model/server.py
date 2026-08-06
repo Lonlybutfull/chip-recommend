@@ -46,6 +46,7 @@ from chip_model.scoring import (  # v3.0 scoring engine
     parse_fp16,
     round_up_pow2,
     RecommendContext,
+    CategoryWeights,
     ScoringWeights,
     TRAIN_WEIGHTS,
     INFERENCE_WEIGHTS,
@@ -57,6 +58,8 @@ from chip_model.scoring import (  # v3.0 scoring engine
     WEIGHTS_INFER_FP16,
     WEIGHTS_INFER_QUANT,
     get_scenario_weights,
+    get_category_weights,
+    CATEGORY_DEFS,
     estimate_vram_total,
     estimate_training_flops,
     DimensionResult,
@@ -307,8 +310,8 @@ def api_chip_recommend(
             )
         raise HTTPException(404, f"没有芯片满足 {model} 的VRAM需求 (≥{min_vram_total:.0f}GB)，请尝试其他模型或放宽约束")
 
-    # 5. Get scenario-specific weights (v3.1: quantize scenario added)
-    weights, scenario_label = get_scenario_weights(
+    # 5. Get scenario-specific category weights (v4.0: 3-category system)
+    cat_weights, scenario_label = get_category_weights(
         scenario, stage=stage_val, method=method_val, quant=quant_val,
         quantize_bits=quantize_bits_val,
     )
@@ -394,10 +397,9 @@ def api_chip_recommend(
         )
 
         scoring_result = aggregate_score(
-            ctx, weights,
+            ctx, cat_weights,
             prefer_domestic=prefer_domestic,
             prefer_vendor=prefer_vendor,
-            tco_weight_override=tco_weight,
         )
 
         scored.append({
@@ -436,10 +438,11 @@ def api_chip_recommend(
             "max_price_wan": max_price,
         },
         "scoring_meta": {
-            "version": "3.1.0",
+            "version": "4.0.0",
             "scenario_label": scenario_label,
-            "scenario_weights": weights.__dict__,
+            "category_weights": cat_weights.to_dict(),
             "dimensions": DIMENSION_META,
+            "categories": CATEGORY_DEFS,
         },
         "candidates": [
             chip_recommend_candidate_v2(

@@ -1593,11 +1593,88 @@ async function runRecommend(){
 }
 
 function renderDimensionBreakdown(scoring, dimNameMap) {
-  if (!scoring || !scoring.dimensions) return '';
+  if (!scoring) return '';
+
+  // v4.0: Use nested categories structure if available
+  const cats = scoring.categories;
+  if (cats) {
+    return renderCategoryBreakdown(cats, dimNameMap);
+  }
+
+  // Fallback: old flat dimensions format
   const dims = scoring.dimensions;
+  if (!dims) return '';
+  return renderFlatDimensionBreakdown(dims, dimNameMap);
+}
+
+function renderCategoryBreakdown(cats, dimNameMap) {
+  function barColor(s) {
+    if (s>=8) return 'linear-gradient(90deg, var(--accent2), var(--accent))';
+    if (s>=6) return 'linear-gradient(90deg, var(--green), var(--accent))';
+    if (s>=3) return 'linear-gradient(90deg, var(--orange), var(--green))';
+    return 'linear-gradient(90deg, var(--red), var(--orange))';
+  }
+
+  const catOrder = [
+    {id:'compute_power', icon:'⚡'},
+    {id:'cost_effectiveness', icon:'💰'},
+    {id:'ecosystem_maturity', icon:'🌐'}
+  ];
+
+  const sections = catOrder.map(({id, icon}) => {
+    const cat = cats[id];
+    if (!cat) return '';
+    const subDims = cat.sub_dimensions || {};
+    const entries = Object.entries(subDims).filter(([,v]) => v.score > 0 || v.weight > 0);
+    if (!entries.length) return '';
+
+    const catPct = Math.min(100, cat.score * 10);
+
+    // Category header
+    const headerHtml = `<div style="display:flex;align-items:center;gap:8px;margin:10px 0 3px;padding:6px 8px;background:var(--bg3);border-radius:6px;border-left:3px solid var(--accent)">
+      <span style="font-weight:700;font-size:0.78rem;color:var(--text);white-space:nowrap">${icon} ${esc(cat.name_cn)}</span>
+      <span style="flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden">
+        <span style="display:block;height:100%;width:${catPct}%;background:${barColor(cat.score)};border-radius:3px"></span>
+      </span>
+      <span style="font-weight:700;font-size:0.82rem;color:var(--accent);white-space:nowrap">${cat.score.toFixed(1)}</span>
+      <span style="color:var(--text3);font-size:0.62rem;white-space:nowrap">×${(cat.weight*100).toFixed(0)}% = ${cat.weighted.toFixed(1)}</span>
+    </div>`;
+
+    // Sub-dimension rows (indented)
+    const rowsHtml = entries.map(([dimId, v]) => {
+      const meta = dimNameMap[dimId] || {};
+      const name = meta.name_cn || dimId;
+      const pct = Math.min(100, v.score * 10);
+      const tooltipData = esc(JSON.stringify({
+        name, score: v.score, weight: v.weight, weighted: v.weighted,
+        detail: v.detail || '', raw: v.raw_values || {}
+      }));
+      return `<div class="dim-row" style="display:flex;align-items:center;gap:4px;font-size:0.65rem;padding:2px 4px;margin:0 0 0 14px;border-radius:3px"
+        onmouseenter="showScoreTooltip(event, ${tooltipData})"
+        onmousemove="moveScoreTooltip(event)"
+        onmouseleave="hideScoreTooltip()">
+        <span style="width:58px;color:var(--text2);white-space:nowrap;text-align:right;flex-shrink:0;font-size:0.62rem">${esc(name)}</span>
+        <span style="flex:1;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden">
+          <span style="display:block;height:100%;width:${pct}%;background:${barColor(v.score)};border-radius:3px"></span>
+        </span>
+        <span style="width:20px;text-align:center;font-weight:600;color:var(--text);flex-shrink:0;font-size:0.68rem">${v.score.toFixed(1)}</span>
+        <span style="width:46px;text-align:right;color:var(--text3);font-size:0.58rem;flex-shrink:0">×${v.weight.toFixed(2)}=${v.weighted.toFixed(1)}</span>
+      </div>`;
+    }).join('');
+
+    return headerHtml + rowsHtml;
+  }).join('');
+
+  return `<div class="dim-breakdown" style="margin-top:8px;border-top:var(--border);padding-top:6px">
+    <div style="font-size:0.68rem;color:var(--text3);margin-bottom:4px">📊 评分明细 — 3大类·11子维度（悬浮查看公式）</div>
+    ${sections}
+  </div>`;
+}
+
+function renderFlatDimensionBreakdown(dims, dimNameMap) {
+  // Legacy fallback for data without categories
   const entries = Object.entries(dims).filter(([,v])=>v.score>0||v.weight>0);
   if (!entries.length) return '';
-  // Color gradient: 0-3 red, 3-6 yellow, 6-8 green, 8-10 blue
   function barColor(s) {
     if (s>=8) return 'linear-gradient(90deg, var(--accent2), var(--accent))';
     if (s>=6) return 'linear-gradient(90deg, var(--green), var(--accent))';
@@ -1684,12 +1761,12 @@ function renderCalcBreakdown(req, rec, chip){
   if(rec.total_cost_wan != null){
     items.push({label:'预估总价', value:rec.total_cost_wan+' 万元', detail:`${rec.recommended_cards||rec.vram_cards}卡 × ${chip.price_cny_wan||'?'}万/卡`});
   }
-  // Scenario weights
-  const w = rec.scenario_weights || (chip.scoring && chip.scoring.weights);
-  if(w){
-    const dimNames = {compute_perf:'算力',vram_sufficiency:'显存',cost_efficiency:'制程',power_efficiency:'能效',interconnect_quality:'互联',ecosystem_maturity:'生态',sla_satisfaction:'SLA',production_readiness:'量产',benchmark_evidence:'实测'};
-    const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${dimNames[k]||k}:${(v*100).toFixed(0)}%`).join(' ');
-    items.push({label:'场景权重分配', value:parts, detail:`总分=Σ(维度分×权重)×10, 0-100分制`});
+  // Category weights (v4.0: 3-category system)
+  const w = rec.scenario_weights || (scoring && scoring.category_weights);
+  if (w) {
+    const catNames = {compute_power:'算力性能(5维)', cost_effectiveness:'性价比(2维)', ecosystem_maturity:'生态成熟度(4维)'};
+    const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${catNames[k]||k}:${(v*100).toFixed(0)}%`).join(' ');
+    items.push({label:'大类权重分配', value:parts, detail:`总分=Σ(大类分×大类权重)×10, 子维度权重为固定比值`});
   }
   if(!items.length) return '';
   return `<details class="calc-breakdown">
@@ -1723,20 +1800,20 @@ async function showMethodology() {
         <div class="group"><div class="group-header">硬约束条件</div><div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px">
           ${(data.hard_constraints||[]).map(c=>`<div class="group-field"><span class="val">${esc(c)}</span></div>`).join('')}
         </div></div>
-        <div class="group"><div class="group-header">评分维度 (11维)</div>
+        <div class="group"><div class="group-header">评分维度 (3大类 × 11子维度)</div>
         <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:6px">
           ${dims.map(d=>`<div class="group-field" style="flex-direction:column;align-items:flex-start;gap:2px">
-            <span style="font-weight:600;color:var(--accent)">${esc(d.name_cn)} (${esc(d.name_en)})</span>
+            <span style="font-weight:600;color:var(--accent)">${esc(d.name_cn)} (${esc(d.name_en)}) <span style="font-size:0.6rem;color:var(--text3)">[${esc((d.category||'').replace('compute_power','算力性能').replace('cost_effectiveness','性价比').replace('ecosystem_maturity','生态成熟度'))}]</span></span>
             <span style="color:var(--text2);font-size:0.73rem">${esc(d.desc||'')} · 单位: ${esc(d.unit||'')}</span>
-            <span style="color:var(--text3);font-size:0.68rem">训练:${(d.train_weight||0).toFixed(2)} | 推理:${(d.infer_weight||0).toFixed(2)} | 量化:${(d.quantize_weight||0).toFixed(2)}</span>
+            <span style="color:var(--text3);font-size:0.68rem">子权重: ${((d.sub_weight||0)*100).toFixed(0)}%</span>
           </div>`).join('')}
         </div></div>
         ${data.scenario_weights ? `
-        <div class="group"><div class="group-header">场景权重矩阵</div>
+        <div class="group"><div class="group-header">大类权重矩阵 (3大类)</div>
         <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px;font-size:0.7rem">
           ${Object.entries(data.scenario_weights).map(([scenario,w])=>{
-            const dimNames = {compute_perf:'算力',vram_sufficiency:'显存',cost_efficiency:'制程',power_efficiency:'能效',interconnect_quality:'互联',ecosystem_maturity:'生态',sla_satisfaction:'SLA',production_readiness:'量产',benchmark_evidence:'实测'};
-            const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>dimNames[k]+':'+(v*100).toFixed(0)+'%').join(', ');
+            const catNames = {compute_power:'算力性能(5维)', cost_effectiveness:'性价比(2维)', ecosystem_maturity:'生态成熟度(4维)'};
+            const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${catNames[k]||k}:${(v*100).toFixed(0)}%`).join(', ');
             return `<div class="group-field"><span class="key" style="font-weight:600">${esc(scenario)}</span><span class="val">${esc(parts)}</span></div>`;
           }).join('')}
         </div></div>` : ''}

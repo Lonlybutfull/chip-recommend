@@ -157,11 +157,143 @@ def estimate_training_flops(params_B: float, tokens_T: float) -> float:
 
 
 # ═══════════════════════════════════════════════════════════
-# Configuration — scoring weights (v3.0: 7 scenario presets)
+# v4.0 Configuration — 3-category weights + sub-dimension ratios
 # ═══════════════════════════════════════════════════════════
+#
+# Category weights (3 presets × 3 categories):
+#   Train:     compute=55%, cost=15%, ecosystem=30%
+#   Inference: compute=45%, cost=25%, ecosystem=30%
+#   Quantize:  compute=40%, cost=20%, ecosystem=40%
+#
+# Sub-dimension ratios are FIXED (not scenario-dependent):
+#   Compute:  D1(30%) + D2(30%) + D5(15%) + D7(10%) + D8(15%)
+#   Cost:     D3(50%) + D4(50%)
+#   Ecosystem: D6(40%) + D9(20%) + D10(30%) + D11(10%)
+# ═══════════════════════════════════════════════════════════
+
+
+@dataclass
+class CategoryWeights:
+    """3-category weight preset. Sum must be 1.0."""
+    compute_power: float = 0.50
+    cost_effectiveness: float = 0.25
+    ecosystem_maturity: float = 0.25
+
+    def validate(self) -> bool:
+        return abs(self.compute_power + self.cost_effectiveness + self.ecosystem_maturity - 1.0) < 0.001
+
+    def to_dict(self) -> dict:
+        return {
+            "compute_power": self.compute_power,
+            "cost_effectiveness": self.cost_effectiveness,
+            "ecosystem_maturity": self.ecosystem_maturity,
+        }
+
+
+@dataclass
+class CategoryResult:
+    """Aggregate score for one category, composed of sub-dimensions."""
+    id: str = ""
+    name_cn: str = ""
+    name_en: str = ""
+    score: float = 0.0          # 0-10 weighted avg of sub-dimensions
+    weight: float = 0.0          # category-level weight
+    weighted: float = 0.0        # score × weight
+    sub_dimensions: dict = field(default_factory=dict)  # {dim_id: DimensionResult}
+    formula: str = ""            # e.g. "D1×0.30 + D2×0.30 + ..."
+
+
+# ── Sub-dimension composition (fixed ratios within each category) ──
+
+SUB_DIMS_COMPUTE_POWER = {
+    "compute_perf": 0.30,
+    "vram_sufficiency": 0.30,
+    "interconnect_quality": 0.15,
+    "sla_satisfaction": 0.10,
+    "production_readiness": 0.15,
+}
+
+SUB_DIMS_COST_EFFECTIVENESS = {
+    "cost_efficiency": 0.50,   # process_node_nm
+    "power_efficiency": 0.50,
+}
+
+SUB_DIMS_ECOSYSTEM = {
+    "ecosystem_maturity": 0.40,
+    "software_compat": 0.20,
+    "benchmark_evidence": 0.30,
+    "domestic_priority": 0.10,
+}
+
+CATEGORY_DEFS = [
+    {"id": "compute_power", "name_cn": "算力性能", "name_en": "Compute Capability",
+     "sub_dims": SUB_DIMS_COMPUTE_POWER},
+    {"id": "cost_effectiveness", "name_cn": "性价比", "name_en": "Cost-Effectiveness",
+     "sub_dims": SUB_DIMS_COST_EFFECTIVENESS},
+    {"id": "ecosystem_maturity", "name_cn": "生态成熟度", "name_en": "Ecosystem Maturity",
+     "sub_dims": SUB_DIMS_ECOSYSTEM},
+]
+
+# ── Category weight presets for each scenario ──
+
+CAT_WEIGHTS_TRAIN = CategoryWeights(
+    compute_power=0.55, cost_effectiveness=0.15, ecosystem_maturity=0.30,
+)
+CAT_WEIGHTS_INFER = CategoryWeights(
+    compute_power=0.45, cost_effectiveness=0.25, ecosystem_maturity=0.30,
+)
+CAT_WEIGHTS_QUANTIZE = CategoryWeights(
+    compute_power=0.40, cost_effectiveness=0.20, ecosystem_maturity=0.40,
+)
+
+# ── Scenario → (CategoryWeights, label) lookup ──
+
+_SCENARIO_CAT_MAP = {
+    ("train", "cpt", "full_param"):    (CAT_WEIGHTS_TRAIN, "训练·CPT·全参"),
+    ("train", "sft", "full_param"):    (CAT_WEIGHTS_TRAIN, "训练·SFT·全参"),
+    ("train", "sft", "lora"):          (CAT_WEIGHTS_TRAIN, "训练·SFT·LoRA"),
+    ("train", "rl", "full_param"):     (CAT_WEIGHTS_TRAIN, "训练·RL·全参"),
+    ("quantize", "gptq", ""):          (CAT_WEIGHTS_QUANTIZE, "量化"),
+    ("quantize", "awq", ""):           (CAT_WEIGHTS_QUANTIZE, "量化"),
+    ("quantize", "bitsandbytes", ""):  (CAT_WEIGHTS_QUANTIZE, "量化"),
+    ("quantize", "gguf", ""):          (CAT_WEIGHTS_QUANTIZE, "量化"),
+    ("inference", "fp16", ""):         (CAT_WEIGHTS_INFER, "推理·FP16"),
+    ("inference", "int8", ""):         (CAT_WEIGHTS_INFER, "推理·INT8"),
+    ("inference", "int4_gptq", ""):    (CAT_WEIGHTS_INFER, "推理·INT4"),
+    ("inference", "int4_awq", ""):     (CAT_WEIGHTS_INFER, "推理·INT4"),
+    ("inference", "gguf_q4", ""):      (CAT_WEIGHTS_INFER, "推理·GGUF Q4"),
+    ("inference", "gguf_q8", ""):      (CAT_WEIGHTS_INFER, "推理·GGUF Q8"),
+}
+
+
+def get_category_weights(
+    scenario: str,
+    stage: TrainStage = "sft",
+    method: str = "full_param",
+    quant: str = "fp16",
+    quantize_bits: str = "int4",
+) -> tuple[CategoryWeights, str]:
+    """Return (category_weights, display_label) for a given scenario."""
+    if scenario == "train":
+        key = ("train", stage, method)
+    elif scenario == "quantize":
+        key = ("quantize", method, "")
+    else:
+        key = ("inference", quant, "")
+    return _SCENARIO_CAT_MAP.get(
+        key,
+        (CAT_WEIGHTS_TRAIN if scenario == "train" else
+         CAT_WEIGHTS_QUANTIZE if scenario == "quantize" else
+         CAT_WEIGHTS_INFER,  scenario),
+    )
+
+
+# ── Backward compat: legacy ScoringWeights + scenario presets ──
+# Kept for any existing callers; internally converted from CategoryWeights.
 
 @dataclass
 class ScoringWeights:
+    """DEPRECATED — use CategoryWeights. Kept for backward compat."""
     compute_perf: float = 0.20
     vram_sufficiency: float = 0.15
     cost_efficiency: float = 0.12
@@ -174,7 +306,6 @@ class ScoringWeights:
     total_cost_ownership: float = 0.00
 
     def scale_other_weights(self, tco_weight: float) -> "ScoringWeights":
-        """Apply TCO weight and scale remaining to sum to 1.0."""
         remaining = 1.0 - tco_weight
         scale = remaining / (1.0 - self.total_cost_ownership) if (1.0 - self.total_cost_ownership) > 0 else 1.0
         return ScoringWeights(
@@ -191,73 +322,46 @@ class ScoringWeights:
         )
 
 
-# ── v3.0 Scenario-specific weight presets ──
-# Each preset adjusts which dimensions matter most for that use case.
-
-# CPT: heavy compute + interconnect (distributed training)
+# Legacy scenario presets (7 presets kept for backward compat)
 WEIGHTS_CPT = ScoringWeights(
     compute_perf=0.22, vram_sufficiency=0.15, cost_efficiency=0.10,
     power_efficiency=0.07, interconnect_quality=0.15, ecosystem_maturity=0.08,
     sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.08,
 )
-
-# SFT full-param: balanced training
 WEIGHTS_SFT_FULL = ScoringWeights(
     compute_perf=0.18, vram_sufficiency=0.18, cost_efficiency=0.12,
     power_efficiency=0.08, interconnect_quality=0.10, ecosystem_maturity=0.10,
     sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.09,
 )
-
-# SFT LoRA: VRAM-light, more weight on cost + ecosystem
 WEIGHTS_SFT_LORA = ScoringWeights(
     compute_perf=0.12, vram_sufficiency=0.25, cost_efficiency=0.15,
     power_efficiency=0.08, interconnect_quality=0.05, ecosystem_maturity=0.12,
     sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.08,
 )
-
-# SFT QLoRA: removed from train methods in v3.1 — quantization is now its own scenario
-# (see WEIGHTS_QUANTIZE below)
-
-# Quantize scenario: VRAM-dominant (must hold FP16 model + calibration structures),
-# needs training-capable hardware for forward+backward calibration passes.
 WEIGHTS_QUANTIZE = ScoringWeights(
-    compute_perf=0.12,          # calibration computation needs some compute
-    vram_sufficiency=0.28,      # most critical — FP16 model + calibration data in VRAM
-    cost_efficiency=0.12,       # one-time cost, moderate importance
-    power_efficiency=0.06,      # one-shot task, power less important
-    interconnect_quality=0.08,  # only 70B+ models need multi-card quantization
-    ecosystem_maturity=0.12,    # AutoGPTQ/AutoAWQ/bitsandbytes/llama.cpp toolchain support
-    sla_satisfaction=0.08,      # one-shot task, SLA is soft
-    production_readiness=0.06,
-    benchmark_evidence=0.08,
+    compute_perf=0.12, vram_sufficiency=0.28, cost_efficiency=0.12,
+    power_efficiency=0.06, interconnect_quality=0.08, ecosystem_maturity=0.12,
+    sla_satisfaction=0.08, production_readiness=0.06, benchmark_evidence=0.08,
 )
-
-# RL: multi-model copies → VRAM + interconnect critical
 WEIGHTS_RL = ScoringWeights(
     compute_perf=0.17, vram_sufficiency=0.22, cost_efficiency=0.10,
     power_efficiency=0.08, interconnect_quality=0.12, ecosystem_maturity=0.08,
     sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.08,
 )
-
-# Inference FP16: VRAM + ecosystem + cost
 WEIGHTS_INFER_FP16 = ScoringWeights(
     compute_perf=0.15, vram_sufficiency=0.20, cost_efficiency=0.15,
     power_efficiency=0.08, interconnect_quality=0.08, ecosystem_maturity=0.12,
     sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.07,
 )
-
-# Inference quantized (INT8/INT4): VRAM light, cost + ecosystem dominant
 WEIGHTS_INFER_QUANT = ScoringWeights(
     compute_perf=0.10, vram_sufficiency=0.25, cost_efficiency=0.17,
     power_efficiency=0.08, interconnect_quality=0.05, ecosystem_maturity=0.13,
     sla_satisfaction=0.10, production_readiness=0.05, benchmark_evidence=0.07,
 )
-
-# Legacy backward-compat aliases
-TRAIN_WEIGHTS = WEIGHTS_SFT_FULL    # default train = SFT full-param
+TRAIN_WEIGHTS = WEIGHTS_SFT_FULL
 INFERENCE_WEIGHTS = WEIGHTS_INFER_FP16
 
-# ── Lookup table (v3.1: qlora removed from train, quantize scenario added) ──
+# Legacy _SCENARIO_KEY_MAP (backward compat)
 _SCENARIO_KEY_MAP = {
     ("train", "cpt", "full_param"): WEIGHTS_CPT,
     ("train", "sft", "full_param"): WEIGHTS_SFT_FULL,
@@ -282,7 +386,6 @@ _SCENARIO_KEY_MAP = {
     ("inference", "gguf_q4"): WEIGHTS_INFER_QUANT,
     ("inference", "gguf_q8"): WEIGHTS_INFER_QUANT,
 }
-
 _SCENARIO_LABEL_MAP = {
     ("train", "cpt", "full_param"): "训练·CPT·全参",
     ("train", "sft", "full_param"): "训练·SFT·全参",
@@ -345,9 +448,9 @@ class DimensionResult:
 @dataclass
 class ScoringResult:
     total_score: float = 0.0     # 0–100
-    dimensions: dict[str, DimensionResult] = field(default_factory=dict)
-    weights: ScoringWeights = field(default_factory=ScoringWeights)
-    version: str = "3.4.0"
+    categories: dict[str, CategoryResult] = field(default_factory=dict)
+    dimensions: dict[str, DimensionResult] = field(default_factory=dict)  # flat backward-compat
+    version: str = "4.0.0"
 
 
 @dataclass
@@ -973,36 +1076,37 @@ def score_domestic_priority(vendor_region: str, prefer_domestic: bool,
 
 def aggregate_score(
     ctx: RecommendContext,
-    weights: ScoringWeights,
+    cat_weights: CategoryWeights,
     prefer_domestic: bool = False,
     prefer_vendor: Optional[str] = None,
-    tco_weight_override: float = 0.0,
 ) -> ScoringResult:
-    """Compute all dimension scores and weighted total for one chip."""
+    """v4.0: Compute all dimension scores, aggregate into 3 categories.
 
-    if tco_weight_override != weights.total_cost_ownership:
-        weights = weights.scale_other_weights(tco_weight_override)
+    Formula:
+      total = Cat_A × w_A + Cat_B × w_B + Cat_C × w_C    (0-100 scale)
+    where each category score = Σ(sub_dim_score × sub_weight) within category.
+    """
 
     chip = ctx.chip
+
+    # ── Step 1: Compute all 11 sub-dimension scores (same as v3.x) ──
 
     dims: dict[str, DimensionResult] = {}
 
     # D1: 算力性能
     dims["compute_perf"] = score_compute_perf(ctx.fp16_tflops)
 
-    # D2: 显存充裕度 (use vram_cards for per-card need, not recommended_cards)
+    # D2: 显存充裕度
     dims["vram_sufficiency"] = score_vram_sufficiency(
         float(chip.get("vram_gb", 0) or 0), ctx.min_vram_total, ctx.vram_cards,
     )
 
-    # D3: 制程先进性 (was cost_efficiency — price data has 0% coverage)
-    # Legacy cost_efficiency always returns 5.0 now; also compute process_node score
+    # D3: 制程先进性 (cost_efficiency key kept for API compat)
     _price_score = score_cost_efficiency(
         ctx.fp16_tflops, float(chip.get("price_cny_wan", 0) or 0),
     )
     _process_nm = parse_process_node(str(chip.get("process_node_nm", "") or ""))
     _process_score = score_process_node(_process_nm)
-    # Blend: if we have process data, use it; otherwise fall back to neutral price score
     dims["cost_efficiency"] = _process_score if _process_nm > 0 else _price_score
 
     # D4: 能效比
@@ -1010,14 +1114,14 @@ def aggregate_score(
         ctx.fp16_tflops, float(chip.get("tdp_w", 0) or 0),
     )
 
-    # D5: 互联扩展 (v3.3: using VRAM BW as proxy, 88% coverage vs 4% for interconnect_bw)
+    # D5: 互联扩展
     dims["interconnect_quality"] = score_interconnect_quality(
         float(chip.get("interconnect_bw_gb_s", 0) or 0),
         str(chip.get("interconnect_tech", "") or ""),
         vram_bw=float(chip.get("vram_bw_gb_s", 0) or 0),
     )
 
-    # D6: 生态成熟度 (v3.0: no maturity_level)
+    # D6: 生态成熟度
     has_fw = bool((chip.get("software_stack") or "").strip() or
                   (chip.get("compatible_frameworks") or "").strip())
     dims["ecosystem_maturity"] = score_ecosystem_maturity(
@@ -1037,8 +1141,6 @@ def aggregate_score(
         )
         dims["sla_satisfaction"] = score_sla_inference(est_tps, ctx.target_tps)
     elif ctx.scenario == "quantize":
-        # Quantization is a one-shot task — SLA is soft.
-        # Score based on whether the chip has sufficient VRAM in recommended configuration.
         dims["sla_satisfaction"] = DimensionResult(
             score=5.0, detail="量化是一次性任务，无SLA目标 → 中性 5.0/10",
             raw_values={"note": "quantize_no_sla"},
@@ -1049,7 +1151,7 @@ def aggregate_score(
             raw_values={"note": "no_sla_target"},
         )
 
-    # D8: 生产就绪度 (v3.3: fp16 perf as inference signal for 82% missing status)
+    # D8: 生产就绪度
     dims["production_readiness"] = score_production_readiness(
         str(chip.get("production_status", "") or ""),
         str(chip.get("is_released", "") or ""),
@@ -1067,39 +1169,67 @@ def aggregate_score(
         ctx.benchmark_count, ctx.max_benchmark_mfu, ctx.max_benchmark_tps, ctx.scenario,
     )
 
-    # Bonus: 国产化优先 (included in total but not a "scoring dimension")
+    # D11: 国产化优先
     dims["domestic_priority"] = score_domestic_priority(
         str(chip.get("vendor_region", "") or ""),
         prefer_domestic, prefer_vendor,
         str(chip.get("vendor", "") or ""),
     )
 
-    # Apply weights and compute total
-    weight_map = {
-        "compute_perf": weights.compute_perf,
-        "vram_sufficiency": weights.vram_sufficiency,
-        "cost_efficiency": weights.cost_efficiency,
-        "power_efficiency": weights.power_efficiency,
-        "interconnect_quality": weights.interconnect_quality,
-        "ecosystem_maturity": weights.ecosystem_maturity,
-        "sla_satisfaction": weights.sla_satisfaction,
-        "production_readiness": weights.production_readiness,
-        "software_compat": 0.0,  # not in weight budget, treated as bonus
-        "benchmark_evidence": weights.benchmark_evidence,
-        "domestic_priority": 0.0,  # v3.4: when prefer_domestic/prefer_vendor active → 0.10 taken from ecosystem
-    }
+    # ── Step 2: Aggregate into 3 categories ──
 
+    categories: dict[str, CategoryResult] = {}
     total = 0.0
-    for dim_id, result in dims.items():
-        w = weight_map.get(dim_id, 0.0)
-        result.weight = w
-        result.weighted = round(result.score * w, 4)
-        total += result.weighted
+
+    for cat_def in CATEGORY_DEFS:
+        cat_id = cat_def["id"]
+        sub_dims = cat_def["sub_dims"]
+
+        # Compute category score = weighted average of sub-dimensions (0-10)
+        cat_score = 0.0
+        sub_results: dict[str, DimensionResult] = {}
+        formula_parts = []
+        for dim_id, sub_w in sub_dims.items():
+            dr = dims[dim_id]
+            # Sub-weight is the fraction within the category; record as weight for display
+            dr.weight = sub_w
+            dr.weighted = round(dr.score * sub_w, 4)
+            cat_score += dr.score * sub_w
+            sub_results[dim_id] = dr
+            # Build formula label (short dim names)
+            short_names = {
+                "compute_perf": "D1算力", "vram_sufficiency": "D2显存",
+                "interconnect_quality": "D5互联", "sla_satisfaction": "D7 SLA",
+                "production_readiness": "D8量产", "cost_efficiency": "D3制程",
+                "power_efficiency": "D4能效", "ecosystem_maturity": "D6生态",
+                "software_compat": "D9软件", "benchmark_evidence": "D10实测",
+                "domestic_priority": "D11国产",
+            }
+            sn = short_names.get(dim_id, dim_id)
+            formula_parts.append(f"{sn}×{sub_w:.0%}")
+
+        cat_score = round(cat_score, 2)
+        cat_weight = getattr(cat_weights, cat_id)
+        cat_weighted = round(cat_score * cat_weight, 4)
+
+        cr = CategoryResult(
+            id=cat_id,
+            name_cn=cat_def["name_cn"],
+            name_en=cat_def["name_en"],
+            score=cat_score,
+            weight=cat_weight,
+            weighted=cat_weighted,
+            sub_dimensions=sub_results,
+            formula=" + ".join(formula_parts),
+        )
+        categories[cat_id] = cr
+        total += cat_weighted
 
     return ScoringResult(
         total_score=round(total * 10, 1),  # scale to 0-100
-        dimensions=dims,
-        weights=weights,
+        categories=categories,
+        dimensions=dims,         # flat backward-compat
+        version="4.0.0",
     )
 
 
@@ -1108,31 +1238,50 @@ def aggregate_score(
 # ═══════════════════════════════════════════════════════════
 
 def scoring_result_to_dict(sr: ScoringResult) -> dict:
-    """Convert ScoringResult to API-ready dict."""
+    """v4.0: Convert ScoringResult to API-ready dict with nested categories."""
+    # Build categories output
+    cats_out = {}
+    for cat_id, cr in sr.categories.items():
+        sub_out = {}
+        for dim_id, dr in cr.sub_dimensions.items():
+            sub_out[dim_id] = {
+                "score": dr.score,
+                "weight": dr.weight,      # sub-weight within category
+                "weighted": dr.weighted,
+                "detail": dr.detail,
+                "raw_values": dr.raw_values,
+            }
+        cats_out[cat_id] = {
+            "score": cr.score,
+            "weight": cr.weight,          # category-level weight
+            "weighted": cr.weighted,
+            "name_cn": cr.name_cn,
+            "name_en": cr.name_en,
+            "sub_dimensions": sub_out,
+            "formula": cr.formula,
+        }
+
+    # Build flat dimensions (backward compat)
     dims_out = {}
     for dim_id, dr in sr.dimensions.items():
         dims_out[dim_id] = {
             "score": dr.score,
-            "weight": dr.weight,
+            "weight": dr.weight,          # sub-weight (within category) or 0
             "weighted": dr.weighted,
             "detail": dr.detail,
             "raw_values": dr.raw_values,
         }
+
+    # Build category weights dict for display
+    cw = {}
+    for cat_id, cr in sr.categories.items():
+        cw[cat_id] = cr.weight
+
     return {
         "total": sr.total_score,
-        "dimensions": dims_out,
-        "weights": {
-            "compute_perf": sr.weights.compute_perf,
-            "vram_sufficiency": sr.weights.vram_sufficiency,
-            "cost_efficiency": sr.weights.cost_efficiency,
-            "power_efficiency": sr.weights.power_efficiency,
-            "interconnect_quality": sr.weights.interconnect_quality,
-            "ecosystem_maturity": sr.weights.ecosystem_maturity,
-            "sla_satisfaction": sr.weights.sla_satisfaction,
-            "production_readiness": sr.weights.production_readiness,
-            "benchmark_evidence": sr.weights.benchmark_evidence,
-            "total_cost_ownership": sr.weights.total_cost_ownership,
-        },
+        "categories": cats_out,
+        "dimensions": dims_out,        # flat backward-compat
+        "category_weights": cw,
         "version": sr.version,
     }
 
@@ -1142,35 +1291,35 @@ def scoring_result_to_dict(sr: ScoringResult) -> dict:
 DIMENSION_META = [
     {"id": "compute_perf",          "name_cn": "算力性能",     "name_en": "Compute Performance",
      "desc": "单卡FP16/BF16理论算力(TFLOPS)", "unit": "TFLOPS",
-     "train_weight": 0.20, "infer_weight": 0.15, "quantize_weight": 0.12},
+     "category": "compute_power", "sub_weight": 0.30},
     {"id": "vram_sufficiency",      "name_cn": "显存充裕度",   "name_en": "VRAM Sufficiency",
      "desc": "单卡显存相比模型需求的余量倍数", "unit": "比率",
-     "train_weight": 0.15, "infer_weight": 0.20, "quantize_weight": 0.28},
+     "category": "compute_power", "sub_weight": 0.30},
     {"id": "cost_efficiency",       "name_cn": "制程先进性",   "name_en": "Process Node",
      "desc": "芯片制程工艺(nm)，越小越先进", "unit": "nm",
-     "train_weight": 0.12, "infer_weight": 0.15, "quantize_weight": 0.12},
+     "category": "cost_effectiveness", "sub_weight": 0.50},
     {"id": "power_efficiency",      "name_cn": "能效比",      "name_en": "Power Efficiency",
      "desc": "每瓦功耗产出的算力", "unit": "GFLOPS/W",
-     "train_weight": 0.08, "infer_weight": 0.08, "quantize_weight": 0.06},
+     "category": "cost_effectiveness", "sub_weight": 0.50},
     {"id": "interconnect_quality",  "name_cn": "互联扩展性",   "name_en": "Interconnect Quality",
      "desc": "多卡互联带宽+技术等级", "unit": "GB/s + 技术分",
-     "train_weight": 0.12, "infer_weight": 0.08, "quantize_weight": 0.08},
+     "category": "compute_power", "sub_weight": 0.15},
     {"id": "ecosystem_maturity",    "name_cn": "生态成熟度",   "name_en": "Ecosystem Maturity",
      "desc": "云平台可用+已验证兼容模型数+框架支持", "unit": "综合分",
-     "train_weight": 0.10, "infer_weight": 0.12, "quantize_weight": 0.12},
+     "category": "ecosystem_maturity", "sub_weight": 0.40},
     {"id": "sla_satisfaction",      "name_cn": "SLA满足度",    "name_en": "SLA Satisfaction",
      "desc": "训练天数/推理吞吐是否满足目标（量化场景固定5.0）", "unit": "SLA分",
-     "train_weight": 0.10, "infer_weight": 0.10, "quantize_weight": 0.08},
+     "category": "compute_power", "sub_weight": 0.10},
     {"id": "production_readiness",  "name_cn": "生产就绪度",   "name_en": "Production Readiness",
      "desc": "量产/已发布/未公开等状态", "unit": "等级",
-     "train_weight": 0.05, "infer_weight": 0.05, "quantize_weight": 0.06},
+     "category": "compute_power", "sub_weight": 0.15},
     {"id": "benchmark_evidence",    "name_cn": "实测验证度",   "name_en": "Benchmark Evidence",
      "desc": "是否有实测benchmark数据(MFU/吞吐)", "unit": "证据分",
-     "train_weight": 0.08, "infer_weight": 0.07, "quantize_weight": 0.08},
+     "category": "ecosystem_maturity", "sub_weight": 0.30},
     {"id": "software_compat",       "name_cn": "软件栈兼容",   "name_en": "Software Compatibility",
      "desc": "支持的主流框架和工具链数量", "unit": "框架数",
-     "train_weight": 0.00, "infer_weight": 0.00, "quantize_weight": 0.00},
+     "category": "ecosystem_maturity", "sub_weight": 0.20},
     {"id": "domestic_priority",     "name_cn": "国产化优先",   "name_en": "Domestic Priority",
      "desc": "国产/厂商偏好匹配加分", "unit": "偏好分",
-     "train_weight": 0.00, "infer_weight": 0.00, "quantize_weight": 0.00},
+     "category": "ecosystem_maturity", "sub_weight": 0.10},
 ]
