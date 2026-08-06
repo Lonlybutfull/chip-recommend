@@ -1,8 +1,21 @@
 """
-AISHPerf Chip Recommendation Scoring Engine v3.0
+AISHPerf Chip Recommendation Scoring Engine v3.4
 
 10-dimension scoring with each dimension outputting 0.0-10.0,
 weighted sum yields total 0-100.
+
+v3.4 changes:
+  - Missing-data fallback: replaced uniform 5.0 with per-dimension statistical
+    means computed from all 1,093 chips (real database distributions)
+  - Fixed parse_process_node() to handle pure numbers ("7"), TSMC naming ("4NP"),
+    and "5nm/6nm" dual-node notation (was dropping 96.6% of process_node values)
+  - Benchmark chip-name matching now uses normalized (lowercase, trimmed) lookup
+
+v3.3 changes:
+  - D1~D10 scoring formulas re-anchored on real chip data percentiles
+    (P50/P75/P90/P95/P99 from 1,093-chip distribution)
+  - D3 switched from price (0% coverage) to process_node_nm (98% coverage)
+  - D5 switched from interconnect_bw (4% coverage) to vram_bw_gb_s (88% coverage)
 
 v3.0 changes:
   - Removed maturity_level dimension (too abstract for chip selection)
@@ -334,7 +347,7 @@ class ScoringResult:
     total_score: float = 0.0     # 0–100
     dimensions: dict[str, DimensionResult] = field(default_factory=dict)
     weights: ScoringWeights = field(default_factory=ScoringWeights)
-    version: str = "3.0.0"
+    version: str = "3.4.0"
 
 
 @dataclass
@@ -387,13 +400,40 @@ def parse_fp16(perf_str: str) -> float:
 
 
 def parse_process_node(process_str: str) -> float:
-    """Extract process node in nm (e.g., '4nm' → 4.0, '5nm/6nm' → 5.0)."""
+    """Extract process node in nm from all formats found in the database.
+
+    Handles:
+      - "Xnm" / "X nm" / "Xnm (...)":  "5nm", "3nm (TSMC N3)"
+      - TSMC naming:  "4NP", "4N" → 4.0
+      - Pure number:  "7", "14", "5.0", "28.0"
+      - Dual-node:    "5nm/6nm" → 5.0 (takes smaller, more advanced node)
+      - Old µm-scale: "220.0", "180.0" → 220, 180
+
+    Coverage: 1067/1093 chips (97.6%).
+    """
     if not process_str:
         return 0.0
     text = str(process_str).strip()
+    # Pattern 1: "Xnm" or "X nm" or "Xnm (details)"
     m = re.search(r"(\d+\.?\d*)\s*nm", text)
     if m:
         return float(m.group(1))
+    # Pattern 2: TSMC naming "XN" or "XNP" (e.g., "4NP" → 4)
+    m = re.search(r"^(\d+\.?\d*)\s*N", text)
+    if m:
+        return float(m.group(1))
+    # Pattern 3: pure number, check if reasonable nm range (≤220)
+    m = re.search(r"^(\d+\.?\d*)$", text)
+    if m:
+        v = float(m.group(1))
+        if v <= 220:
+            return v
+    # Pattern 4: first number as fallback
+    m = re.search(r"(\d+\.?\d*)", text)
+    if m:
+        v = float(m.group(1))
+        if v <= 220:
+            return v
     return 0.0
 
 
@@ -419,13 +459,17 @@ def round_up_pow2(n: int) -> int:
 def score_compute_perf(fp16_tflops: float) -> DimensionResult:
     """Single-card FP16/BF16 compute throughput.
 
-    Based on 693-chip distribution (1093 total, 63% coverage):
-      P50=13T, P75=33T, P90=105T, P95=383T, P99=2563T
+    Based on 996-chip distribution (1093 total, 91.1% coverage):
+      P50=6.5T, P75=24T, P90=105T, P95=383T, P99=2563T
     Piecewise linear anchored at data percentiles:
-      ≤13T(P50)→0-2.5, 13-105T→2.5-5.0, 105-383T→5.0-7.5, >383T→7.5-10(capped at 2563=P99)
+      ≤13T(P50 area)→0-2.5, 13-105T→2.5-5.0, 105-383T→5.0-7.5, >383T→7.5-10(capped at 2563=P99)
 
-    Missing data → neutral 5.0 (don't penalize chips without published perf data).
+    Missing data → statistical mean 1.9 (996-chip average; actual mean is low because
+    most chips are consumer GPUs with modest FP16). Prevents inflating scores for
+    chips without published perf data — if they can't benchmark, they likely aren't
+    strong compute chips.
     """
+    MEAN = 1.9  # statistical mean of 996 chips (91.1% coverage)
     if fp16_tflops > 0:
         if fp16_tflops <= 13:
             score = fp16_tflops / 13.0 * 2.5
@@ -440,13 +484,13 @@ def score_compute_perf(fp16_tflops: float) -> DimensionResult:
             score = min(7.5 + (fp16_tflops - 383) / (2563 - 383) * 2.5, 10.0)
             detail = f"FP16={fp16_tflops:.0f}T (>P95=383T) → {score:.1f}/10"
     else:
-        score = 5.0
-        detail = "无FP16/BF16算力数据 → 中性分 5.0/10"
+        score = MEAN
+        detail = f"无FP16/BF16算力数据 → 统计均值 {MEAN:.1f}/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={"fp16_tflops": fp16_tflops,
                     "formula": "piecewise: P50(13T)=2.5, P90(105T)=5.0, P95(383T)=7.5, P99(2563T)=10",
-                    "source": "chip.precision_perf (693/1093 chips, 63% coverage)", "missing": fp16_tflops <= 0},
+                    "source": "chip.precision_perf (996/1093 chips, 91% coverage)", "missing": fp16_tflops <= 0},
     )
 
 
@@ -460,13 +504,15 @@ def score_vram_sufficiency(vram_gb: float, model_vram_total: float, vram_cards: 
     Uses `vram_cards` (VRAM-only constraint) to compute per-card need,
     NOT recommended_cards (which may include compute constraint amplification).
 
-    Missing data → neutral 5.0.
+    VRAM GB: 983 chips, mean=18.8GB, median=8.0GB, P25=3.0, P75=16.0.
+    Missing data → statistical mean 2.7 (983-chip average for 7B-FP16×1card scenario).
     """
+    MEAN = 2.7  # statistical mean of 983 chips for typical 7B inference (97.4% coverage)
     if vram_gb <= 0 or model_vram_total <= 0:
         return DimensionResult(
-            score=5.0, detail="无显存数据 → 中性分 5.0/10",
+            score=MEAN, detail=f"无显存数据 → 统计均值 {MEAN:.1f}/10",
             raw_values={"vram_gb": vram_gb, "model_vram_total": model_vram_total,
-                        "source": "chip.vram_gb", "missing": True},
+                        "source": "chip.vram_gb (983/1093 chips, 97.4% coverage)", "missing": True},
         )
     per_card_need = model_vram_total / max(vram_cards, 1)
     ratio = vram_gb / max(per_card_need, 0.1)
@@ -474,8 +520,8 @@ def score_vram_sufficiency(vram_gb: float, model_vram_total: float, vram_cards: 
         score = 10.0 * (1.0 - math.exp(-0.5 * ratio))
         detail = f"显存{vram_gb:.0f}GB / 需求{per_card_need:.0f}GB = {ratio:.1f}× → {score:.1f}/10"
     else:
-        score = 5.0
-        detail = "无法计算显存充裕度 → 中性分 5.0/10"
+        score = MEAN
+        detail = "无法计算显存充裕度 → 统计均值 2.7/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
@@ -494,16 +540,17 @@ def score_vram_sufficiency(vram_gb: float, model_vram_total: float, vram_cards: 
 # ═══════════════════════════════════════════════════════════
 
 def score_process_node(process_node_nm: float) -> DimensionResult:
-    """Process node score based on actual 1067-chip distribution.
+    """Process node score based on actual 1067-chip distribution (97.6% coverage).
 
-    Data: P10=5nm, P25=7nm, P50=12nm, P75=28nm, P90=40nm, MAX=90nm
+    Data: mean=23.6nm, median=12nm, P25=7nm, P75=28nm, min=3nm, max=220nm.
     Tier-based: 3-5nm=10, 6-7nm=8, 8-10nm=6, 12-16nm=4, 20-28nm=3, 40-55nm=2, >=90nm=1
-    Missing → neutral 5.0.
+    Missing → statistical mean 5.3 (1067-chip average).
     """
+    MEAN = 5.3  # statistical mean of 1067 chips (97.6% coverage)
     nm = float(process_node_nm or 0)
     if nm <= 0:
-        return DimensionResult(score=5.0, detail="无制程数据 → 中性分 5.0/10",
-                               raw_values={"process_node_nm": 0, "source": "chip.process_node_nm", "missing": True})
+        return DimensionResult(score=MEAN, detail=f"无制程数据 → 统计均值 {MEAN:.1f}/10",
+                               raw_values={"process_node_nm": 0, "source": "chip.process_node_nm (1067/1093 chips, 97.6% coverage)", "missing": True})
     if nm <= 5:     score, tier = 10.0, "3-5nm (顶级)"
     elif nm <= 7:   score, tier = 8.0,  "6-7nm (先进)"
     elif nm <= 10:  score, tier = 6.0,  "8-10nm (主流)"
@@ -538,12 +585,13 @@ def score_cost_efficiency(fp16_tflops: float, price_cny_wan: float) -> Dimension
 # ═══════════════════════════════════════════════════════════
 
 def score_power_efficiency(fp16_tflops: float, tdp_w: float) -> DimensionResult:
-    """GFLOPS per Watt. Based on 693-chip FP16×TDP cross-section.
+    """GFLOPS per Watt. Based on 959-chip FP16×TDP cross-section (87.7% coverage).
 
-    Actual data: P50≈130 GFLOPS/W, P90≈470, H100=1413, B200=2250.
-    Piecewise: ≤130(P50)→0-2.5, 130-470(P90)→2.5-5.0, 470-1500→5.0-8.0, >1500→8.0-10.0(cap at 4500=top).
-    Missing data → neutral 5.0.
+    Actual data: mean=167 GFLOPS/W, median=76, P25=10, P75=160, P90=470.
+    Piecewise: ≤130(P50 area)→0-2.5, 130-470(P90)→2.5-5.0, 470-1500→5.0-8.0, >1500→8.0-10.0(cap at 4500=top).
+    Missing data → statistical mean 2.0 (959-chip average).
     """
+    MEAN = 2.0  # statistical mean of 959 chips (87.7% coverage)
     tdp = float(tdp_w or 0)
     if fp16_tflops > 0 and tdp > 0:
         gf = fp16_tflops * 1000 / tdp  # GFLOPS/W
@@ -560,9 +608,9 @@ def score_power_efficiency(fp16_tflops: float, tdp_w: float) -> DimensionResult:
             score = min(8.0 + (gf - 1500) / 3000 * 2.0, 10.0)
             detail = f"{fp16_tflops:.0f}T/{tdp:.0f}W={gf:.0f}GFLOPS/W (>H100=1413) → {score:.1f}/10"
     else:
-        score = 5.0
+        score = MEAN
         gf = 0.0
-        detail = "无功耗或算力数据 → 中性分 5.0/10"
+        detail = f"无功耗或算力数据 → 统计均值 {MEAN:.1f}/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
@@ -588,16 +636,17 @@ def score_power_efficiency(fp16_tflops: float, tdp_w: float) -> DimensionResult:
 def score_interconnect_quality(bw_gb_s: float, tech: str, vram_bw: float = 0.0) -> DimensionResult:
     """Multi-card scalability: VRAM bandwidth proxy + interconnect technology tier.
 
-    VRAM BW data: P50=224GB/s, P75=448, P90=1020, P95=2039, MAX=10300 (MI300A).
+    VRAM BW data (962 chips, 88% coverage): mean=554GB/s, median=224, P25=83, P75=448, P90=1020.
     Piecewise: ≤224(P50)→0-2, 224-1020(P90)→2-5, 1020-4000→5-8, >4000→8-10.
     Tech bonus (max +2): NVLink/HCCS +2, Infinity Fabric/ICI/C2C +1.5, other +1.
-    Missing → neutral 5.0.
+    Missing → statistical mean 2.3 (962-chip average).
     """
+    MEAN = 2.3  # statistical mean of 962 chips (88% coverage)
     vbw = float(vram_bw or 0)
     tech = (tech or "").strip()
     if vbw <= 0:
         return DimensionResult(
-            score=5.0, detail="无显存带宽数据 → 中性分 5.0/10",
+            score=MEAN, detail=f"无显存带宽数据 → 统计均值 {MEAN:.1f}/10",
             raw_values={"vram_bw_gb_s": 0, "tech": "",
                         "source": "chip.vram_bw_gb_s (962/1093 chips, 88% coverage)", "missing": True},
         )
@@ -648,32 +697,35 @@ def score_ecosystem_maturity(cloud: int, compat_verified: int,
     """Composite: cloud support (+3) + verified compat (+4 max, 0.8/ea) + frameworks (+3).
 
     Max: 3 + 4 + 3 = 10.0. (v3.0: removed maturity_level — too abstract)
-    Missing data → neutral 5.0.
+    Coverage: cloud_available=0, software_stack=41, compatible_frameworks=19, verified_compat=10 rows.
+    Missing data → statistical mean 2.8 (48-chip average with any ecosystem signal).
     """
     cloud_val = int(float(cloud or 0))
+    compat_val = int(compat_verified or 0)
     cloud_score = 3.0 if cloud_val >= 1 else 0.0
-    compat_score = min(compat_verified * 0.8, 4.0)
+    compat_score = min(compat_val * 0.8, 4.0)
     fw_score = 3.0 if has_frameworks else 0.0
 
     score = min(cloud_score + compat_score + fw_score, 10.0)
     parts = []
     if cloud_score: parts.append(f"云可用+{cloud_score:.0f}")
-    if compat_score > 0: parts.append(f"兼容{compat_verified}条→+{compat_score:.1f}")
+    if compat_score > 0: parts.append(f"兼容{compat_val}条→+{compat_score:.1f}")
     if fw_score: parts.append(f"框架+{fw_score:.0f}")
     if parts:
         detail = " + ".join(parts) + f" = {score:.1f}/10"
     else:
-        score = 5.0
-        detail = "无生态数据 → 中性分 5.0/10"
+        MEAN = 2.8  # statistical mean of 48 chips with any ecosystem data (4.4% coverage)
+        score = MEAN
+        detail = f"无生态数据 → 统计均值 {MEAN:.1f}/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
             "cloud_available": cloud_val,
-            "compat_verified_count": compat_verified,
+            "compat_verified_count": compat_val,
             "has_frameworks": has_frameworks,
             "formula": "min(cloud*3 + min(compat*0.8,4) + fw*3, 10)",
             "source": "chip.cloud_available + chip_model_compatibility + chip.software_stack",
-            "missing": score <= 0 and not parts,
+            "missing": not parts,
         },
     )
 
@@ -758,10 +810,12 @@ def score_production_readiness(status: str, is_released: str,
                                 fp16_tflops: float = 0.0) -> DimensionResult:
     """How ready this chip is for production deployment.
 
-    Data: 82% of chips have no production_status (896/1093).
+    Data: 82% of chips have no production_status (896/1093). Among the 197 with status:
+    量产=162, 已发布=14, 未公开发布=7, others=14. Overall mean score=5.78 (all 1093 chips).
     For missing status, infer from fp16 perf: >100T → likely production-grade → 7.0.
-    Unknown with no signals → neutral 5.0.
+    Unknown with no signals → statistical mean 5.8.
     """
+    MEAN = 5.8  # statistical mean of all 1093 chips (100% have is_released or status)
     s = str(status or "")
     r = str(is_released or "")
     if "量产" in s:
@@ -776,7 +830,7 @@ def score_production_readiness(status: str, is_released: str,
         # High-performance chips without explicit status → likely production
         score, detail = 7.0, f"FP16={fp16_tflops:.0f}T → 推测量产级 → 7/10"
     else:
-        score, detail = 5.0, "状态未知 → 中性分 5.0/10"
+        score, detail = MEAN, f"状态未知 → 统计均值 {MEAN:.1f}/10"
     return DimensionResult(
         score=score, detail=detail,
         raw_values={"production_status": s, "is_released": r,
@@ -798,15 +852,18 @@ _MINOR_FRAMEWORKS = ["deepspeed", "megatron", "fsdp", "tensorrt", "openvino", "t
 
 def score_software_compat(software_stack: str, compatible_frameworks: str) -> DimensionResult:
     """Framework support breadth. 7 major × 2.5 = 17.5, capped at 10.
-    Missing data → neutral 5.0 (D9 is bonus, weight=0.0).
+    Coverage: software_stack=41 chips (3.7%), compatible_frameworks=19 chips (1.7%).
+    Missing data → statistical mean 5.8 (23-chip average with any framework signal).
+    D9 is bonus (weight=0.0 in weight budget), so missing score doesn't distort primary ranking.
     """
     fw_text = (str(software_stack or "") + " " + str(compatible_frameworks or "")).lower()
     major_hits = sum(1 for fw in _MAJOR_FRAMEWORKS if fw in fw_text)
     minor_hits = sum(1 for fw in _MINOR_FRAMEWORKS if fw in fw_text)
     score = min(major_hits * 2.5 + minor_hits * 1.0, 10.0)
     if major_hits == 0 and minor_hits == 0:
-        score = 5.0
-        detail = "未检测到主流框架支持 → 中性分 5.0/10"
+        MEAN = 5.8  # statistical mean of 23 chips with any framework data (2.1% coverage)
+        score = MEAN
+        detail = f"未检测到主流框架支持 → 统计均值 {MEAN:.1f}/10"
     else:
         detail = f"主流框架×{major_hits} (+{major_hits*2.5}) + 工具链×{minor_hits} (+{minor_hits}) = {score:.1f}/10"
     return DimensionResult(
@@ -828,15 +885,17 @@ def score_benchmark_evidence(benchmark_count: int, max_mfu: Optional[float],
                               max_tps: Optional[float], scenario: str) -> DimensionResult:
     """Reward chips with real benchmark data.
 
-    Data: 60.7% of chips have NO benchmarks. Among 430 that do:
-      P50=4, P75=6, P90=13, P95=24, MAX=302 (RTX 5090).
-    Count-based tiers (primary): 0=5.0, 1-3→5-6, 4-13→6-8, 13+→8-10.
+    Data: 430 distinct chips have benchmarks (table), but only 33 match chips table by name.
+    Among the 33: mean score=6.22, median=5.95.
+    Count-based tiers (primary): 0=missing, 1-3→5-6, 4-13→6-8, 13+→8-10.
     MFU/TPS as bonus multipliers (×0.8-1.2) rather than primary score drivers.
+    Missing → statistical mean 6.2 (33-chip average).
     """
     if benchmark_count == 0:
-        return DimensionResult(score=5.0, detail="无实测benchmark数据 → 中性分 5.0/10",
+        MEAN = 6.2  # statistical mean of 33 chips with matched benchmarks (3.0% coverage)
+        return DimensionResult(score=MEAN, detail=f"无实测benchmark数据 → 统计均值 {MEAN:.1f}/10",
                                raw_values={"benchmark_count": 0,
-                                           "source": "chip_model_benchmarks (430/1093 chips, 39% coverage)",
+                                           "source": "chip_model_benchmarks (33 matched / 430 total, 3% coverage)",
                                            "missing": True})
 
     # Count-based base score
@@ -1027,7 +1086,7 @@ def aggregate_score(
         "production_readiness": weights.production_readiness,
         "software_compat": 0.0,  # not in weight budget, treated as bonus
         "benchmark_evidence": weights.benchmark_evidence,
-        "domestic_priority": 0.0,  # bonus — not in weight budget
+        "domestic_priority": 0.0,  # v3.4: when prefer_domestic/prefer_vendor active → 0.10 taken from ecosystem
     }
 
     total = 0.0
