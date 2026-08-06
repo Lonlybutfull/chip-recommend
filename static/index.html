@@ -722,7 +722,7 @@ async function ensureModelList(){
  */
 function initAutocomplete(inputId, dropdownId, source, onPick, multi=false, getPickName=null){
   const inp = $(inputId), dd = $(dropdownId);
-  let activeIdx = -1, lastQuery = '';
+  let activeIdx = -1, lastQuery = '', _suggestTimer = null, _cachedQuery = '';
 
   // Store onPick on the input element so pickAcItem can call it
   inp._acOnPick = onPick;
@@ -732,10 +732,18 @@ function initAutocomplete(inputId, dropdownId, source, onPick, multi=false, getP
 
   async function suggest(){
     const q = (inp.value||'').toLowerCase().trim();
-    if(q === lastQuery) return;
-    lastQuery = q;
+    // Skip if same query already resolved (debounce guard)
+    if(q === _cachedQuery) return;
+    _cachedQuery = q;
+    // Debounce: wait 150ms after last keystroke before running expensive filter
+    clearTimeout(_suggestTimer);
     activeIdx = -1;
     if(!q || q.length < 1){ dd.classList.remove('open'); return; }
+    _suggestTimer = setTimeout(async () => {
+      const currentQ = (inp.value||'').toLowerCase().trim();
+      if(!currentQ || currentQ.length < 1){ dd.classList.remove('open'); return; }
+      if(currentQ === lastQuery) return;
+      lastQuery = currentQ;
 
     let matches;
     if(source==='chips'){
@@ -767,7 +775,8 @@ function initAutocomplete(inputId, dropdownId, source, onPick, multi=false, getP
       </div>`;
     }).join('');
     dd.classList.add('open');
-  }
+    }  // end setTimeout
+  }  // end suggest()
 
   // keyboard navigation
   inp.addEventListener('keydown', async function(e){
