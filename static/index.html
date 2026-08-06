@@ -1687,7 +1687,7 @@ function renderCalcBreakdown(req, rec, chip){
   // Scenario weights
   const w = rec.scenario_weights || (chip.scoring && chip.scoring.weights);
   if(w){
-    const dimNames = {compute_perf:'算力',vram_sufficiency:'显存',cost_efficiency:'成本',power_efficiency:'能效',interconnect_quality:'互联',ecosystem_maturity:'生态',sla_satisfaction:'SLA',production_readiness:'量产',benchmark_evidence:'实测'};
+    const dimNames = {compute_perf:'算力',vram_sufficiency:'显存',cost_efficiency:'制程',power_efficiency:'能效',interconnect_quality:'互联',ecosystem_maturity:'生态',sla_satisfaction:'SLA',production_readiness:'量产',benchmark_evidence:'实测'};
     const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${dimNames[k]||k}:${(v*100).toFixed(0)}%`).join(' ');
     items.push({label:'场景权重分配', value:parts, detail:`总分=Σ(维度分×权重)×10, 0-100分制`});
   }
@@ -1735,7 +1735,7 @@ async function showMethodology() {
         <div class="group"><div class="group-header">场景权重矩阵</div>
         <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px;font-size:0.7rem">
           ${Object.entries(data.scenario_weights).map(([scenario,w])=>{
-            const dimNames = {compute_perf:'算力',vram_sufficiency:'显存',cost_efficiency:'成本',power_efficiency:'能效',interconnect_quality:'互联',ecosystem_maturity:'生态',sla_satisfaction:'SLA',production_readiness:'量产',benchmark_evidence:'实测'};
+            const dimNames = {compute_perf:'算力',vram_sufficiency:'显存',cost_efficiency:'制程',power_efficiency:'能效',interconnect_quality:'互联',ecosystem_maturity:'生态',sla_satisfaction:'SLA',production_readiness:'量产',benchmark_evidence:'实测'};
             const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>dimNames[k]+':'+(v*100).toFixed(0)+'%').join(', ');
             return `<div class="group-field"><span class="key" style="font-weight:600">${esc(scenario)}</span><span class="val">${esc(parts)}</span></div>`;
           }).join('')}
