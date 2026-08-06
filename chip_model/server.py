@@ -193,10 +193,11 @@ def api_chip_search(
 def api_chip_recommend(
     model: str = Query(..., description="Model name (fuzzy match)",
                        examples=["Qwen2.5-7B", "Llama-3.1-8B", "DeepSeek-V3"]),
-    scenario: str = Query("train", description="train | inference"),
+    scenario: str = Query("train", description="train | quantize | inference"),
     stage: Optional[str] = Query("sft", description="[train] cpt | sft | rl"),
-    method: Optional[str] = Query("full_param", description="[train] full_param | lora | qlora"),
+    method: Optional[str] = Query("full_param", description="[train] full_param | lora  [quantize] gptq | awq | bitsandbytes | gguf"),
     quant: Optional[str] = Query("fp16", description="[inference] fp16 | int8 | int4_gptq | int4_awq | gguf_q4 | gguf_q8"),
+    quantize_bits: Optional[str] = Query("int4", description="[quantize] int8 | int4 | fp8"),
     training_days: Optional[float] = Query(None, description="Target training days"),
     training_tokens: Optional[float] = Query(None, description="Training data volume (T tokens), auto-estimated if unset"),
     sla_tps: Optional[float] = Query(None, description="Target inference throughput (tok/s)"),
@@ -209,14 +210,16 @@ def api_chip_recommend(
     tco_weight: float = Query(0.0, ge=0.0, le=0.3, description="TCO dimension weight 0.0-0.3"),
     limit: int = Query(5, le=20),
 ):
-    """Recommend chips for a model × scenario × constraints.  v3.0 fine-grained scenarios.
+    """Recommend chips for a model × scenario × constraints.  v3.1 quantize scenario.
 
-    Training: choose stage (CPT/SFT/RL) + method (full_param/LoRA/QLoRA).
+    Training: choose stage (CPT/SFT/RL) + method (full_param/LoRA).
+    Quantize: choose method (GPTQ/AWQ/bitsandbytes/GGUF) + bits (INT8/INT4/FP8).
     Inference: choose quantization (FP16/INT8/INT4-GPTQ/AWQ/GGUF).
     """
     stage_val = stage or "sft"
     method_val = method or "full_param"
     quant_val = quant or "fp16"
+    quantize_bits_val = quantize_bits or "int4"
 
     # 1. Find model
     model_result = search_models(ModelFilters(search=model), limit=1)
@@ -259,10 +262,11 @@ def api_chip_recommend(
     if scenario == "train" and is_quantized:
         raise HTTPException(400, f"量化模型 {model_id} 只能用于推理场景，不支持训练")
 
-    # 3. Calculate VRAM + FLOPs with v3.0 fine-grained formulas
+    # 3. Calculate VRAM + FLOPs with v3.1 fine-grained formulas
     min_vram_total, vram_formula = estimate_vram_total(
         total_params, scenario=scenario,
         stage=stage_val, method=method_val, quant=quant_val,
+        quantize_bits=quantize_bits_val,
         moe_activated_B=moe_activated,
     )
 
@@ -296,9 +300,10 @@ def api_chip_recommend(
             )
         raise HTTPException(404, f"没有芯片满足 {model} 的VRAM需求 (≥{min_vram_total:.0f}GB)，请尝试其他模型或放宽约束")
 
-    # 5. Get scenario-specific weights
+    # 5. Get scenario-specific weights (v3.1: quantize scenario added)
     weights, scenario_label = get_scenario_weights(
         scenario, stage=stage_val, method=method_val, quant=quant_val,
+        quantize_bits=quantize_bits_val,
     )
 
     # 6. Scoring loop
@@ -357,7 +362,7 @@ def api_chip_recommend(
         bench_tps_val = get_chip_benchmark_tps(chip_model_name)
         compat_verified = get_chip_model_compat_count(chip_model_name)
 
-        # ── v3.0 Scoring ──
+        # ── v3.1 Scoring ──
         ctx = RecommendContext(
             chip=chip_dict,
             model_params_B=total_params,
@@ -365,6 +370,7 @@ def api_chip_recommend(
             stage=stage_val,
             method=method_val,
             quant=quant_val,
+            quantize_bits=quantize_bits_val,
             min_vram_total=min_vram_total,
             vram_formula=vram_formula,
             vram_cards=vram_cards,
@@ -408,21 +414,22 @@ def api_chip_recommend(
         "model": model_summary,
         "requirements": {
             "scenario": scenario,
-            "stage": stage_val,
-            "method": method_val if scenario == "train" else None,
+            "stage": stage_val if scenario == "train" else None,
+            "method": method_val if scenario in ("train", "quantize") else None,
             "quant": quant_val if scenario == "inference" else None,
+            "quantize_bits": quantize_bits_val if scenario == "quantize" else None,
             "scenario_label": scenario_label,
             "vram_formula": vram_formula,
             "min_vram_gb": round(min_vram_total, 1),
             "training_tokens_T": round(training_tokens_val, 1) if scenario == "train" else None,
-            "target_training_days": training_days,
+            "target_training_days": training_days if scenario == "train" else None,
             "target_tokens_per_sec": sla_tps,
             "max_cards": max_cards,
             "min_cards": min_cards,
             "max_price_wan": max_price,
         },
         "scoring_meta": {
-            "version": "3.0.0",
+            "version": "3.1.0",
             "scenario_label": scenario_label,
             "scenario_weights": weights.__dict__,
             "dimensions": DIMENSION_META,
@@ -480,15 +487,35 @@ def chip_recommend_candidate_v2(
 def api_methodology():
     """Return scoring methodology documentation for the UI."""
     return {
-        "version": "2.0.0",
-        "description": "AISHPerf 芯片推荐引擎 — 10维量化评分方法",
+        "version": "3.1.0",
+        "description": "AISHPerf 芯片推荐引擎 — 10维量化评分方法 (v3.1: 量化场景独立)",
         "card_estimation": {
-            "vram_train": "总参数量(B) × 12 × 1.3 → 按单卡显存分摊 → 取2幂次方",
+            "vram_train": "总参数量(B) × 20 × 1.3 → 按单卡显存分摊 → 取2幂次方",
+            "vram_train_lora": "总参数量(B) × 2.5 × 1.3 → 按单卡显存分摊 → 取2幂次方",
+            "vram_quantize": {
+                "gptq": "总参数量(B) × 3.5 × 1.25 (FP16模型 + Hessian矩阵)",
+                "awq": "总参数量(B) × 3.0 × 1.25 (FP16模型 + 激活统计)",
+                "bitsandbytes": "总参数量(B) × 2.5 × 1.25 (FP16模型 + 量化缓冲)",
+                "gguf": "总参数量(B) × 2.5 × 1.25 (FP16模型 + 校准数据)",
+            },
             "vram_inference": "总参数量(B) × 2 × 1.25 → 按单卡显存分摊 → 取2幂次方",
+            "vram_inference_quant": {
+                "int8": "总参数量(B) × 1.0 × 1.25",
+                "int4": "总参数量(B) × 0.5 × 1.25",
+            },
             "compute_train": "6ND FLOPs (N=参数量, D=训练数据量tokens) / (单卡有效算力 × 训练天数) → 取2幂次方",
             "mfu_default": 0.30,
             "mfu_prefer_benchmark": "优先使用 chip_model_benchmarks 表的实测 MFU",
             "inference_throughput_formula": "min(compute_bound, memory_bound) × 0.30 效率因子",
+        },
+        "scenario_weights": {
+            "train_sft_full": {"compute_perf": 0.20, "vram_sufficiency": 0.15, "cost_efficiency": 0.12, "power_efficiency": 0.08, "interconnect_quality": 0.12, "ecosystem_maturity": 0.10, "sla_satisfaction": 0.10, "production_readiness": 0.05, "benchmark_evidence": 0.08},
+            "train_sft_lora": {"compute_perf": 0.10, "vram_sufficiency": 0.25, "cost_efficiency": 0.17, "power_efficiency": 0.08, "interconnect_quality": 0.05, "ecosystem_maturity": 0.12, "sla_satisfaction": 0.10, "production_readiness": 0.05, "benchmark_evidence": 0.08},
+            "train_cpt":     {"compute_perf": 0.22, "vram_sufficiency": 0.17, "cost_efficiency": 0.14, "power_efficiency": 0.08, "interconnect_quality": 0.12, "ecosystem_maturity": 0.10, "sla_satisfaction": 0.07, "production_readiness": 0.03, "benchmark_evidence": 0.07},
+            "train_rl":      {"compute_perf": 0.15, "vram_sufficiency": 0.18, "cost_efficiency": 0.10, "power_efficiency": 0.08, "interconnect_quality": 0.18, "ecosystem_maturity": 0.10, "sla_satisfaction": 0.10, "production_readiness": 0.05, "benchmark_evidence": 0.06},
+            "quantize":      {"compute_perf": 0.12, "vram_sufficiency": 0.28, "cost_efficiency": 0.12, "power_efficiency": 0.06, "interconnect_quality": 0.08, "ecosystem_maturity": 0.12, "sla_satisfaction": 0.08, "production_readiness": 0.06, "benchmark_evidence": 0.08},
+            "inference_fp16": {"compute_perf": 0.15, "vram_sufficiency": 0.20, "cost_efficiency": 0.15, "power_efficiency": 0.08, "interconnect_quality": 0.08, "ecosystem_maturity": 0.12, "sla_satisfaction": 0.10, "production_readiness": 0.05, "benchmark_evidence": 0.07},
+            "inference_quant": {"compute_perf": 0.10, "vram_sufficiency": 0.25, "cost_efficiency": 0.16, "power_efficiency": 0.08, "interconnect_quality": 0.06, "ecosystem_maturity": 0.12, "sla_satisfaction": 0.10, "production_readiness": 0.05, "benchmark_evidence": 0.08},
         },
         "scoring_dimensions": DIMENSION_META,
         "total_score_formula": "Σ(维度得分 × 权重) × 10 → 0~100 分制",

@@ -470,7 +470,10 @@ def get_chip_recommend_candidates(
     prefer_domestic: bool = False,
     db_path: str | Path | None = None,
 ) -> tuple[dict | None, list[dict]]:
-    """Find model + candidate chips for recommend pipeline."""
+    """Find model + candidate chips for recommend pipeline.
+
+    v3.1: quantize scenario uses same usage filter as train (needs training-capable chips).
+    """
     with get_db(db_path, readonly=True) as db:
         # Find model
         row = db.execute(
@@ -482,10 +485,13 @@ def get_chip_recommend_candidates(
 
         model_data = dict(row)
 
-        # Calculate VRAM
+        # Calculate VRAM (rough estimate for candidate filtering only;
+        # the accurate formula is applied in server.py via estimate_vram_total())
         total_params = float(model_data.get("total_params_b", 0) or 0)
-        if scenario == "train":
-            min_vram_total = total_params * 12 * 1.3
+        if scenario in ("train", "quantize"):
+            # Both training and quantization need training-capable chips
+            # (quantization requires forward+backward passes for calibration)
+            min_vram_total = total_params * 12 * 1.3  # rough upper bound
             usage_cond = "AND (usage LIKE ? OR usage LIKE ?)"
             usage_params = ["%训练%", "%训推%"]
         else:
