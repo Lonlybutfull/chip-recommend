@@ -527,9 +527,13 @@ function doLogin(){
 }
 (function checkLogin(){
   if(sessionStorage.getItem('aishperf_authed') === '1'){
-    $('login-overlay').classList.add('hidden');
+    var overlay = document.getElementById('login-overlay');
+    if(overlay) overlay.classList.add('hidden');
   }
-  setTimeout(()=>{ const el=$('login-user'); if(el)el.focus(); },100);
+  setTimeout(function(){
+    var el = document.getElementById('login-user');
+    if(el) el.focus();
+  }, 100);
 })();
 
 /* ═══════════════════════════════════════════════════════════
