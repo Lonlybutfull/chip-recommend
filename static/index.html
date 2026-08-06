@@ -1812,9 +1812,9 @@ async function showMethodology() {
         <div class="group"><div class="group-header">大类权重矩阵 (3大类)</div>
         <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px;font-size:0.7rem">
           ${Object.entries(data.scenario_weights).map(([scenario,w])=>{
-            const catNames = {compute_power:'算力性能(5维)', cost_effectiveness:'性价比(2维)', ecosystem_maturity:'生态成熟度(4维)'};
+            const catNames = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度'};
             const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${catNames[k]||k}:${(v*100).toFixed(0)}%`).join(', ');
-            return `<div class="group-field"><span class="key" style="font-weight:600">${esc(scenario)}</span><span class="val">${esc(parts)}</span></div>`;
+            return '<div class="group-field"><span class="key" style="font-weight:600">' + esc(scenario) + '</span><span class="val">' + esc(parts) + '</span></div>';
           }).join('')}
         </div></div>` : ''}
       </div>`;

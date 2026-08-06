@@ -495,48 +495,32 @@ def chip_recommend_candidate_v2(
 
 @app.get("/api/v1/methodology")
 def api_methodology():
-    """Return scoring methodology documentation for the UI."""
-    # Build weights dynamically from actual WEIGHTS_* constants (single source of truth)
-    _ws = lambda w: {
-        "compute_perf": w.compute_perf, "vram_sufficiency": w.vram_sufficiency,
-        "cost_efficiency": w.cost_efficiency, "power_efficiency": w.power_efficiency,
-        "interconnect_quality": w.interconnect_quality, "ecosystem_maturity": w.ecosystem_maturity,
-        "sla_satisfaction": w.sla_satisfaction, "production_readiness": w.production_readiness,
-        "benchmark_evidence": w.benchmark_evidence,
-    }
+    """Return scoring methodology documentation for the UI (v4.0: 3-category system)."""
     return {
-        "version": "3.1.0",
-        "description": "AISHPerf 芯片推荐引擎 — 10维量化评分方法 (v3.1: 量化场景独立)",
+        "version": "4.0.0",
+        "description": "AISHPerf 芯片推荐引擎 — 3大类·11子维度 分层评分方法 (v4.0)",
         "card_estimation": {
             "vram_train": "总参数量(B) × 20 × 1.3 → 按单卡显存分摊 → 取2幂次方",
             "vram_train_lora": "总参数量(B) × 2.5 × 1.3 → 按单卡显存分摊 → 取2幂次方",
-            "vram_quantize": {
-                "gptq": "总参数量(B) × 3.5 × 1.25 (FP16模型 + Hessian矩阵)",
-                "awq": "总参数量(B) × 3.0 × 1.25 (FP16模型 + 激活统计)",
-                "bitsandbytes": "总参数量(B) × 2.5 × 1.25 (FP16模型 + 量化缓冲)",
-                "gguf": "总参数量(B) × 2.5 × 1.25 (FP16模型 + 校准数据)",
-            },
+            "vram_quantize": "GPTQ:3.5×P×1.25 / AWQ:3.0×P×1.25 / bitsandbytes:2.5×P×1.25 / GGUF:2.5×P×1.25",
             "vram_inference": "总参数量(B) × 2 × 1.25 → 按单卡显存分摊 → 取2幂次方",
-            "vram_inference_quant": {
-                "int8": "总参数量(B) × 1.0 × 1.25",
-                "int4": "总参数量(B) × 0.5 × 1.25",
-            },
-            "compute_train": "6ND FLOPs (N=参数量, D=训练数据量tokens) / (单卡有效算力 × 训练天数) → 取2幂次方",
+            "vram_inference_quant": "INT8:1.0×P×1.25 / INT4:0.5×P×1.25",
+            "compute_train": "6ND FLOPs / (单卡有效算力 × 训练天数) → 取2幂次方",
             "mfu_default": 0.30,
             "mfu_prefer_benchmark": "优先使用 chip_model_benchmarks 表的实测 MFU",
             "inference_throughput_formula": "min(compute_bound, memory_bound) × 0.30 效率因子",
         },
+        "total_score_formula": "总分 = 算力性能×0.50 + 性价比×0.25 + 生态成熟度×0.25 (大类权重按场景调整)",
         "scenario_weights": {
-            "train_sft_full":  _ws(WEIGHTS_SFT_FULL),
-            "train_sft_lora":  _ws(WEIGHTS_SFT_LORA),
-            "train_cpt":       _ws(WEIGHTS_CPT),
-            "train_rl":        _ws(WEIGHTS_RL),
-            "quantize":        _ws(WEIGHTS_QUANTIZE),
-            "inference_fp16":  _ws(WEIGHTS_INFER_FP16),
-            "inference_quant": _ws(WEIGHTS_INFER_QUANT),
+            "训练·SFT全参":   {"compute_power": 0.55, "cost_effectiveness": 0.15, "ecosystem_maturity": 0.30},
+            "训练·SFT·LoRA": {"compute_power": 0.55, "cost_effectiveness": 0.15, "ecosystem_maturity": 0.30},
+            "训练·CPT":       {"compute_power": 0.55, "cost_effectiveness": 0.15, "ecosystem_maturity": 0.30},
+            "训练·RL":        {"compute_power": 0.55, "cost_effectiveness": 0.15, "ecosystem_maturity": 0.30},
+            "量化":            {"compute_power": 0.40, "cost_effectiveness": 0.20, "ecosystem_maturity": 0.40},
+            "推理·FP16":      {"compute_power": 0.45, "cost_effectiveness": 0.25, "ecosystem_maturity": 0.30},
+            "推理·量化":       {"compute_power": 0.45, "cost_effectiveness": 0.25, "ecosystem_maturity": 0.30},
         },
         "scoring_dimensions": DIMENSION_META,
-        "total_score_formula": "Σ(维度得分 × 权重) × 10 → 0~100 分制",
         "hard_constraints": [
             "max_cards: 推荐卡数超过此值 → 排除",
             "min_cards: 推荐卡数低于此值 → 拉高到 min_cards (2幂次方)",
