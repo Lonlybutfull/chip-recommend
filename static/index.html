@@ -1596,7 +1596,7 @@ async function runRecommend(){
             <div class="rec-stat"><div class="label">显存</div><div class="value">${c.vram_gb||'?'} GB</div></div>
           </div>
           <div class="rec-rationale">${esc(rec.rationale||'')}</div>
-          ${renderCalcBreakdown(req, rec, c)}
+          ${renderCalcBreakdown(req, rec, c, scoring)}
           <div class="score-bar"><div class="score-bar-fill" style="width:${scoreBarPct}%"></div></div>
           ${renderDimensionBreakdown(scoring, dimNameMap)}
         </div>
@@ -1753,7 +1753,7 @@ function hideScoreTooltip(){
 }
 
 // ── Calculation Breakdown (collapsible) ──
-function renderCalcBreakdown(req, rec, chip){
+function renderCalcBreakdown(req, rec, chip, scoring){
   const items = [];
   // VRAM calculation
   if(req.vram_formula){
