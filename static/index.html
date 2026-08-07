@@ -1639,7 +1639,7 @@ async function runRecommend(){
       dimMeta.forEach(m=>{ dimNameMap[m.id]=m; });
       return `
         <div class="rec-card ${i===0?'best':''}">
-          <div class="rec-rank">#${i+1} · 综合评分 ${scoring.total!=null?scoring.total:rec.score} / 100 · ${esc(c.chip_model)} <span style="color:var(--text2);font-weight:400">${esc(c.vendor_display||'')}</span></div>
+          <div class="rec-rank">#${i+1} · 综合评分 ${scoring.total!=null?scoring.total.toFixed(0):rec.score} / 100 · ${esc(c.chip_model)} <span style="color:var(--text2);font-weight:400">${esc(c.vendor_display||'')}</span></div>
           <!-- Row 1: 计算与推荐 -->
           <div class="rec-calc-row">
             ${renderCalcRow(req, rec, c)}
@@ -1755,7 +1755,7 @@ function renderScoringDetail(scoring, dimNameMap) {
       <div class="rec-scoring-cat-header">
         ${icon} ${esc(cat.name_cn)}
         <span style="color:var(--text2);font-size:0.65rem;font-weight:400">大类权重 ${(cat.weight*100).toFixed(0)}%</span>
-        <span class="cat-score">${cat.score.toFixed(1)} 分 · 加权 ${cat.weighted.toFixed(2)}</span>
+        <span class="cat-score">${cat.score.toFixed(0)} 分 · 加权 ${cat.weighted.toFixed(0)}</span>
       </div>
       ${entries.map(([dimId, v]) => {
         const meta = dimNameMap[dimId] || {};
@@ -1773,8 +1773,8 @@ function renderScoringDetail(scoring, dimNameMap) {
           <div class="dim-head">
             <span class="dim-name">${esc(name)}</span>
             <span class="dim-wbar">子权重 ${(subWt*100).toFixed(1)}% × ${(catWt*100).toFixed(0)}% = 全局 ${(globalWt*100).toFixed(1)}%</span>
-            <span style="font-weight:700;color:var(--accent);font-size:0.75rem;margin-left:auto">${v.score.toFixed(1)}<span style="font-size:0.6rem;color:var(--text3)">/10</span></span>
-            <span style="color:var(--text3);font-size:0.6rem">加权 ${v.weighted.toFixed(2)}</span>
+            <span style="font-weight:700;color:var(--accent);font-size:0.75rem;margin-left:auto">${v.score.toFixed(0)}<span style="font-size:0.6rem;color:var(--text3)">/100</span></span>
+            <span style="color:var(--text3);font-size:0.6rem">加权 ${v.weighted.toFixed(0)}</span>
           </div>
           <div class="dim-calc">${esc(detail)}</div>
           ${formula ? `<div class="dim-formula">📐 公式: ${esc(formula)}</div>` : ''}
@@ -1786,13 +1786,13 @@ function renderScoringDetail(scoring, dimNameMap) {
   }).join('');
 
   // Total score formula
-  const total = scoring.total!=null ? scoring.total.toFixed(1) : '?';
+  const total = scoring.total!=null ? scoring.total.toFixed(0) : '?';
   const cw = scoring.category_weights || {};
   const catNames2 = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度'};
   const totalParts = Object.entries(cw).filter(([,v])=>v>0).map(([k,v])=>
-    `${catNames2[k]||k}: ${cats[k]?.score?.toFixed(1)||'?'} × ${(v*100).toFixed(0)}% = ${cats[k]?.weighted?.toFixed(2)||'?'}`
+    `${catNames2[k]||k}: ${cats[k]?.score?.toFixed(0)||'?'} × ${(v*100).toFixed(0)}% = ${cats[k]?.weighted?.toFixed(0)||'?'}`
   );
-  const totalFormula = totalParts.length ? `总分 = (${totalParts.join(' + ')}) × 10 = ${total}` : `总分 = ${total}`;
+  const totalFormula = totalParts.length ? `总分 = ${totalParts.join(' + ')} = ${total}` : `总分 = ${total}`;
 
   return `<div style="font-size:0.68rem;color:var(--text3);margin-bottom:6px">📊 评分明细 v${scoring.version||'4.2'} — 3大类·9子维度</div>
     ${sections}
@@ -1817,8 +1817,8 @@ function renderFlatScoringDetail(dims, dimNameMap) {
       return `<div class="rec-scoring-dim">
         <div class="dim-head">
           <span class="dim-name">${esc(name)}</span>
-          <span style="font-weight:700;color:var(--accent);margin-left:auto">${v.score.toFixed(1)}<span style="font-size:0.6rem;color:var(--text3)">/10</span></span>
-          <span style="color:var(--text3);font-size:0.6rem">×${v.weight.toFixed(2)} = ${v.weighted.toFixed(1)}</span>
+          <span style="font-weight:700;color:var(--accent);margin-left:auto">${v.score.toFixed(0)}<span style="font-size:0.6rem;color:var(--text3)">/100</span></span>
+          <span style="color:var(--text3);font-size:0.6rem">×${v.weight.toFixed(2)} = ${v.weighted.toFixed(0)}</span>
         </div>
         ${detail ? `<div class="dim-calc">${esc(detail)}</div>` : ''}
         ${formula ? `<div class="dim-formula">📐 公式: ${esc(formula)}</div>` : ''}
@@ -1843,11 +1843,11 @@ function showScoreTooltip(ev, data){
   const rawEntries = Object.entries(data.raw||{}).filter(([,v])=>v!=null&&v!==''&&String(v)!=='undefined');
   const src = data.raw?.source || data.raw?.note;
   tt.innerHTML = `
-    <div class="tt-title"><span>${esc(data.name)}</span><span class="tt-score">${data.score}<span style="font-size:0.65rem;color:var(--text3)">/10</span></span></div>
+    <div class="tt-title"><span>${esc(data.name)}</span><span class="tt-score">${data.score.toFixed(0)}<span style="font-size:0.65rem;color:var(--text3)">/100</span></span></div>
     <div class="tt-formula">${esc(data.detail)}</div>
     ${rawEntries.length ? '<div class="tt-raw">'+rawEntries.map(([k,v])=>`<span>${esc(k)}: <b>${esc(typeof v==='number'?v.toFixed(2):String(v))}</b></span>`).join(' ')+'</div>' : ''}
     ${src ? '<div class="tt-raw" style="margin-top:3px;font-size:0.6rem;color:var(--text3)">📂 '+esc(String(src).slice(0,120))+'</div>' : ''}
-    <div class="tt-weight">权重: ${data.weight.toFixed(2)} · 加权: ${(data.score*data.weight).toFixed(2)}</div>
+    <div class="tt-weight">权重: ${data.weight.toFixed(2)} · 加权: ${(data.score*data.weight).toFixed(0)}</div>
   `;
   tt.classList.add('visible');
   moveScoreTooltip(ev);
@@ -1888,12 +1888,12 @@ function renderCalcBreakdown(req, rec, chip, scoring){
   if(rec.total_cost_wan != null){
     items.push({label:'预估总价', value:rec.total_cost_wan+' 万元', detail:`${rec.recommended_cards||rec.vram_cards}卡 × ${chip.price_cny_wan||'?'}万/卡`});
   }
-  // Category weights (v4.0: 3-category system)
+  // Category weights (v4.2: 3-category, 100-point scale)
   const w = rec.scenario_weights || (scoring && scoring.category_weights);
   if (w) {
-    const catNames = {compute_power:'算力性能(5维)', cost_effectiveness:'性价比(2维)', ecosystem_maturity:'生态成熟度(4维)'};
+    const catNames = {compute_power:'算力性能(2维)', cost_effectiveness:'性价比(2维)', ecosystem_maturity:'生态成熟度(5维)'};
     const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${catNames[k]||k}:${(v*100).toFixed(0)}%`).join(' ');
-    items.push({label:'大类权重分配', value:parts, detail:`总分=Σ(大类分×大类权重)×10, 子维度权重为固定比值`});
+    items.push({label:'大类权重分配', value:parts, detail:`总分=Σ(大类分×大类权重), 子维度权重为固定比值`});
   }
   if(!items.length) return '';
   return `<details class="calc-breakdown">
@@ -1936,7 +1936,7 @@ async function showMethodology() {
           </div>`).join('')}
         </div></div>
         ${data.scenario_weights ? `
-        <div class="group"><div class="group-header">大类权重矩阵 (3大类)</div>
+        <div class="group"><div class="group-header">大类权重矩阵 (5:2:3 统一)</div>
         <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px;font-size:0.7rem">
           ${Object.entries(data.scenario_weights).map(([scenario,w])=>{
             const catNames = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度'};

@@ -1,17 +1,16 @@
 """
 AISHPerf Chip Recommendation Scoring Engine v4.2
 
-9-dimension scoring with each dimension outputting 0.0-10.0,
+9-dimension scoring with each dimension outputting 0.0-100.0,
 weighted sum yields total 0-100.
 
 v4.2 changes:
+  - All scores now 0-100 scale (was 0-10). Category scores, dimension scores, detail
+    messages all in /100. total = direct weighted sum, no ×10.
   - Deleted: production_readiness, cost_efficiency (process_node), domestic_priority
-  - New: server_count_efficiency (8卡/节点=10, 多节点扣分)
-    framework_compat (major frameworks, split from software_compat)
-    toolchain_compat (minor toolchains, split from software_compat)
-    source_credibility (official source ratio)
+  - New: server_count_efficiency, framework_compat, toolchain_compat, source_credibility
   - Modified: ecosystem_maturity → compatibility_score (renamed)
-    benchmark_evidence: no-data default 5.0 (was 6.2)
+    benchmark_evidence: no-data default 50 (was 6.2)
     SUB_DIMS_ECOSYSTEM: compat 40% + framework 15% + toolchain 15% + benchmark 20% + source 10%
 
 All formulas have clear physical meaning, documented constants,
@@ -186,7 +185,7 @@ class CategoryResult:
     id: str = ""
     name_cn: str = ""
     name_en: str = ""
-    score: float = 0.0          # 0-10 weighted avg of sub-dimensions
+    score: float = 0.0          # 0-100 weighted avg of sub-dimensions
     weight: float = 0.0          # category-level weight
     weighted: float = 0.0        # score × weight
     sub_dimensions: dict = field(default_factory=dict)  # {dim_id: DimensionResult}
@@ -555,34 +554,34 @@ def score_compute_perf(fp16_tflops: float) -> DimensionResult:
     Based on 996-chip distribution (1093 total, 91.1% coverage):
       P50=6.5T, P75=24T, P90=105T, P95=383T, P99=2563T
     Piecewise linear anchored at data percentiles:
-      ≤13T(P50 area)→0-2.5, 13-105T→2.5-5.0, 105-383T→5.0-7.5, >383T→7.5-10(capped at 2563=P99)
+      ≤13T(P50 area)→0-25, 13-105T→25-50, 105-383T→50-75, >383T→75-100 (capped at 2563=P99)
 
-    Missing data → statistical mean 1.9 (996-chip average; actual mean is low because
+    Missing data → statistical mean 19 (996-chip average; actual mean is low because
     most chips are consumer GPUs with modest FP16). Prevents inflating scores for
     chips without published perf data — if they can't benchmark, they likely aren't
     strong compute chips.
     """
-    MEAN = 1.9  # statistical mean of 996 chips (91.1% coverage)
+    MEAN = 19.0  # statistical mean of 996 chips (91.1% coverage)
     if fp16_tflops > 0:
         if fp16_tflops <= 13:
-            score = fp16_tflops / 13.0 * 2.5
-            detail = f"FP16={fp16_tflops:.0f}T (≤P50=13T) → {score:.1f}/10"
+            score = fp16_tflops / 13.0 * 25.0
+            detail = f"FP16={fp16_tflops:.0f}T (≤P50=13T) → {score:.0f}/100"
         elif fp16_tflops <= 105:
-            score = 2.5 + (fp16_tflops - 13) / (105 - 13) * 2.5
-            detail = f"FP16={fp16_tflops:.0f}T (P50-P90) → {score:.1f}/10"
+            score = 25.0 + (fp16_tflops - 13) / (105 - 13) * 25.0
+            detail = f"FP16={fp16_tflops:.0f}T (P50-P90) → {score:.0f}/100"
         elif fp16_tflops <= 383:
-            score = 5.0 + (fp16_tflops - 105) / (383 - 105) * 2.5
-            detail = f"FP16={fp16_tflops:.0f}T (P90-P95) → {score:.1f}/10"
+            score = 50.0 + (fp16_tflops - 105) / (383 - 105) * 25.0
+            detail = f"FP16={fp16_tflops:.0f}T (P90-P95) → {score:.0f}/100"
         else:
-            score = min(7.5 + (fp16_tflops - 383) / (2563 - 383) * 2.5, 10.0)
-            detail = f"FP16={fp16_tflops:.0f}T (>P95=383T) → {score:.1f}/10"
+            score = min(75.0 + (fp16_tflops - 383) / (2563 - 383) * 25.0, 100.0)
+            detail = f"FP16={fp16_tflops:.0f}T (>P95=383T) → {score:.0f}/100"
     else:
         score = MEAN
-        detail = f"无FP16/BF16算力数据 → 统计均值 {MEAN:.1f}/10"
+        detail = f"无FP16/BF16算力数据 → 统计均值 {MEAN:.0f}/100"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={"fp16_tflops": fp16_tflops,
-                    "formula": "piecewise: P50(13T)=2.5, P90(105T)=5.0, P95(383T)=7.5, P99(2563T)=10",
+                    "formula": "piecewise: P50(13T)=25, P90(105T)=50, P95(383T)=75, P99(2563T)=100",
                     "source": "chip.precision_perf (996/1093 chips, 91% coverage)", "missing": fp16_tflops <= 0},
     )
 
@@ -598,18 +597,18 @@ def score_bandwidth_adequacy(vram_bw_gb_s: float, cards: int,
     total_bw = vram_bw_gb_s × cards   (aggregate bandwidth across all cards)
     adequacy = model_need / total_bw  (lower is better)
 
-    Scoring: model needs ≤ 50% of total bandwidth → 10 (comfortable headroom)
-             above 50% → linear decay: score = 10 × (1 - 2×(ratio - 0.5))
-             i.e. at 50%→10, at 75%→5, at 100%→0
+    Scoring: model needs ≤ 50% of total bandwidth → 100 (comfortable headroom)
+             above 50% → linear decay: score = 100 × (1 - 2×(ratio - 0.5))
+             i.e. at 50%→100, at 75%→50, at 100%→0
 
-    Missing data → statistical mean 4.1 (962-chip average, 88% coverage).
+    Missing data → statistical mean 41 (962-chip average, 88% coverage).
     """
-    MEAN = 4.1  # statistical mean of 962 chips (88% coverage)
+    MEAN = 41.0  # statistical mean of 962 chips (88% coverage)
     cards = max(cards, 1)
     bw = float(vram_bw_gb_s or 0)
     if bw <= 0:
         return DimensionResult(
-            score=MEAN, detail=f"无显存带宽数据 → 统计均值 {MEAN:.1f}/10",
+            score=MEAN, detail=f"无显存带宽数据 → 统计均值 {MEAN:.0f}/100",
             raw_values={"vram_bw_gb_s": 0, "cards": cards,
                         "source": "chip.vram_bw_gb_s (962/1093 chips, 88% coverage)",
                         "missing": True},
@@ -617,19 +616,19 @@ def score_bandwidth_adequacy(vram_bw_gb_s: float, cards: int,
     total_bw = bw * cards
     if model_bandwidth_gb_s <= 0:
         # No bandwidth target → assume adequate
-        score = 8.0
-        detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s （无模型带宽需求目标） → 8.0/10"
+        score = 80.0
+        detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s （无模型带宽需求目标） → 80/100"
     else:
         ratio = model_bandwidth_gb_s / total_bw
         if ratio <= 0.5:
-            score = 10.0
-            detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s, 需求{model_bandwidth_gb_s:.0f}GB/s, 占比{ratio*100:.0f}% → 满分10.0"
+            score = 100.0
+            detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s, 需求{model_bandwidth_gb_s:.0f}GB/s, 占比{ratio*100:.0f}% → 满分100"
         elif ratio <= 1.0:
-            score = 10.0 - (ratio - 0.5) * 20.0  # 0.5→10, 1.0→0
-            detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s, 需求{model_bandwidth_gb_s:.0f}GB/s, 占比{ratio*100:.0f}%（>50%） → {score:.1f}/10"
+            score = 100.0 - (ratio - 0.5) * 200.0  # 0.5→100, 1.0→0
+            detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s, 需求{model_bandwidth_gb_s:.0f}GB/s, 占比{ratio*100:.0f}%（>50%） → {score:.0f}/100"
         else:
             score = 0.0
-            detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s < 需求{model_bandwidth_gb_s:.0f}GB/s, 占比{ratio*100:.0f}% → 0/10"
+            detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s < 需求{model_bandwidth_gb_s:.0f}GB/s, 占比{ratio*100:.0f}% → 0/100"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
@@ -637,7 +636,7 @@ def score_bandwidth_adequacy(vram_bw_gb_s: float, cards: int,
             "total_bw_gb_s": round(total_bw, 1),
             "model_bandwidth_gb_s": round(model_bandwidth_gb_s, 1),
             "ratio": round(ratio, 3) if model_bandwidth_gb_s > 0 else 0,
-            "formula": "total_bw = vram_bw × cards; ratio = model_need / total_bw; ≤50%→10, >50%→linear 10→0",
+            "formula": "total_bw = vram_bw × cards; ratio = model_need / total_bw; ≤50%→100, >50%→linear 100→0",
             "source": "chip.vram_bw_gb_s (88% coverage)",
         },
     )
@@ -651,34 +650,34 @@ def score_power_efficiency(fp16_tflops: float, tdp_w: float) -> DimensionResult:
     """GFLOPS per Watt. Based on 959-chip FP16×TDP cross-section (87.7% coverage).
 
     Actual data: mean=167 GFLOPS/W, median=76, P25=10, P75=160, P90=470.
-    Piecewise: ≤130(P50 area)→0-2.5, 130-470(P90)→2.5-5.0, 470-1500→5.0-8.0, >1500→8.0-10.0(cap at 4500=top).
-    Missing data → statistical mean 2.0 (959-chip average).
+    Piecewise: ≤130(P50 area)→0-25, 130-470(P90)→25-50, 470-1500→50-80, >1500→80-100(cap at 4500=top).
+    Missing data → statistical mean 20 (959-chip average).
     """
-    MEAN = 2.0  # statistical mean of 959 chips (87.7% coverage)
+    MEAN = 20.0  # statistical mean of 959 chips (87.7% coverage)
     tdp = float(tdp_w or 0)
     if fp16_tflops > 0 and tdp > 0:
         gf = fp16_tflops * 1000 / tdp  # GFLOPS/W
         if gf <= 130:
-            score = gf / 130.0 * 2.5
-            detail = f"{fp16_tflops:.0f}T/{tdp:.0f}W={gf:.0f}GFLOPS/W (≤P50=130) → {score:.1f}/10"
+            score = gf / 130.0 * 25.0
+            detail = f"{fp16_tflops:.0f}T/{tdp:.0f}W={gf:.0f}GFLOPS/W (≤P50=130) → {score:.0f}/100"
         elif gf <= 470:
-            score = 2.5 + (gf - 130) / (470 - 130) * 2.5
-            detail = f"{fp16_tflops:.0f}T/{tdp:.0f}W={gf:.0f}GFLOPS/W (P50-P90) → {score:.1f}/10"
+            score = 25.0 + (gf - 130) / (470 - 130) * 25.0
+            detail = f"{fp16_tflops:.0f}T/{tdp:.0f}W={gf:.0f}GFLOPS/W (P50-P90) → {score:.0f}/100"
         elif gf <= 1500:
-            score = 5.0 + (gf - 470) / (1500 - 470) * 3.0
-            detail = f"{fp16_tflops:.0f}T/{tdp:.0f}W={gf:.0f}GFLOPS/W (P90-H100) → {score:.1f}/10"
+            score = 50.0 + (gf - 470) / (1500 - 470) * 30.0
+            detail = f"{fp16_tflops:.0f}T/{tdp:.0f}W={gf:.0f}GFLOPS/W (P90-H100) → {score:.0f}/100"
         else:
-            score = min(8.0 + (gf - 1500) / 3000 * 2.0, 10.0)
-            detail = f"{fp16_tflops:.0f}T/{tdp:.0f}W={gf:.0f}GFLOPS/W (>H100=1413) → {score:.1f}/10"
+            score = min(80.0 + (gf - 1500) / 3000 * 20.0, 100.0)
+            detail = f"{fp16_tflops:.0f}T/{tdp:.0f}W={gf:.0f}GFLOPS/W (>H100=1413) → {score:.0f}/100"
     else:
         score = MEAN
         gf = 0.0
-        detail = f"无功耗或算力数据 → 统计均值 {MEAN:.1f}/10"
+        detail = f"无功耗或算力数据 → 统计均值 {MEAN:.0f}/100"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
             "gflops_per_watt": round(gf, 1), "tdp_w": tdp,
-            "formula": "piecewise: P50(130)=2.5, P90(470)=5.0, H100(1413)=8.0, B200(2250)=10",
+            "formula": "piecewise: P50(130)=25, P90(470)=50, H100(1413)=80, B200(2250)=100",
             "source": "chip.tdp_w (92% coverage) + chip.precision_perf",
             "missing": tdp <= 0 or fp16_tflops <= 0,
         },
@@ -693,35 +692,34 @@ def score_power_efficiency(fp16_tflops: float, tdp_w: float) -> DimensionResult:
 
 def score_compatibility(cloud: int, compat_verified: int,
                          has_frameworks: bool = False) -> DimensionResult:
-    """Composite: cloud support (+3) + verified compat (+4 max, 0.8/ea) + frameworks (+3).
+    """Composite: cloud support (+30) + verified compat (+40 max, 8/ea) + frameworks (+30).
 
-    Max: 3 + 4 + 3 = 10.0.
-    Coverage: cloud_available=0, software_stack=41, compatible_frameworks=19, verified_compat=10 rows.
-    Missing data → 5.0 (neutral, previously 2.8).
+    Max: 30 + 40 + 30 = 100.
+    Missing data → 50 (neutral, previously 2.8).
     """
     cloud_val = int(float(cloud or 0))
     compat_val = int(compat_verified or 0)
-    cloud_score = 3.0 if cloud_val >= 1 else 0.0
-    compat_score = min(compat_val * 0.8, 4.0)
-    fw_score = 3.0 if has_frameworks else 0.0
+    cloud_score = 30.0 if cloud_val >= 1 else 0.0
+    compat_score = min(compat_val * 8.0, 40.0)
+    fw_score = 30.0 if has_frameworks else 0.0
 
-    score = min(cloud_score + compat_score + fw_score, 10.0)
+    score = min(cloud_score + compat_score + fw_score, 100.0)
     parts = []
     if cloud_score: parts.append(f"云可用+{cloud_score:.0f}")
-    if compat_score > 0: parts.append(f"兼容{compat_val}条→+{compat_score:.1f}")
+    if compat_score > 0: parts.append(f"兼容{compat_val}条→+{compat_score:.0f}")
     if fw_score: parts.append(f"框架+{fw_score:.0f}")
     if parts:
-        detail = " + ".join(parts) + f" = {score:.1f}/10"
+        detail = " + ".join(parts) + f" = {score:.0f}/100"
     else:
-        score = 5.0  # neutral default
-        detail = f"无生态数据 → 默认 {score:.1f}/10"
+        score = 50.0  # neutral default
+        detail = f"无生态数据 → 默认 {score:.0f}/100"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
             "cloud_available": cloud_val,
             "compat_verified_count": compat_val,
             "has_frameworks": has_frameworks,
-            "formula": "min(cloud*3 + min(compat*0.8,4) + fw*3, 10); no-data→5.0",
+            "formula": "min(cloud*30 + min(compat*8,40) + fw*30, 100); no-data→50",
             "source": "chip.cloud_available + chip_model_compatibility + chip.software_stack",
             "missing": not parts,
         },
@@ -734,31 +732,31 @@ def score_compatibility(cloud: int, compat_verified: int,
 # ═══════════════════════════════════════════════════════════
 
 def score_server_count_efficiency(recommended_cards: int) -> DimensionResult:
-    """8 cards per node = 10 (optimal), more nodes → linear decay.
+    """8 cards per node = 100 (optimal), more nodes → linear decay.
 
     Formula: nodes = ceil(cards / 8)
-    1 node (≤8 cards) → 10
-    2 nodes (9-16) → 8
-    3 nodes (17-24) → 6
-    4 nodes (25-32) → 4
-    5+ nodes → max(0, 2 - 0.5 per extra node above 4)
+    1 node (≤8 cards) → 100
+    2 nodes (9-16) → 80
+    3 nodes (17-24) → 60
+    4 nodes (25-32) → 40
+    5+ nodes → max(0, 20 - 5 per extra node above 4)
     """
     cards = max(recommended_cards, 1)
     nodes = (cards + 7) // 8  # ceiling division
     if nodes <= 1:
-        score = 10.0
-        detail = f"{cards}卡 = 1节点 → 满分 10.0/10"
+        score = 100.0
+        detail = f"{cards}卡 = 1节点 → 满分 100/100"
     elif nodes <= 4:
-        score = 10.0 - (nodes - 1) * 2.0  # 1→10, 2→8, 3→6, 4→4
-        detail = f"{cards}卡 = {nodes}节点 → {score:.1f}/10"
+        score = 100.0 - (nodes - 1) * 20.0  # 1→100, 2→80, 3→60, 4→40
+        detail = f"{cards}卡 = {nodes}节点 → {score:.0f}/100"
     else:
-        score = max(0.0, 4.0 - (nodes - 4) * 0.5)  # 5→3.5, 6→3.0, ...
-        detail = f"{cards}卡 = {nodes}节点（>4） → {score:.1f}/10"
+        score = max(0.0, 40.0 - (nodes - 4) * 5.0)  # 5→35, 6→30, ...
+        detail = f"{cards}卡 = {nodes}节点（>4） → {score:.0f}/100"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
             "recommended_cards": cards, "nodes": nodes,
-            "formula": "nodes=ceil(cards/8); 1→10, 2→8, 3→6, 4→4, >4→-0.5/node",
+            "formula": "nodes=ceil(cards/8); 1→100, 2→80, 3→60, 4→40, >4→-5/node",
         },
     )
 
@@ -776,22 +774,22 @@ _MINOR_FRAMEWORKS = ["deepspeed", "megatron", "fsdp", "tensorrt", "openvino", "t
 # ═══════════════════════════════════════════════════════════
 
 def score_framework_compat(software_stack: str, compatible_frameworks: str) -> DimensionResult:
-    """Major framework support. 7 frameworks × 1.5, capped at 10.
-    No data → default 5.0.
+    """Major framework support. 7 frameworks × 15, capped at 100.
+    No data → default 50.
     """
     fw_text = (str(software_stack or "") + " " + str(compatible_frameworks or "")).lower()
     major_hits = sum(1 for fw in _MAJOR_FRAMEWORKS if fw in fw_text)
     if major_hits == 0:
-        score = 5.0
-        detail = "未检测到主流框架支持 → 默认 5.0/10"
+        score = 50.0
+        detail = "未检测到主流框架支持 → 默认 50/100"
     else:
-        score = min(major_hits * 1.5, 10.0)
-        detail = f"主流框架×{major_hits} (+{major_hits*1.5:.1f}) = {score:.1f}/10"
+        score = min(major_hits * 15.0, 100.0)
+        detail = f"主流框架×{major_hits} (+{major_hits*15:.0f}) = {score:.0f}/100"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
             "major_frameworks_found": major_hits,
-            "formula": "min(major*1.5, 10); no-data→5.0",
+            "formula": "min(major*15, 100); no-data→50",
             "source": "chip.software_stack + chip.compatible_frameworks",
             "missing": major_hits == 0,
         },
@@ -804,22 +802,22 @@ def score_framework_compat(software_stack: str, compatible_frameworks: str) -> D
 # ═══════════════════════════════════════════════════════════
 
 def score_toolchain_compat(software_stack: str, compatible_frameworks: str) -> DimensionResult:
-    """Minor toolchain support. 10 tools × 0.8, capped at 8.
-    No data → default 5.0.
+    """Minor toolchain support. 10 tools × 8, capped at 80.
+    No data → default 50.
     """
     fw_text = (str(software_stack or "") + " " + str(compatible_frameworks or "")).lower()
     minor_hits = sum(1 for fw in _MINOR_FRAMEWORKS if fw in fw_text)
     if minor_hits == 0:
-        score = 5.0
-        detail = "未检测到工具链支持 → 默认 5.0/10"
+        score = 50.0
+        detail = "未检测到工具链支持 → 默认 50/100"
     else:
-        score = min(minor_hits * 0.8, 8.0)
-        detail = f"工具链×{minor_hits} (+{minor_hits*0.8:.1f}) = {score:.1f}/10"
+        score = min(minor_hits * 8.0, 80.0)
+        detail = f"工具链×{minor_hits} (+{minor_hits*8:.0f}) = {score:.0f}/100"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
             "minor_tools_found": minor_hits,
-            "formula": "min(minor*0.8, 8); no-data→5.0",
+            "formula": "min(minor*8, 80); no-data→50",
             "source": "chip.software_stack + chip.compatible_frameworks",
             "missing": minor_hits == 0,
         },
@@ -832,47 +830,47 @@ def score_toolchain_compat(software_stack: str, compatible_frameworks: str) -> D
 
 def score_benchmark_evidence(benchmark_count: int, max_mfu: Optional[float],
                               max_tps: Optional[float]) -> DimensionResult:
-    """Reward chips with real benchmark data. No data → 5.0 (neutral default).
+    """Reward chips with real benchmark data. No data → 50 (neutral default).
 
-    Count-based: 0→5.0, 1-3→5.5-6.5, 4-13→6.5-8.5, 13+→8.5-9.5.
-    Modest MFU/TPS bonus (±0.5 max) rather than multiplier.
+    Count-based: 0→50, 1-3→55-65, 4-13→65-85, 13+→85-95.
+    Modest MFU/TPS bonus (±2.5 max) rather than multiplier.
     """
     if benchmark_count == 0:
-        return DimensionResult(score=5.0, detail="无实测benchmark数据 → 默认 5.0/10",
+        return DimensionResult(score=50.0, detail="无实测benchmark数据 → 默认 50/100",
                                raw_values={"benchmark_count": 0,
                                            "source": "chip_model_benchmarks (33 matched / 430 total, 3% coverage)",
                                            "missing": True})
 
     # Count-based base score (modest range)
     if benchmark_count <= 3:
-        base = 5.0 + benchmark_count / 3.0 * 1.5  # 1→5.5, 2→6.0, 3→6.5
+        base = 50.0 + benchmark_count / 3.0 * 15.0  # 1→55, 2→60, 3→65
     elif benchmark_count <= 13:
-        base = 6.5 + (benchmark_count - 3) / 10.0 * 2.0  # 4→6.7, 13→8.5
+        base = 65.0 + (benchmark_count - 3) / 10.0 * 20.0  # 4→67, 13→85
     else:
-        base = min(8.5 + (benchmark_count - 13) / 87.0 * 1.0, 9.5)  # capped at 9.5
+        base = min(85.0 + (benchmark_count - 13) / 87.0 * 10.0, 95.0)  # capped at 95
 
-    # Modest MFU bonus (±0.25)
+    # Modest MFU bonus (±2.5)
     mfu = float(max_mfu or 0)
     mfu_bonus = 0.0
     if mfu > 40:
-        mfu_bonus = 0.25
+        mfu_bonus = 2.5
     elif mfu > 0:
-        mfu_bonus = -0.25
+        mfu_bonus = -2.5
 
-    # Modest TPS bonus (±0.25)
+    # Modest TPS bonus (±2.5)
     tps = float(max_tps or 0)
     tps_bonus = 0.0
     if tps > 500:
-        tps_bonus = 0.25
+        tps_bonus = 2.5
     elif tps > 0:
-        tps_bonus = -0.25
+        tps_bonus = -2.5
 
-    score = min(base + mfu_bonus + tps_bonus, 10.0)
+    score = min(base + mfu_bonus + tps_bonus, 100.0)
 
     detail = f"{benchmark_count}条实测"
     if mfu > 0: detail += f" MFU={mfu:.0f}%"
     if tps > 0: detail += f" TPS={tps:.0f}"
-    detail += f" → {score:.1f}/10"
+    detail += f" → {score:.0f}/100"
 
     return DimensionResult(
         score=round(score, 2), detail=detail,
@@ -881,7 +879,7 @@ def score_benchmark_evidence(benchmark_count: int, max_mfu: Optional[float],
             "max_throughput_tok_s": tps,
             "base_score": round(base, 2), "mfu_bonus": round(mfu_bonus, 2),
             "tps_bonus": round(tps_bonus, 2),
-            "formula": "count-base(5.0-9.5) + MFU/TPS bonus(±0.25); no-data→5.0",
+            "formula": "count-base(50-95) + MFU/TPS bonus(±2.5); no-data→50",
             "source": "chip_model_benchmarks",
         },
     )
@@ -895,34 +893,34 @@ def score_source_credibility(official_ratio: float) -> DimensionResult:
     """How much of the chip's data comes from official sources.
 
     official_ratio = official_fields / total_fields (from field_provenance)
-    ≥80% official → 10, ≥60% → 8, ≥40% → 7, ≥20% → 6, <20% → 5
-    No provenance data → 5.0 (neutral, data comes from web_crawl mostly)
+    ≥80% → 100, ≥60% → 80, ≥40% → 70, ≥20% → 60, <20% → 50
+    No provenance data → 50 (neutral, data comes from web_crawl mostly)
     """
     if official_ratio < 0:
         return DimensionResult(
-            score=5.0, detail="无来源溯源数据 → 默认 5.0/10",
+            score=50.0, detail="无来源溯源数据 → 默认 50/100",
             raw_values={"official_ratio": 0, "missing": True},
         )
     if official_ratio >= 0.80:
-        score = 10.0
-        detail = f"官方来源 {official_ratio*100:.0f}%（≥80%）→ 10/10"
+        score = 100.0
+        detail = f"官方来源 {official_ratio*100:.0f}%（≥80%）→ 100/100"
     elif official_ratio >= 0.60:
-        score = 8.0
-        detail = f"官方来源 {official_ratio*100:.0f}%（60-80%）→ 8/10"
+        score = 80.0
+        detail = f"官方来源 {official_ratio*100:.0f}%（60-80%）→ 80/100"
     elif official_ratio >= 0.40:
-        score = 7.0
-        detail = f"官方来源 {official_ratio*100:.0f}%（40-60%）→ 7/10"
+        score = 70.0
+        detail = f"官方来源 {official_ratio*100:.0f}%（40-60%）→ 70/100"
     elif official_ratio >= 0.20:
-        score = 6.0
-        detail = f"官方来源 {official_ratio*100:.0f}%（20-40%）→ 6/10"
+        score = 60.0
+        detail = f"官方来源 {official_ratio*100:.0f}%（20-40%）→ 60/100"
     else:
-        score = 5.0
-        detail = f"官方来源 {official_ratio*100:.0f}%（<20%）→ 5/10"
+        score = 50.0
+        detail = f"官方来源 {official_ratio*100:.0f}%（<20%）→ 50/100"
     return DimensionResult(
         score=score, detail=detail,
         raw_values={
             "official_ratio": round(official_ratio, 3),
-            "formula": "official_fields/total_fields; ≥80%=10, ≥60%=8, ≥40%=7, ≥20%=6, <20%=5",
+            "formula": "official_fields/total_fields; ≥80%=100, ≥60%=80, ≥40%=70, ≥20%=60, <20%=50",
             "source": "field_provenance table — source_type + is_official",
         },
     )
@@ -935,8 +933,6 @@ def score_source_credibility(official_ratio: float) -> DimensionResult:
 def aggregate_score(
     ctx: RecommendContext,
     cat_weights: CategoryWeights,
-    prefer_domestic: bool = False,
-    prefer_vendor: Optional[str] = None,
 ) -> ScoringResult:
     """v4.2: Compute all dimension scores, aggregate into 3 categories.
 
@@ -1047,7 +1043,7 @@ def aggregate_score(
         total += cat_weighted
 
     return ScoringResult(
-        total_score=round(total * 10, 1),  # scale to 0-100
+        total_score=round(total, 1),  # direct weighted sum (0-100)
         categories=categories,
         dimensions=dims,         # flat backward-compat
         version="4.2.0",
