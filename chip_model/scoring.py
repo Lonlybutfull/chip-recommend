@@ -225,13 +225,13 @@ CATEGORY_DEFS = [
 # ── Category weight presets for each scenario ──
 
 CAT_WEIGHTS_TRAIN = CategoryWeights(
-    compute_power=0.55, cost_effectiveness=0.15, ecosystem_maturity=0.30,
+    compute_power=0.50, cost_effectiveness=0.20, ecosystem_maturity=0.30,
 )
 CAT_WEIGHTS_INFER = CategoryWeights(
-    compute_power=0.45, cost_effectiveness=0.25, ecosystem_maturity=0.30,
+    compute_power=0.50, cost_effectiveness=0.20, ecosystem_maturity=0.30,
 )
 CAT_WEIGHTS_QUANTIZE = CategoryWeights(
-    compute_power=0.40, cost_effectiveness=0.20, ecosystem_maturity=0.40,
+    compute_power=0.50, cost_effectiveness=0.20, ecosystem_maturity=0.30,
 )
 
 # ── Scenario → (CategoryWeights, label) lookup ──
