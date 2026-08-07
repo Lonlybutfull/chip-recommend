@@ -1,8 +1,14 @@
 """
-AISHPerf Chip Recommendation Scoring Engine v3.4
+AISHPerf Chip Recommendation Scoring Engine v4.1
 
-10-dimension scoring with each dimension outputting 0.0-10.0,
+8-dimension scoring with each dimension outputting 0.0-10.0,
 weighted sum yields total 0-100.
+
+v4.1 changes:
+  - Removed D2 (vram_sufficiency) and D7 (sla_satisfaction) — minor / redundant
+  - D5 replaced: interconnect_quality → bandwidth_adequacy
+    New formula: total_bw = vram_bw_gb_s × cards; model bandwidth need ≤ 50% total → 10,
+    above 50% → linear decay to 0
 
 v3.4 changes:
   - Missing-data fallback: replaced uniform 5.0 with per-dimension statistical
@@ -16,13 +22,6 @@ v3.3 changes:
     (P50/P75/P90/P95/P99 from 1,093-chip distribution)
   - D3 switched from price (0% coverage) to process_node_nm (98% coverage)
   - D5 switched from interconnect_bw (4% coverage) to vram_bw_gb_s (88% coverage)
-
-v3.0 changes:
-  - Removed maturity_level dimension (too abstract for chip selection)
-  - Added fine-grained scenarios: train stage (CPT/SFT/RL) × method (full_param/LoRA/QLoRA)
-  - Added quantization-aware inference (INT8/INT4/GPTQ/AWQ/GGUF)
-  - VRAM formulas per scenario with different bytes-per-param coefficients
-  - 7 scenario-specific weight presets replacing old TRAIN/INFERENCE dichotomy
 
 All formulas have clear physical meaning, documented constants,
 and return traces for transparency.
@@ -206,11 +205,9 @@ class CategoryResult:
 # ── Sub-dimension composition (fixed ratios within each category) ──
 
 SUB_DIMS_COMPUTE_POWER = {
-    "compute_perf": 0.30,
-    "vram_sufficiency": 0.30,
-    "interconnect_quality": 0.15,
-    "sla_satisfaction": 0.10,
-    "production_readiness": 0.15,
+    "compute_perf": 0.50,
+    "bandwidth_adequacy": 0.30,
+    "production_readiness": 0.20,
 }
 
 SUB_DIMS_COST_EFFECTIVENESS = {
@@ -450,7 +447,7 @@ class ScoringResult:
     total_score: float = 0.0     # 0–100
     categories: dict[str, CategoryResult] = field(default_factory=dict)
     dimensions: dict[str, DimensionResult] = field(default_factory=dict)  # flat backward-compat
-    version: str = "4.0.0"
+    version: str = "4.1.0"
 
 
 @dataclass
@@ -468,6 +465,7 @@ class RecommendContext:
     vram_cards: int = 0
     recommended_cards: int = 0
     fp16_tflops: float = 0.0
+    model_bandwidth_gb_s: float = 0.0  # model bandwidth requirement (GB/s)
     training_tokens_T: float = 0.0
     target_training_days: Optional[float] = None
     target_tps: Optional[float] = None
@@ -598,40 +596,57 @@ def score_compute_perf(fp16_tflops: float) -> DimensionResult:
 
 
 # ═══════════════════════════════════════════════════════════
-# Dimension #2: 显存充裕度 (VRAM Sufficiency) — weight 12-20%
+# Dimension #2: 带宽充裕度 (Bandwidth Adequacy) — weight 30%
 # ═══════════════════════════════════════════════════════════
 
-def score_vram_sufficiency(vram_gb: float, model_vram_total: float, vram_cards: int) -> DimensionResult:
-    """How much VRAM headroom per card vs what the model needs.
+def score_bandwidth_adequacy(vram_bw_gb_s: float, cards: int,
+                              model_bandwidth_gb_s: float) -> DimensionResult:
+    """Is total VRAM bandwidth sufficient for the model?
 
-    Uses `vram_cards` (VRAM-only constraint) to compute per-card need,
-    NOT recommended_cards (which may include compute constraint amplification).
+    total_bw = vram_bw_gb_s × cards   (aggregate bandwidth across all cards)
+    adequacy = model_need / total_bw  (lower is better)
 
-    VRAM GB: 983 chips, mean=18.8GB, median=8.0GB, P25=3.0, P75=16.0.
-    Missing data → statistical mean 2.7 (983-chip average for 7B-FP16×1card scenario).
+    Scoring: model needs ≤ 50% of total bandwidth → 10 (comfortable headroom)
+             above 50% → linear decay: score = 10 × (1 - 2×(ratio - 0.5))
+             i.e. at 50%→10, at 75%→5, at 100%→0
+
+    Missing data → statistical mean 4.1 (962-chip average, 88% coverage).
     """
-    MEAN = 2.7  # statistical mean of 983 chips for typical 7B inference (97.4% coverage)
-    if vram_gb <= 0 or model_vram_total <= 0:
+    MEAN = 4.1  # statistical mean of 962 chips (88% coverage)
+    cards = max(cards, 1)
+    bw = float(vram_bw_gb_s or 0)
+    if bw <= 0:
         return DimensionResult(
-            score=MEAN, detail=f"无显存数据 → 统计均值 {MEAN:.1f}/10",
-            raw_values={"vram_gb": vram_gb, "model_vram_total": model_vram_total,
-                        "source": "chip.vram_gb (983/1093 chips, 97.4% coverage)", "missing": True},
+            score=MEAN, detail=f"无显存带宽数据 → 统计均值 {MEAN:.1f}/10",
+            raw_values={"vram_bw_gb_s": 0, "cards": cards,
+                        "source": "chip.vram_bw_gb_s (962/1093 chips, 88% coverage)",
+                        "missing": True},
         )
-    per_card_need = model_vram_total / max(vram_cards, 1)
-    ratio = vram_gb / max(per_card_need, 0.1)
-    if ratio > 0:
-        score = 10.0 * (1.0 - math.exp(-0.5 * ratio))
-        detail = f"显存{vram_gb:.0f}GB / 需求{per_card_need:.0f}GB = {ratio:.1f}× → {score:.1f}/10"
+    total_bw = bw * cards
+    if model_bandwidth_gb_s <= 0:
+        # No bandwidth target → assume adequate
+        score = 8.0
+        detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s （无模型带宽需求目标） → 8.0/10"
     else:
-        score = MEAN
-        detail = "无法计算显存充裕度 → 统计均值 2.7/10"
+        ratio = model_bandwidth_gb_s / total_bw
+        if ratio <= 0.5:
+            score = 10.0
+            detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s, 需求{model_bandwidth_gb_s:.0f}GB/s, 占比{ratio*100:.0f}% → 满分10.0"
+        elif ratio <= 1.0:
+            score = 10.0 - (ratio - 0.5) * 20.0  # 0.5→10, 1.0→0
+            detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s, 需求{model_bandwidth_gb_s:.0f}GB/s, 占比{ratio*100:.0f}%（>50%） → {score:.1f}/10"
+        else:
+            score = 0.0
+            detail = f"总带宽{bw:.0f}×{cards}卡={total_bw:.0f}GB/s < 需求{model_bandwidth_gb_s:.0f}GB/s, 占比{ratio*100:.0f}% → 0/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
-            "vram_gb": vram_gb, "per_card_need_gb": round(per_card_need, 1),
-            "vram_cards": vram_cards, "headroom_ratio": round(ratio, 2),
-            "formula": "10*(1-exp(-0.5*headroom_ratio))",
-            "source": "chip.vram_gb",
+            "vram_bw_gb_s": bw, "cards": cards,
+            "total_bw_gb_s": round(total_bw, 1),
+            "model_bandwidth_gb_s": round(model_bandwidth_gb_s, 1),
+            "ratio": round(ratio, 3) if model_bandwidth_gb_s > 0 else 0,
+            "formula": "total_bw = vram_bw × cards; ratio = model_need / total_bw; ≤50%→10, >50%→linear 10→0",
+            "source": "chip.vram_bw_gb_s (88% coverage)",
         },
     )
 
@@ -726,74 +741,6 @@ def score_power_efficiency(fp16_tflops: float, tdp_w: float) -> DimensionResult:
 
 
 # ═══════════════════════════════════════════════════════════
-# Dimension #5: 互联扩展性 (Interconnect Quality) — weight 8-12%
-# ═══════════════════════════════════════════════════════════
-
-# ═══════════════════════════════════════════════════════════
-# Dimension #5: 互联扩展性 (Interconnect / VRAM BW) — weight 8-12%
-# interconnect_bw_gb_s only has 4% coverage (45/1093 chips).
-# Using vram_bw_gb_s instead (88% coverage, 962/1093 chips) as a proxy
-# since high-bandwidth VRAM (HBM) correlates with high-end interconnect.
-# ═══════════════════════════════════════════════════════════
-
-def score_interconnect_quality(bw_gb_s: float, tech: str, vram_bw: float = 0.0) -> DimensionResult:
-    """Multi-card scalability: VRAM bandwidth proxy + interconnect technology tier.
-
-    VRAM BW data (962 chips, 88% coverage): mean=554GB/s, median=224, P25=83, P75=448, P90=1020.
-    Piecewise: ≤224(P50)→0-2, 224-1020(P90)→2-5, 1020-4000→5-8, >4000→8-10.
-    Tech bonus (max +2): NVLink/HCCS +2, Infinity Fabric/ICI/C2C +1.5, other +1.
-    Missing → statistical mean 2.3 (962-chip average).
-    """
-    MEAN = 2.3  # statistical mean of 962 chips (88% coverage)
-    vbw = float(vram_bw or 0)
-    tech = (tech or "").strip()
-    if vbw <= 0:
-        return DimensionResult(
-            score=MEAN, detail=f"无显存带宽数据 → 统计均值 {MEAN:.1f}/10",
-            raw_values={"vram_bw_gb_s": 0, "tech": "",
-                        "source": "chip.vram_bw_gb_s (962/1093 chips, 88% coverage)", "missing": True},
-        )
-    # VRAM BW → base score (0-8)
-    if vbw <= 224:
-        bw_score = vbw / 224.0 * 2.0
-    elif vbw <= 1020:
-        bw_score = 2.0 + (vbw - 224) / (1020 - 224) * 3.0
-    elif vbw <= 4000:
-        bw_score = 5.0 + (vbw - 1020) / (4000 - 1020) * 3.0
-    else:
-        bw_score = min(8.0 + (vbw - 4000) / 6300 * 2.0, 8.0)
-
-    # Tech bonus (max 2.0)
-    tech_lower = tech.lower()
-    if "nvlink" in tech_lower or "hccs" in tech_lower:
-        tech_bonus = 2.0
-        tech_label = f"{tech[:20]} +2.0"
-    elif any(t in tech_lower for t in ["infinity fabric", "ici", "matrixlink", "c2c"]):
-        tech_bonus = 1.5
-        tech_label = f"{tech[:20]} +1.5"
-    elif tech:
-        tech_bonus = 1.0
-        tech_label = f"{tech[:20]} +1.0"
-    else:
-        tech_bonus = 0.0
-        tech_label = "无互联技术"
-
-    score = min(bw_score + tech_bonus, 10.0)
-    detail = f"VRAM带宽{vbw:.0f}GB/s({bw_score:.1f}) + {tech_label} = {score:.1f}/10"
-    return DimensionResult(
-        score=round(score, 2), detail=detail,
-        raw_values={
-            "vram_bw_gb_s": vbw, "bw_score": round(bw_score, 2),
-            "interconnect_tech": tech, "tech_bonus": tech_bonus,
-            "formula": "VRAM BW piecewise(0-8) + tech_bonus(0-2)",
-            "source": "chip.vram_bw_gb_s (88% cov) + chip.interconnect_tech",
-        },
-    )
-
-
-# ═══════════════════════════════════════════════════════════
-# Dimension #6: 生态成熟度 (Ecosystem Maturity) — weight 8-13%
-# ═══════════════════════════════════════════════════════════
 
 def score_ecosystem_maturity(cloud: int, compat_verified: int,
                              has_frameworks: bool = False) -> DimensionResult:
@@ -834,79 +781,7 @@ def score_ecosystem_maturity(cloud: int, compat_verified: int,
 
 
 # ═══════════════════════════════════════════════════════════
-# Dimension #7: SLA 满足度 (SLA Satisfaction) — weight 10%
-# ═══════════════════════════════════════════════════════════
-
-def score_sla_train(estimated_days: Optional[float], target_days: float) -> DimensionResult:
-    """Training SLA: distance from deadline.
-    Exactly on-target → 5, 50% ahead → 7.5, 100%+ ahead → 10.
-    Miss → linear penalty to 0.
-    """
-    if target_days is None or target_days <= 0:
-        return DimensionResult(score=5.0, detail="无训练天数SLA → 中性 5.0/10",
-                               raw_values={"note": "no_target"})
-    if estimated_days is None:
-        return DimensionResult(score=5.0, detail=f"无法估算训练天数 → 中性分 5.0/10",
-                               raw_values={"target_days": target_days, "source": "server.py effective_per_card_day calculation", "missing": True})
-    if estimated_days <= target_days:
-        margin = (target_days - estimated_days) / target_days
-        score = min(5.0 + margin * 5.0, 10.0)
-        detail = f"预计{estimated_days:.1f}天 / 目标{target_days:.0f}天 → 提前{margin*100:.0f}% → {score:.1f}/10"
-    else:
-        shortfall = (estimated_days - target_days) / target_days
-        score = max(0.0, 5.0 - shortfall * 5.0)
-        detail = f"预计{estimated_days:.1f}天 / 目标{target_days:.0f}天 → 超出{shortfall*100:.0f}% → {score:.1f}/10"
-    return DimensionResult(
-        score=round(score, 2), detail=detail,
-        raw_values={"estimated_days": estimated_days, "target_days": target_days,
-                     "formula": "5 + margin*5 (on-time) or 5 - shortfall*5 (miss)"},
-    )
-
-
-def score_sla_inference(estimated_tps: Optional[float], target_tps: float) -> DimensionResult:
-    """Inference SLA: throughput vs target. Same structure as training SLA."""
-    if target_tps is None or target_tps <= 0:
-        return DimensionResult(score=5.0, detail="无推理吞吐SLA → 中性 5.0/10",
-                               raw_values={"note": "no_target"})
-    if estimated_tps is None:
-        return DimensionResult(score=5.0, detail=f"无法估算推理吞吐 → 中性分 5.0/10",
-                               raw_values={"target_tps": target_tps, "source": "benchmark or estimate_inference_tps()", "missing": True})
-    if estimated_tps >= target_tps:
-        margin = (estimated_tps - target_tps) / target_tps
-        score = min(5.0 + margin * 5.0, 10.0)
-        detail = f"估算{estimated_tps:.0f}tok/s / 目标{target_tps:.0f}tok/s → 超出{margin*100:.0f}% → {score:.1f}/10"
-    else:
-        shortfall = (target_tps - estimated_tps) / target_tps
-        score = max(0.0, 5.0 - shortfall * 5.0)
-        detail = f"估算{estimated_tps:.0f}tok/s / 目标{target_tps:.0f}tok/s → 不足{shortfall*100:.0f}% → {score:.1f}/10"
-    return DimensionResult(
-        score=round(score, 2), detail=detail,
-        raw_values={"estimated_tps": estimated_tps, "target_tps": target_tps,
-                     "formula": "5 + margin*5 (satisfied) or 5 - shortfall*5 (miss)"},
-    )
-
-
-def estimate_inference_tps(fp16_tflops: float, vram_bw_gb_s: float, total_params_B: float) -> Optional[float]:
-    """Theoretical single-card inference throughput (tok/s) for a model.
-
-    Bound by min(compute, memory bandwidth), then apply 30% real-world efficiency.
-    """
-    if fp16_tflops <= 0 or total_params_B <= 0:
-        return None
-    # Compute bound: each token needs 2*params FLOPs
-    compute_bound = fp16_tflops * 1e12 / (2 * total_params_B * 1e9)  # tok/s
-    # Memory bound: each token reads 2*params bytes from VRAM
-    bw = float(vram_bw_gb_s or 0)
-    if bw > 0:
-        memory_bound = bw * 1e9 / (2 * total_params_B * 1e9)
-    else:
-        memory_bound = float('inf')
-    theoretical = min(compute_bound, memory_bound)
-    return theoretical * 0.30  # 30% practical efficiency
-
-
-# ═══════════════════════════════════════════════════════════
-# Dimension #8: 生产就绪度 (Production Readiness) — weight 5%
+# Dimension #8: 生产就绪度 (Production Readiness) — weight 20%
 # ═══════════════════════════════════════════════════════════
 
 def score_production_readiness(status: str, is_released: str,
@@ -1080,7 +955,7 @@ def aggregate_score(
     prefer_domestic: bool = False,
     prefer_vendor: Optional[str] = None,
 ) -> ScoringResult:
-    """v4.0: Compute all dimension scores, aggregate into 3 categories.
+    """v4.1: Compute all dimension scores, aggregate into 3 categories.
 
     Formula:
       total = Cat_A × w_A + Cat_B × w_B + Cat_C × w_C    (0-100 scale)
@@ -1089,16 +964,18 @@ def aggregate_score(
 
     chip = ctx.chip
 
-    # ── Step 1: Compute all 11 sub-dimension scores (same as v3.x) ──
+    # ── Step 1: Compute all 8 sub-dimension scores ──
 
     dims: dict[str, DimensionResult] = {}
 
     # D1: 算力性能
     dims["compute_perf"] = score_compute_perf(ctx.fp16_tflops)
 
-    # D2: 显存充裕度
-    dims["vram_sufficiency"] = score_vram_sufficiency(
-        float(chip.get("vram_gb", 0) or 0), ctx.min_vram_total, ctx.vram_cards,
+    # D2: 带宽充裕度（替代旧互联扩展性+D2显存+D7 SLA）
+    dims["bandwidth_adequacy"] = score_bandwidth_adequacy(
+        float(chip.get("vram_bw_gb_s", 0) or 0),
+        ctx.recommended_cards,
+        ctx.model_bandwidth_gb_s,
     )
 
     # D3: 制程先进性 (cost_efficiency key kept for API compat)
@@ -1114,13 +991,6 @@ def aggregate_score(
         ctx.fp16_tflops, float(chip.get("tdp_w", 0) or 0),
     )
 
-    # D5: 互联扩展
-    dims["interconnect_quality"] = score_interconnect_quality(
-        float(chip.get("interconnect_bw_gb_s", 0) or 0),
-        str(chip.get("interconnect_tech", "") or ""),
-        vram_bw=float(chip.get("vram_bw_gb_s", 0) or 0),
-    )
-
     # D6: 生态成熟度
     has_fw = bool((chip.get("software_stack") or "").strip() or
                   (chip.get("compatible_frameworks") or "").strip())
@@ -1130,46 +1000,25 @@ def aggregate_score(
         has_frameworks=has_fw,
     )
 
-    # D7: SLA 满足度
-    if ctx.scenario == "train" and ctx.target_training_days:
-        dims["sla_satisfaction"] = score_sla_train(
-            ctx.estimated_training_days, ctx.target_training_days,
-        )
-    elif ctx.scenario == "inference" and ctx.target_tps:
-        est_tps = ctx.max_benchmark_tps or estimate_inference_tps(
-            ctx.fp16_tflops, float(chip.get("vram_bw_gb_s", 0) or 0), ctx.model_params_B,
-        )
-        dims["sla_satisfaction"] = score_sla_inference(est_tps, ctx.target_tps)
-    elif ctx.scenario == "quantize":
-        dims["sla_satisfaction"] = DimensionResult(
-            score=5.0, detail="量化是一次性任务，无SLA目标 → 中性 5.0/10",
-            raw_values={"note": "quantize_no_sla"},
-        )
-    else:
-        dims["sla_satisfaction"] = DimensionResult(
-            score=5.0, detail="无SLA目标 → 中性 5.0/10",
-            raw_values={"note": "no_sla_target"},
-        )
-
-    # D8: 生产就绪度
+    # D7 (was D8): 生产就绪度
     dims["production_readiness"] = score_production_readiness(
         str(chip.get("production_status", "") or ""),
         str(chip.get("is_released", "") or ""),
         fp16_tflops=ctx.fp16_tflops,
     )
 
-    # D9: 软件栈兼容
+    # D8 (was D9): 软件栈兼容
     dims["software_compat"] = score_software_compat(
         str(chip.get("software_stack", "") or ""),
         str(chip.get("compatible_frameworks", "") or ""),
     )
 
-    # D10: 实测验证度
+    # D9 (was D10): 实测验证度
     dims["benchmark_evidence"] = score_benchmark_evidence(
         ctx.benchmark_count, ctx.max_benchmark_mfu, ctx.max_benchmark_tps, ctx.scenario,
     )
 
-    # D11: 国产化优先
+    # D10 (was D11): 国产化优先
     dims["domestic_priority"] = score_domestic_priority(
         str(chip.get("vendor_region", "") or ""),
         prefer_domestic, prefer_vendor,
@@ -1198,12 +1047,11 @@ def aggregate_score(
             sub_results[dim_id] = dr
             # Build formula label (short dim names)
             short_names = {
-                "compute_perf": "D1算力", "vram_sufficiency": "D2显存",
-                "interconnect_quality": "D5互联", "sla_satisfaction": "D7 SLA",
-                "production_readiness": "D8量产", "cost_efficiency": "D3制程",
-                "power_efficiency": "D4能效", "ecosystem_maturity": "D6生态",
-                "software_compat": "D9软件", "benchmark_evidence": "D10实测",
-                "domestic_priority": "D11国产",
+                "compute_perf": "D1算力", "bandwidth_adequacy": "D2带宽",
+                "production_readiness": "D7量产", "cost_efficiency": "D3制程",
+                "power_efficiency": "D4能效", "ecosystem_maturity": "D5生态",
+                "software_compat": "D8软件", "benchmark_evidence": "D9实测",
+                "domestic_priority": "D10国产",
             }
             sn = short_names.get(dim_id, dim_id)
             formula_parts.append(f"{sn}×{sub_w:.0%}")
@@ -1229,7 +1077,7 @@ def aggregate_score(
         total_score=round(total * 10, 1),  # scale to 0-100
         categories=categories,
         dimensions=dims,         # flat backward-compat
-        version="4.0.0",
+        version="4.1.0",
     )
 
 
@@ -1291,9 +1139,9 @@ def scoring_result_to_dict(sr: ScoringResult) -> dict:
 DIMENSION_META = [
     {"id": "compute_perf",          "name_cn": "算力性能",     "name_en": "Compute Performance",
      "desc": "单卡FP16/BF16理论算力(TFLOPS)", "unit": "TFLOPS",
-     "category": "compute_power", "sub_weight": 0.30},
-    {"id": "vram_sufficiency",      "name_cn": "显存充裕度",   "name_en": "VRAM Sufficiency",
-     "desc": "单卡显存相比模型需求的余量倍数", "unit": "比率",
+     "category": "compute_power", "sub_weight": 0.50},
+    {"id": "bandwidth_adequacy",    "name_cn": "带宽充裕度",   "name_en": "Bandwidth Adequacy",
+     "desc": "总显存带宽(vram_bw×卡数)相对模型带宽需求的充裕程度", "unit": "比率",
      "category": "compute_power", "sub_weight": 0.30},
     {"id": "cost_efficiency",       "name_cn": "制程先进性",   "name_en": "Process Node",
      "desc": "芯片制程工艺(nm)，越小越先进", "unit": "nm",
@@ -1301,18 +1149,12 @@ DIMENSION_META = [
     {"id": "power_efficiency",      "name_cn": "能效比",      "name_en": "Power Efficiency",
      "desc": "每瓦功耗产出的算力", "unit": "GFLOPS/W",
      "category": "cost_effectiveness", "sub_weight": 0.50},
-    {"id": "interconnect_quality",  "name_cn": "互联扩展性",   "name_en": "Interconnect Quality",
-     "desc": "多卡互联带宽+技术等级", "unit": "GB/s + 技术分",
-     "category": "compute_power", "sub_weight": 0.15},
     {"id": "ecosystem_maturity",    "name_cn": "生态成熟度",   "name_en": "Ecosystem Maturity",
      "desc": "云平台可用+已验证兼容模型数+框架支持", "unit": "综合分",
      "category": "ecosystem_maturity", "sub_weight": 0.40},
-    {"id": "sla_satisfaction",      "name_cn": "SLA满足度",    "name_en": "SLA Satisfaction",
-     "desc": "训练天数/推理吞吐是否满足目标（量化场景固定5.0）", "unit": "SLA分",
-     "category": "compute_power", "sub_weight": 0.10},
     {"id": "production_readiness",  "name_cn": "生产就绪度",   "name_en": "Production Readiness",
      "desc": "量产/已发布/未公开等状态", "unit": "等级",
-     "category": "compute_power", "sub_weight": 0.15},
+     "category": "compute_power", "sub_weight": 0.20},
     {"id": "benchmark_evidence",    "name_cn": "实测验证度",   "name_en": "Benchmark Evidence",
      "desc": "是否有实测benchmark数据(MFU/吞吐)", "unit": "证据分",
      "category": "ecosystem_maturity", "sub_weight": 0.30},

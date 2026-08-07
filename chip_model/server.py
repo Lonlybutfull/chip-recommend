@@ -364,6 +364,28 @@ def api_chip_recommend(
         if training_days and estimated_days is not None and estimated_days > training_days:
             meets_sla = False
 
+        # ── Bandwidth need estimate ──
+        # Model bandwidth need: inference 1 card must at least have enough BW
+        # to keep up with compute. For training it's higher (gradient comm).
+        # Simple formula: compute-bound BW = FP16 TFLOPS × 1000 / 30 GFLOPS/byte
+        # (typical efficiency ratio for LLM inference)
+        # For multi-card training: inter-card comm ≈ model_params × 2 × cards
+        model_bandwidth_gb_s = 0.0
+        vram_bw = float(chip_dict.get("vram_bw_gb_s", 0) or 0)
+        if fp16_val > 0 and vram_bw > 0:
+            if scenario == "train":
+                # Training: gradient all-reduce bandwidth per step
+                # Roughly: model params × 2 (fp16) × 3 (forward+backward+grad) / step_sec
+                # Simplified: use compute BW proxy
+                model_bandwidth_gb_s = fp16_val * 50  # ~50 GB/s per TFLOPS for training comm
+            elif scenario == "inference":
+                # Inference: memory-bound, model params × 2 bytes / token × tokens/s
+                # Simplified: vram_bw is the bottleneck, model needs roughly vram_bw of 1 card
+                model_bandwidth_gb_s = vram_bw * 0.8  # 80% of single-card BW as baseline need
+            else:
+                # Quantize: similar to inference
+                model_bandwidth_gb_s = vram_bw * 0.6
+
         # ── Benchmark data ──
         bench_records = get_chip_benchmarks_for_model(
             chip_model_name, model_id, total_params,
@@ -372,7 +394,7 @@ def api_chip_recommend(
         bench_tps_val = get_chip_benchmark_tps(chip_model_name)
         compat_verified = get_chip_model_compat_count(chip_model_name)
 
-        # ── v3.1 Scoring ──
+        # ── v4.1 Scoring ──
         ctx = RecommendContext(
             chip=chip_dict,
             model_params_B=total_params,
@@ -386,6 +408,7 @@ def api_chip_recommend(
             vram_cards=vram_cards,
             recommended_cards=recommended_cards,
             fp16_tflops=fp16_val,
+            model_bandwidth_gb_s=model_bandwidth_gb_s,
             training_tokens_T=training_tokens_val,
             target_training_days=training_days,
             target_tps=sla_tps,
@@ -438,7 +461,7 @@ def api_chip_recommend(
             "max_price_wan": max_price,
         },
         "scoring_meta": {
-            "version": "4.0.0",
+            "version": "4.1.0",
             "scenario_label": scenario_label,
             "category_weights": cat_weights.to_dict(),
             "dimensions": DIMENSION_META,
@@ -495,10 +518,10 @@ def chip_recommend_candidate_v2(
 
 @app.get("/api/v1/methodology")
 def api_methodology():
-    """Return scoring methodology documentation for the UI (v4.0: 3-category system)."""
+    """Return scoring methodology documentation for the UI (v4.1: 3-category system, 8 dimensions)."""
     return {
-        "version": "4.0.0",
-        "description": "AISHPerf 芯片推荐引擎 — 3大类·11子维度 分层评分方法 (v4.0)",
+        "version": "4.1.0",
+        "description": "AISHPerf 芯片推荐引擎 — 3大类·8子维度 分层评分方法 (v4.1)",
         "card_estimation": {
             "vram_train": "总参数量(B) × 20 × 1.3 → 按单卡显存分摊 → 取2幂次方",
             "vram_train_lora": "总参数量(B) × 2.5 × 1.3 → 按单卡显存分摊 → 取2幂次方",
@@ -510,7 +533,7 @@ def api_methodology():
             "mfu_prefer_benchmark": "优先使用 chip_model_benchmarks 表的实测 MFU",
             "inference_throughput_formula": "min(compute_bound, memory_bound) × 0.30 效率因子",
         },
-        "total_score_formula": "总分 = 算力性能×0.50 + 性价比×0.25 + 生态成熟度×0.25 (大类权重按场景调整)",
+        "total_score_formula": "总分 = 算力性能×0.50 + 性价比×0.25 + 生态成熟度×0.25 (大类权重按场景调整) — v4.1删除了显存充裕度和SLA满足度，互联改带宽充裕度",
         "scenario_weights": {
             "训练·SFT全参":   {"compute_power": 0.55, "cost_effectiveness": 0.15, "ecosystem_maturity": 0.30},
             "训练·SFT·LoRA": {"compute_power": 0.55, "cost_effectiveness": 0.15, "ecosystem_maturity": 0.30},
