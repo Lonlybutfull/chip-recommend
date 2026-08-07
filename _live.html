@@ -1,0 +1,2164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AISHPerf — 算力选型知识图谱 v0.5</title>
+<style>
+/* ── Reset & Base ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#f7f8fa;--bg4:#e8eaed;
+  --text:#1a1d2b;--text2:#6b7280;--text3:#9ca3af;
+  --accent:#2d8cf0;--accent2:#1a6fd4;--green:#10b981;--red:#ef4444;
+  --orange:#f59e0b;--blue:#3b82f6;--purple:#8b5cf6;
+  --radius:10px;--radius-sm:6px;--border:1px solid var(--bg4);
+  --shadow:0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04);
+  --shadow-hover:0 4px 12px rgba(0,0,0,0.08);
+  --transition:0.2s ease;
+}
+html{font-size:16px;scroll-behavior:smooth}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.6;
+  min-height:100vh;
+}
+a{color:var(--accent);text-decoration:none}
+
+/* ── Header ── */
+header{
+  background:var(--bg2);border-bottom:var(--border);
+  padding:0 24px;position:sticky;top:0;z-index:100;
+  box-shadow:0 1px 2px rgba(0,0,0,0.04);
+}
+.header-inner{
+  max-width:1440px;margin:0 auto;display:flex;align-items:center;
+  justify-content:space-between;height:60px;gap:12px;
+}
+.logo{font-size:1.2rem;font-weight:700;color:var(--text)}
+.logo span{color:var(--accent)}
+.version{font-size:0.7rem;color:var(--text3);font-weight:400}
+
+/* ── Tabs ── */
+nav{display:flex;gap:2px;flex-wrap:wrap}
+nav button{
+  background:none;border:none;color:var(--text2);font-size:0.8rem;
+  padding:8px 14px;border-radius:6px;cursor:pointer;
+  font-weight:500;transition:var(--transition);white-space:nowrap;
+}
+nav button:hover{color:var(--accent);background:var(--bg3)}
+nav button.active{color:var(--accent);background:rgba(45,140,240,0.08)}
+.api-link{
+  color:var(--text2);font-size:0.8rem;font-weight:500;
+  padding:7px 14px;border-radius:6px;text-decoration:none;
+  border:var(--border);transition:var(--transition);white-space:nowrap;
+}
+.api-link:hover{color:var(--accent);border-color:var(--accent);background:rgba(45,140,240,0.04)}
+.api-links{display:flex;gap:8px}
+
+/* ── Main ── */
+main{max-width:1440px;margin:0 auto;padding:20px 24px}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ── Filters bar ── */
+.filters{
+  display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;
+  align-items:center;padding:14px 16px;background:var(--bg2);
+  border-radius:var(--radius);border:var(--border);box-shadow:var(--shadow);
+}
+.filters input,.filters select{
+  background:var(--bg3);color:var(--text);border:var(--border);
+  border-radius:var(--radius-sm);padding:8px 12px;font-size:0.84rem;
+  outline:none;transition:var(--transition);
+}
+.filters input:focus,.filters select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,140,240,0.12)}
+.filters .autocomplete-wrapper{flex:1;min-width:160px}
+.filters select{min-width:100px}
+.filters .btn{
+  background:var(--accent);color:#fff;border:none;padding:9px 20px;
+  border-radius:var(--radius-sm);font-weight:600;cursor:pointer;
+  font-size:0.84rem;transition:var(--transition);
+}
+.filters .btn:hover{background:var(--accent2);box-shadow:var(--shadow-hover);transform:translateY(-1px)}
+.vram-slider{display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--text2)}
+.vram-slider input{width:80px;min-width:60px;text-align:center}
+
+/* ── Autocomplete dropdown ── */
+.autocomplete-wrapper{position:relative;flex:1;min-width:160px}
+.autocomplete-wrapper .ac-input{width:100%}
+.ac-dropdown{display:none;position:absolute;top:100%;left:0;right:0;z-index:500;
+  max-height:280px;overflow-y:auto;background:var(--bg2);border:1px solid var(--accent);
+  border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+.ac-dropdown.open{display:block}
+.ac-item{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;
+  font-size:0.78rem;border-bottom:var(--border);transition:var(--transition)}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover,.ac-item.active{background:var(--bg3)}
+.ac-item .ac-name{font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-item .ac-meta{color:var(--text3);font-size:0.68rem;white-space:nowrap;flex-shrink:0}
+.ac-item .ac-tag{font-size:0.62rem;padding:1px 5px;border-radius:3px;flex-shrink:0}
+.ac-empty{padding:10px 14px;font-size:0.75rem;color:var(--text3);text-align:center}
+/* Selected tags */
+.ac-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}
+.ac-tag{display:inline-flex;align-items:center;gap:4px;background:var(--accent);color:#fff;
+  padding:3px 10px;border-radius:14px;font-size:0.72rem;cursor:pointer}
+.ac-tag:hover{background:var(--red)}
+
+/* ── Cards ── */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.card{
+  background:var(--bg2);border:var(--border);border-radius:var(--radius);
+  padding:16px 18px;cursor:pointer;transition:var(--transition);box-shadow:var(--shadow);
+}
+.card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:var(--shadow-hover)}
+
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.card-vendor{
+  font-size:0.72rem;padding:2px 8px;border-radius:4px;
+  font-weight:600;letter-spacing:0.04em;
+}
+.vendor-foreign{background:rgba(59,130,246,0.1);color:var(--blue)}
+.vendor-domestic{background:rgba(245,158,11,0.1);color:var(--orange)}
+.card-model{font-size:1rem;font-weight:600;margin-bottom:4px}
+.card-series{font-size:0.78rem;color:var(--text3);margin-bottom:8px}
+
+.card-stats{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px}
+.card-stat{display:flex;justify-content:space-between;font-size:0.78rem}
+.card-stat .label{color:var(--text3)}
+.card-stat .value{font-weight:600;font-variant-numeric:tabular-nums}
+
+.card-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.card-meta{display:flex;gap:12px;font-size:0.7rem;color:var(--text3);margin-top:6px;padding-top:6px;border-top:var(--border)}
+.card-meta span{display:flex;align-items:center;gap:3px}
+.tag{
+  font-size:0.68rem;padding:2px 8px;border-radius:4px;
+  background:var(--bg3);color:var(--text2);
+}
+.tag.precision{color:var(--purple);background:rgba(139,92,246,0.08)}
+.tag.cloud{color:var(--blue);background:rgba(59,130,246,0.08)}
+.tag.compat{color:var(--blue);background:rgba(59,130,246,0.08)}
+.tag.undisclosed{color:var(--red);background:rgba(239,68,68,0.08);font-weight:600}
+
+/* ── Detail panel ── */
+.detail-overlay{
+  display:none;position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,0.75);backdrop-filter:blur(4px);
+  overflow-y:auto;padding:24px;
+}
+.detail-overlay.open{display:flex;justify-content:center;align-items:center}
+.detail-panel{
+  background:var(--bg2);border:var(--border);border-radius:var(--radius);
+  width:100%;max-width:960px;max-height:82vh;
+  display:flex;flex-direction:column;
+  box-shadow:0 16px 48px rgba(0,0,0,0.12);overflow:hidden;
+}
+.detail-header{
+  padding:18px 22px;border-bottom:var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+  position:sticky;top:0;background:var(--bg2);border-radius:var(--radius) var(--radius) 0 0;z-index:10;
+}
+.detail-header h2{font-size:1.1rem}
+.detail-close{
+  background:var(--bg4);border:none;color:var(--text);width:30px;height:30px;
+  border-radius:50%;cursor:pointer;font-size:1rem;display:flex;
+  align-items:center;justify-content:center;transition:var(--transition);
+}
+.detail-close:hover{background:var(--red);color:#fff}
+/* ── Detail tabs (v3.0) ── */
+.detail-tabs{
+  display:flex;gap:4px;padding:0 22px;border-bottom:var(--border);
+  background:var(--bg3);overflow-x:auto;
+}
+.detail-tab{
+  background:none;border:none;color:var(--text2);font-size:0.78rem;
+  padding:10px 16px;cursor:pointer;font-weight:500;
+  border-bottom:2px solid transparent;transition:var(--transition);
+  white-space:nowrap;
+}
+.detail-tab:hover{color:var(--text);background:var(--bg4)}
+.detail-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.detail-tab-panel{display:none;padding:14px 22px 22px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;word-break:break-word}
+.detail-tab-panel.active{display:block;overflow-y:auto;max-height:100%}
+.detail-body{padding:0;overflow:hidden;flex:1;min-height:0;display:flex;flex-direction:column}
+
+.group{
+  margin-bottom:14px;border:var(--border);border-radius:var(--radius-sm);
+  overflow:visible;
+}
+.group-header{
+  padding:9px 14px;background:var(--bg3);
+  font-size:0.78rem;font-weight:700;
+  letter-spacing:0.05em;color:var(--accent);cursor:pointer;
+  display:flex;justify-content:space-between;align-items:center;
+  position:relative;z-index:1;text-transform:none;
+}
+.group-header{text-transform:none;}
+.group.collapsed .group-body{display:none}
+.group-body{overflow:visible!important;padding:10px 14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px}
+.group-field{overflow:visible;display:flex;justify-content:space-between;font-size:0.78rem;gap:6px;padding:4px 6px;border-bottom:var(--border);border-radius:2px}
+.group-field:nth-child(even){background:var(--bg4)}
+.group-field .key{color:var(--text3);white-space:nowrap;min-width:120px}
+.group-field .val{font-weight:500;text-align:right;word-break:break-all;position:relative;cursor:help}
+.group-field .val:hover{color:var(--accent)}
+
+/* Provenance tooltip — positioned via JS, CSS fallback */
+.prov-tooltip{display:none;position:absolute;bottom:calc(100% + 6px);right:0;z-index:99999;
+  background:var(--bg2);border:2px solid var(--accent);border-radius:var(--radius-sm);
+  padding:8px 10px;min-width:240px;max-width:380px;box-shadow:0 12px 32px rgba(0,0,0,0.2);
+  font-size:0.68rem;text-align:left;pointer-events:none}
+.val-has-provenance:hover>.prov-tooltip{display:block}
+
+/* Provenance row */
+.prov-row{
+  font-size:0.72rem;padding:4px 8px;background:var(--bg3);border-radius:4px;
+  margin:2px 0;color:var(--text2);
+}
+.prov-row .prov-src{color:var(--accent);word-break:break-all}
+
+/* ── Table view ── */
+.data-table{width:100%;border-collapse:collapse;font-size:0.78rem}
+.data-table th{
+  text-align:left;padding:8px 10px;background:var(--bg3);
+  color:var(--text2);font-weight:600;border-bottom:var(--border);
+  position:sticky;top:0;
+}
+.data-table td{padding:6px 10px;border-bottom:var(--border)}
+.data-table tr:hover{background:var(--bg3)}
+.table-wrap{max-height:500px;overflow:auto;border:var(--border);border-radius:var(--radius-sm)}
+
+/* ── Recommend form ── */
+.recommend-form{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+  gap:10px;padding:18px;background:var(--bg2);border-radius:var(--radius);
+  border:var(--border);margin-bottom:18px;
+}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group label{font-size:0.73rem;color:var(--text2);font-weight:600}
+.form-group input,.form-group select{
+  background:var(--bg3);color:var(--text);border:var(--border);
+  border-radius:var(--radius-sm);padding:8px 10px;font-size:0.85rem;outline:none;
+}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent)}
+.form-actions{grid-column:1/-1;display:flex;gap:8px}
+.form-actions .btn{padding:9px 24px;font-size:0.88rem}
+.toggle-row{display:flex;align-items:center;gap:6px}
+.toggle-row label{font-size:0.8rem;color:var(--text2)}
+.toggle{
+  width:40px;height:22px;background:var(--bg4);border-radius:11px;
+  position:relative;cursor:pointer;transition:var(--transition);
+}
+.toggle.on{background:var(--accent)}
+.toggle::after{
+  content:'';position:absolute;width:16px;height:16px;background:#fff;
+  border-radius:50%;top:3px;left:3px;transition:var(--transition);
+}
+.toggle.on::after{left:21px}
+
+/* ── Recommend result card ── */
+.rec-card{
+  background:var(--bg2);border:var(--border);border-radius:var(--radius);
+  padding:16px 18px;margin-bottom:10px;transition:var(--transition);
+}
+.rec-card:hover{border-color:var(--accent)}
+.rec-card.best{border-color:var(--accent);box-shadow:0 4px 16px rgba(45,140,240,0.15)}
+.rec-rank{font-size:0.72rem;color:var(--accent);font-weight:700;margin-bottom:3px}
+.rec-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.rec-header h3{font-size:0.95rem}
+.rec-score{font-size:1.3rem;font-weight:700;color:var(--accent)}
+.rec-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px;margin-bottom:8px}
+.rec-stat .label{font-size:0.68rem;color:var(--text3)}
+.rec-stat .value{font-size:0.85rem;font-weight:600}
+.rec-rationale{font-size:0.75rem;color:var(--text2);font-style:italic}
+/* ── Recommend card layout (3 rows) ── */
+.rec-calc-row{
+  display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;
+  background:var(--bg3);border-radius:var(--radius-sm);padding:10px 14px;
+}
+@media(max-width:700px){.rec-calc-row{grid-template-columns:1fr}}
+.rec-calc-item{font-size:0.73rem;padding:2px 0}
+.rec-calc-item .rcl{color:var(--text3);font-size:0.68rem}
+.rec-calc-item .rcv{color:var(--text);font-weight:600}
+.rec-calc-item .rcd{color:var(--text3);font-size:0.63rem;word-break:break-all}
+.rec-chip-row{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  background:var(--bg3);border-radius:var(--radius-sm);padding:8px 14px;margin-bottom:10px;
+  font-size:0.75rem;
+}
+.rec-chip-row .chip-name{font-weight:700;font-size:0.88rem;color:var(--text)}
+.rec-chip-row .chip-meta{color:var(--text2);font-size:0.7rem}
+.rec-chip-row .chip-spec{color:var(--text);font-weight:500;font-size:0.72rem;white-space:nowrap}
+.rec-chip-row .chip-spec-sep{color:var(--bg4)}
+.rec-profile-btn{
+  display:inline-block;margin-left:auto;font-size:0.68rem;color:var(--accent);
+  cursor:pointer;padding:4px 10px;border:1px solid var(--accent);border-radius:4px;
+  transition:var(--transition);background:transparent;white-space:nowrap;flex-shrink:0;
+}
+.rec-profile-btn:hover{background:var(--accent);color:#fff}
+/* ── Scoring detail panel (collapsible) ── */
+.rec-scoring-toggle{
+  display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;font-weight:600;
+  color:var(--accent);cursor:pointer;user-select:none;padding:6px 0;
+}
+.rec-scoring-toggle .arrow{transition:transform 0.2s;font-size:0.65rem}
+.rec-scoring-toggle.open .arrow{transform:rotate(90deg)}
+.rec-scoring-panel{
+  display:none;margin-top:4px;border-top:var(--border);padding-top:8px;
+}
+.rec-scoring-panel.open{display:block}
+.rec-scoring-cat{
+  margin-bottom:8px;border:1px solid var(--bg4);border-radius:var(--radius-sm);
+  overflow:hidden;
+}
+.rec-scoring-cat-header{
+  padding:6px 10px;background:var(--bg4);font-size:0.74rem;font-weight:600;
+  display:flex;align-items:center;gap:8px;
+}
+.rec-scoring-cat-header .cat-score{color:var(--accent);margin-left:auto}
+.rec-scoring-dim{
+  padding:5px 10px 5px 18px;font-size:0.7rem;border-bottom:1px solid var(--bg4);
+  line-height:1.5;
+}
+.rec-scoring-dim:last-child{border-bottom:none}
+.rec-scoring-dim .dim-head{
+  display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
+}
+.rec-scoring-dim .dim-name{font-weight:600;color:var(--text);font-size:0.73rem}
+.rec-scoring-dim .dim-wbar{font-size:0.62rem;color:var(--text3)}
+.rec-scoring-dim .dim-calc{font-size:0.65rem;color:var(--text2);margin-top:2px}
+.rec-scoring-dim .dim-formula{font-size:0.62rem;color:var(--text3);font-family:monospace;margin-top:1px}
+.rec-scoring-dim .dim-raw{font-size:0.6rem;color:var(--text3);margin-top:1px}
+.dim-row{cursor:pointer;transition:background 0.15s;padding:3px 4px;border-radius:4px;margin:0 -4px}
+.dim-row:hover{background:rgba(255,255,255,0.04)}
+.scoring-details{margin-top:8px}
+.scoring-details summary{font-size:0.75rem;color:var(--text2);cursor:pointer;font-weight:500;user-select:none}
+.scoring-dim{font-size:0.68rem;color:var(--text3);margin-top:6px;line-height:1.5}
+
+/* Score tooltip */
+.score-tooltip{
+  position:fixed;z-index:9999;max-width:380px;min-width:200px;
+  background:rgba(20,24,36,0.96);color:#e8eaf0;
+  border:1px solid rgba(255,255,255,0.12);border-radius:10px;
+  padding:12px 15px;font-size:0.78rem;line-height:1.55;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5);
+  pointer-events:none;opacity:0;transition:opacity 0.18s;
+  backdrop-filter:blur(8px);
+}
+.score-tooltip.visible{opacity:1}
+.score-tooltip .tt-title{font-weight:700;font-size:0.88rem;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.score-tooltip .tt-title .tt-score{font-size:1.1rem;color:var(--accent)}
+.score-tooltip .tt-formula{color:var(--text2);font-size:0.73rem;margin-bottom:6px;padding:6px 8px;background:rgba(255,255,255,0.04);border-radius:6px;font-family:'SF Mono','Cascadia Code',Consolas,monospace}
+.score-tooltip .tt-raw{font-size:0.7rem;color:var(--text3)}
+.score-tooltip .tt-raw span{display:inline-block;margin-right:10px;white-space:nowrap}
+.score-tooltip .tt-weight{color:var(--text3);font-size:0.7rem;margin-top:4px}
+
+.dim-row{cursor:pointer;transition:background 0.15s;padding:3px 4px;border-radius:4px;margin:0 -4px}
+.dim-row:hover{background:rgba(255,255,255,0.04)}
+
+/* Calculation Breakdown */
+.calc-breakdown{margin-top:10px;padding:10px 12px;background:var(--bg3);border-radius:8px;font-size:0.73rem}
+.calc-breakdown summary{font-weight:600;color:var(--accent);cursor:pointer;user-select:none;font-size:0.78rem}
+.calc-breakdown .calc-item{margin:6px 0;padding:4px 0;border-bottom:1px solid var(--bg4)}
+.calc-breakdown .calc-item:last-child{border-bottom:none}
+.calc-breakdown .calc-label{color:var(--text2);font-size:0.68rem}
+.calc-breakdown .calc-value{color:var(--text);font-weight:600;font-family:monospace;font-size:0.75rem}
+.calc-breakdown .calc-detail{color:var(--text3);font-size:0.66rem;margin-top:2px}
+
+
+/* Agent quick-chips panel */
+.agent-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;height:calc(100vh - 140px);min-height:560px}
+@media(max-width:900px){.agent-layout{grid-template-columns:1fr}}
+.agent-chat-panel{display:flex;flex-direction:column;background:var(--bg2);border:var(--border);border-radius:var(--radius);overflow:visible;box-shadow:var(--shadow)}
+.agent-chat-header{padding:10px 16px;border-bottom:var(--border);font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.agent-chat-header .dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+#chat-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.chat-msg{max-width:85%;padding:8px 12px;border-radius:12px;font-size:0.8rem;line-height:1.5;word-break:break-word}
+.chat-msg.tool{background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);color:var(--blue);font-size:0.7rem;max-width:90%}
+.chat-msg.tool pre{font-size:0.65rem;max-height:120px;overflow:auto;margin:4px 0 0;padding:4px 6px;background:var(--bg2);border-radius:4px;white-space:pre-wrap}
+#chat-input-area{display:flex;gap:8px;padding:10px 12px;border-top:var(--border);flex-shrink:0}
+#chat-input{flex:1;background:var(--bg3);color:var(--text);border:var(--border);border-radius:20px;padding:8px 14px;font-size:0.82rem;outline:none}
+#chat-input:focus{border-color:var(--accent)}
+#chat-send{background:var(--accent2);color:#fff;border:none;border-radius:20px;padding:8px 18px;font-weight:600;cursor:pointer;font-size:0.82rem;transition:var(--transition)}
+#chat-send:hover{background:var(--accent)}
+#chat-send:disabled{opacity:0.5;cursor:default}
+.chat-typing{display:flex;gap:4px;padding:8px 12px}
+.chat-typing span{width:6px;height:6px;background:var(--accent);border-radius:50%;animation:chatBounce 1.2s infinite}
+.chat-typing span:nth-child(2){animation-delay:0.2s}
+.chat-typing span:nth-child(3){animation-delay:0.4s}
+@keyframes chatBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+
+/* Agent quick-chips panel */
+.agent-quick-panel{background:var(--bg2);border:var(--border);border-radius:var(--radius);padding:16px;overflow-y:auto}
+.agent-quick-panel h3{font-size:0.85rem;margin-bottom:10px;color:var(--text2)}
+.quick-chip{display:block;width:100%;text-align:left;background:var(--bg3);border:var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;cursor:pointer;color:var(--text);font-size:0.78rem;transition:var(--transition)}
+.quick-chip:hover{background:var(--bg4);border-color:var(--accent)}
+.quick-chip .qc-title{font-weight:600;margin-bottom:2px}
+.quick-chip .qc-desc{color:var(--text3);font-size:0.68rem}
+.chat-msg.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.chat-msg.assistant{align-self:flex-start;background:var(--bg3);color:var(--text);border-bottom-left-radius:4px}
+
+/* ── Status cards ── */
+.status-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.stat-card{
+  background:var(--bg2);border:var(--border);border-radius:var(--radius);
+  padding:14px;text-align:center;
+}
+.stat-card .num{font-size:1.8rem;font-weight:700;color:var(--accent)}
+.stat-card .lbl{font-size:0.75rem;color:var(--text2);margin-top:3px}
+
+/* ── Loading & Empty ── */
+.loading{text-align:center;padding:36px;color:var(--text3)}
+.spinner{
+  width:30px;height:30px;border:3px solid var(--bg4);border-top-color:var(--accent);
+  border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 10px;
+}@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:36px;color:var(--text3);font-size:0.85rem}
+.error{background:rgba(239,68,68,0.06);color:var(--red);padding:10px 14px;
+  border-radius:var(--radius-sm);font-size:0.8rem;margin-bottom:10px;border:1px solid rgba(239,68,68,0.15)}
+.info{background:rgba(59,130,246,0.06);color:var(--blue);padding:10px 14px;
+  border-radius:var(--radius-sm);font-size:0.8rem;margin-bottom:10px;border:1px solid rgba(59,130,246,0.12)}
+
+/* ── Provenance field history ── */
+.prov-field{border-bottom:var(--border);padding:8px 0}
+.prov-field:last-child{border-bottom:none}
+.prov-field-header{padding:4px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.prov-field-history{padding-left:12px;border-left:2px solid var(--bg4);word-break:break-word;overflow-wrap:break-word}
+.prov-history-row{padding:4px 0;border-bottom:1px dashed var(--bg4)}
+.prov-history-row:last-child{border-bottom:none}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .header-inner{flex-wrap:wrap;height:auto;padding:10px 0;gap:6px}
+  nav{order:3;width:100%;overflow-x:auto}
+  .card-grid{grid-template-columns:1fr}
+  .filters{flex-direction:column}
+  .filters input{min-width:100%}
+  .recommend-form{grid-template-columns:1fr}
+  .detail-panel{margin:8px 0}
+}
+/* ── Login overlay ── */
+.login-overlay{
+  position:fixed;inset:0;z-index:9999;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity .35s ease,visibility .35s ease;
+}
+.login-overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
+.login-card{
+  background:var(--bg2);border-radius:14px;padding:40px 36px 32px;
+  width:400px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.12);
+  text-align:center;
+}
+.login-card .login-icon{font-size:2.5rem;margin-bottom:8px}
+.login-card h2{font-size:1.25rem;font-weight:700;margin-bottom:4px}
+.login-card .login-sub{font-size:0.8rem;color:var(--text2);margin-bottom:24px}
+.login-field{text-align:left;margin-bottom:14px}
+.login-field label{display:block;font-size:0.78rem;font-weight:600;color:var(--text2);margin-bottom:4px}
+.login-field input{
+  width:100%;padding:10px 12px;border:var(--border);border-radius:var(--radius-sm);
+  font-size:0.9rem;background:var(--bg3);color:var(--text);
+  outline:none;transition:var(--transition);
+}
+.login-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,140,240,0.12)}
+.login-error{font-size:0.75rem;color:var(--red);margin-bottom:10px;min-height:18px}
+.login-card .btn{width:100%;padding:11px;font-size:0.95rem;font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- ═══ Login Overlay ═══ -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card">
+    <div class="login-icon">🔐</div>
+    <h2>AISHPerf 算力选型平台</h2>
+    <div class="login-sub">请输入管理员账号密码登录</div>
+    <form onsubmit="doLogin();return false">
+      <div class="login-field">
+        <label>账号</label>
+        <input type="text" id="login-user" placeholder="请输入账号" autocomplete="username">
+      </div>
+      <div class="login-field">
+        <label>密码</label>
+        <input type="password" id="login-pass" placeholder="请输入密码" autocomplete="current-password">
+      </div>
+      <div class="login-error" id="login-error"></div>
+      <button class="btn" type="submit">登 录</button>
+    </form>
+  </div>
+</div>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">⚡ AISH<span>Perf</span> <span class="version">v0.6</span></div>
+    <nav id="main-nav"></nav>
+    <div class="api-links">
+      <a class="api-link" href="/api-docs.html">📖 API 文档</a>
+      <a class="api-link" href="/docs" target="_blank" rel="noopener">🛠 调试</a>
+    </div>
+  </div>
+</header>
+
+<main>
+<!-- ═══ AGENT ═══ -->
+<section id="tab-agent" class="tab-panel active">
+  <div class="agent-layout">
+	<div class="agent-chat-panel">
+	  <div class="agent-chat-header"><span class="dot"></span> AI 芯片选型助手 · DeepSeek</div>
+	  <div id="chat-messages">
+		<div class="chat-msg assistant">你好！我是 AI 芯片选型助手 🤖<br>我可以帮你根据模型、场景和预算推荐最合适的芯片。<br><br>请告诉我你的需求，比如：<br>• 想训练/推理什么模型？<br>• 预算、功耗、时延有什么要求？<br>• 更偏好哪家厂商？</div>
+	  </div>
+	  <div id="chat-input-area">
+		<input type="text" id="chat-input" placeholder="输入你的需求…" onkeydown="if(event.key==='Enter')sendChat()">
+		<button id="chat-send" onclick="sendChat()">发送</button>
+	  </div>
+	</div>
+	<div class="agent-quick-panel" id="agent-quick-panel">
+	  <h3>💡 快捷提问</h3>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🔍 训练 Qwen2.5-7B，3天完成，国产优先</span><span class="qc-desc">推荐最适合的国产芯片方案</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🧠 推理 Llama-3-70B，需要什么配置？</span><span class="qc-desc">显存估算 + 芯片推荐</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">💰 预算有限，训练 7B 模型最便宜的方案</span><span class="qc-desc">性价比优先排序</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">📊 H100 和 昇腾910C 对比</span><span class="qc-desc">规格 + 性能 + 生态对比</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🖥️ 当前数据库中有多少芯片和模型？</span><span class="qc-desc">数据库概览统计</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🛠️ 你有哪些技能？列出所有skill</span><span class="qc-desc">查看项目安装的全部 skill</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">🎯 我想训练 DeepSeek-R1 满血版，有什么方案？</span><span class="qc-desc">MoE大模型训练可行性分析</span></button>
+	  <button class="quick-chip" onclick="$('chat-input').value=this.querySelector('.qc-title').textContent.trim();sendChat()"><span class="qc-title">📈 国产芯片中，谁的单卡算力最强？</span><span class="qc-desc">国产芯片算力排行</span></button>
+	</div>
+  </div>
+</section>
+
+<!-- ═══ CHIPS ═══ -->
+<section id="tab-chips" class="tab-panel">
+  <div class="filters" id="chip-filters"></div>
+  <div id="chip-summary" style="margin-bottom:8px"></div>
+  <div id="chip-results" class="card-grid"></div>
+  <div id="chip-loading" class="loading" style="display:none"><div class="spinner"></div></div>
+</section>
+
+<!-- ═══ MODELS ═══ -->
+<section id="tab-models" class="tab-panel">
+  <div class="filters" id="model-filters"></div>
+  <div id="model-summary" style="margin-bottom:8px"></div>
+  <div id="model-results" class="card-grid"></div>
+  <div id="model-loading" class="loading" style="display:none"><div class="spinner"></div></div>
+</section>
+
+<!-- ═══ RECOMMEND ═══ -->
+<section id="tab-recommend" class="tab-panel">
+  <div id="rec-form"></div>
+  <div id="rec-results"></div>
+  <div id="rec-loading" class="loading" style="display:none"><div class="spinner"></div></div>
+</section>
+
+<!-- ═══ COMPAT ═══ -->
+<section id="tab-compat" class="tab-panel">
+  <div class="filters" id="compat-filters"></div>
+  <div id="compat-summary" style="margin-bottom:8px"></div>
+  <div id="compat-results" style="display:grid;gap:10px"></div>
+  <div id="compat-loading" class="loading" style="display:none"><div class="spinner"></div></div>
+</section>
+
+<!-- ═══ STATUS ═══ -->
+<section id="tab-status" class="tab-panel">
+  <div class="status-grid" id="status-cards"></div>
+  <div id="status-loading" class="loading"></div>
+</section>
+</main>
+
+<!-- ── Detail overlay ── -->
+<div class="detail-overlay" id="detail-overlay" onclick="if(event.target===this)closeDetail()">
+  <div class="detail-panel" id="detail-panel"></div>
+</div>
+
+<script>
+/* ═══════════════════ LOGIN ═══════════════════ */
+const LOGIN_CRED = {user:'admin',pass:'lxc583158#'};
+function doLogin(){
+  const u = ($('login-user')||{}).value||'', p = ($('login-pass')||{}).value||'';
+  const err = $('login-error');
+  if(u !== LOGIN_CRED.user || p !== LOGIN_CRED.pass){
+    err.textContent = '账号或密码错误，请重试';
+    return;
+  }
+  err.textContent = '';
+  $('login-overlay').classList.add('hidden');
+  sessionStorage.setItem('aishperf_authed','1');
+}
+(function checkLogin(){
+  if(sessionStorage.getItem('aishperf_authed') === '1'){
+    var overlay = document.getElementById('login-overlay');
+    if(overlay) overlay.classList.add('hidden');
+  }
+  setTimeout(function(){
+    var el = document.getElementById('login-user');
+    if(el) el.focus();
+  }, 100);
+})();
+
+/* ═══════════════════════════════════════════════════════════
+   AISHPerf v0.5 — Dynamic component-based SPA
+   ═══════════════════════════════════════════════════════════ */
+
+const API = '/api/v1';
+const STATE = { vendors: [], currentTab: 'chips' };
+
+function $(id){return document.getElementById(id)}
+function show(el,disp=''){el.style.display=disp}
+function hide(el){el.style.display='none'}
+
+/* ═══ Chat Widget ═══ */
+const CHAT_HISTORY = []; // in-memory only, no history persistence
+
+async function sendChat(){
+  const input=$('chat-input'), msg=input.value.trim();
+  if(!msg)return;
+  input.value='';
+  input.disabled=true;
+  $('chat-send').disabled=true;
+
+  // Show user message
+  appendChatMsg('user',msg);
+  CHAT_HISTORY.push({role:'user',content:msg});
+
+  // Show typing indicator
+  const typing=appendTyping();
+
+  try{
+    const resp=await fetch(`${API}/chat`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:CHAT_HISTORY})
+    });
+    if(!resp.ok){throw new Error(resp.status+': '+await resp.text())}
+
+    let assistantText='';
+    let currentAssistantEl=null;
+
+    const reader=resp.body.getReader();
+    const decoder=new TextDecoder('utf-8');
+    let buffer='';
+
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      // Use stream:true so incomplete multi-byte characters at chunk boundary
+      // are held back and completed by the next chunk
+      buffer += decoder.decode(value, {stream: !done});
+      const lines=buffer.split('\n');
+      buffer=(done ? '' : lines.pop())||'';
+
+      for(const line of lines){
+        if(!line.startsWith('data: '))continue;
+        const data=line.slice(6).trim();
+        if(data==='[DONE]')break;
+        try{
+          const d=JSON.parse(data);
+          if(d.type==='text'){
+            assistantText+=d.content;
+            if(!currentAssistantEl){
+              typing.remove();
+              currentAssistantEl=appendChatMsg('assistant','');
+            }
+            currentAssistantEl.innerHTML=renderMarkdown(assistantText);
+            $('chat-messages').scrollTop=$('chat-messages').scrollHeight;
+          }else if(d.type==='tool_call'){
+            // Skip — tool process is invisible to user
+          }else if(d.type==='tool_start'){
+            // Skip — tool process is invisible to user
+          }else if(d.type==='tool_result'){
+            // Skip — tool process is invisible to user
+          }
+        }catch(e){}
+      }
+    }
+
+    // Cleanup on completion
+    if(assistantText){
+      // Final sanitize pass: remove any XML tags that slipped through
+      assistantText = assistantText.replace(/<[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*\/?\s*>/gi,'');
+      // Also remove full <tag>...</tag> blocks that might have snuck in
+      assistantText = assistantText.replace(/<[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>[\s\S]*?<\/[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>/gi,'');
+      CHAT_HISTORY.push({role:'assistant',content:assistantText});
+    }
+  }catch(e){
+    typing.remove();
+    appendChatMsg('assistant','抱歉，请求出错了: '+esc(e.message));
+  }
+
+  input.disabled=false;
+  $('chat-send').disabled=false;
+  input.focus();
+}
+
+function appendChatMsg(role,content){
+  const msgs=$('chat-messages');
+  const el=document.createElement('div');
+  el.className='chat-msg '+role;
+  el.innerHTML=content;
+  msgs.appendChild(el);
+  msgs.scrollTop=msgs.scrollHeight;
+  return el;
+}
+
+function appendTyping(){
+  const msgs=$('chat-messages');
+  const el=document.createElement('div');
+  el.className='chat-typing';
+  el.innerHTML='<span></span><span></span><span></span>';
+  msgs.appendChild(el);
+  msgs.scrollTop=msgs.scrollHeight;
+  return el;
+}
+
+function renderMarkdown(text){
+  // Safety net: strip all XML/DSML tool-call tags and their content
+  // Matches <function_calls>, <DSML|function_calls>, <invoke>, <parameter>, <tool_calls> etc.
+  let html=text.replace(/<[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>[\s\S]*?<\/[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*>/gi,'');
+  html=html.replace(/<\/?[^>]*?\b(?:function_calls|tool_calls|invoke|parameter)\b[^>]*\/?>/gi,'');
+
+  // STRIP <__SYS-... and other hallucinated OpenAI tool call markers
+  html=html.replace(/<\s*__+[a-zA-Z_][^>]*\/?\s*>/g,'');
+
+  html=esc(html);
+  html=html.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+  html=html.replace(/\*(.+?)\*/g,'<i>$1</i>');
+  html=html.replace(/`(.+?)`/g,'<code>$1</code>');
+  html=html.replace(/\\n/g,'<br>');
+  html=html.replace(/\n/g,'<br>');
+  return html;
+}
+
+/* ═══ Generic Autocomplete (used by chip/model search + recommend) ═══ */
+let CHIP_LIST = [];   // { id, name, vendor, type, arch, vram, ... }
+let MODEL_LIST = [];  // { id, author, params, arch, tag, downloads }
+
+async function ensureChipList(){
+  if(CHIP_LIST.length) return;
+  // Load all chips in fewer, larger requests
+  const BATCH = 1000;
+  let allChips = [];
+  for(let off=0; off<2000; off+=BATCH){
+    try {
+      const data = await fetchJSON(`${API}/chips?limit=${BATCH}&offset=${off}&tier=all`);
+      if(data._error || !data.chips || !data.chips.length) break;
+      allChips = allChips.concat(data.chips);
+      if(data.chips.length < BATCH) break; // last page
+    } catch(e) { break; }
+  }
+  CHIP_LIST = allChips.map(c=>({
+    id: c.id, name: c.chip_model||'', vendor: c.vendor_display||'',
+    type: c.chip_type||'', arch: c.architecture||'', vram: c.vram_gb||'',
+    tier: '',
+  })).filter(c=>c.name).sort((a,b)=>a.name.localeCompare(b.name));
+}
+
+async function ensureModelList(){
+  if(MODEL_LIST.length) return;
+  let allModels = [];
+  const BATCH = 2000; // API now allows 2000
+  for(let off=0; off<2000; off+=BATCH){
+    try {
+      const data = await fetchJSON(`${API}/models?limit=${BATCH}&offset=${off}`);
+      if(data._error || !data.models || !data.models.length) break;
+      allModels = allModels.concat(data.models);
+      if(data.models.length < BATCH) break;
+    } catch(e) { break; }
+  }
+  MODEL_LIST = allModels.map(m=>({
+    id: m.model_id||m.id||'', author: m.author||'',
+    params: m.total_params_b||'?', arch: m.architecture_family||'',
+    tag: m.pipeline_tag||'', downloads: parseInt(m.downloads)||0,
+  })).filter(m=>m.id).sort((a,b)=>{
+    const pa=parseFloat(a.params)||0, pb=parseFloat(b.params)||0;
+    return pb-pa||(b.downloads||0)-(a.downloads||0);
+  });
+}
+
+/**
+ * Attach autocomplete behaviour to any text input.
+ * @param inputId       id of the <input>
+ * @param dropdownId    id of the <div> that holds .ac-item children
+ * @param source        'chips' | 'models' (which list to search)
+ * @param onPick(id)    called when user clicks/enters an item
+ * @param multi         if true, clear input after pick & keep dropdown open
+ * @param getPickName   optional — override display name for chip list (default name)
+ */
+function initAutocomplete(inputId, dropdownId, source, onPick, multi=false, getPickName=null){
+  const inp = $(inputId), dd = $(dropdownId);
+  let activeIdx = -1, lastQuery = '', _suggestTimer = null, _cachedQuery = '';
+
+  // Store onPick on the input element so pickAcItem can call it
+  inp._acOnPick = onPick;
+  inp._acMulti = multi;
+
+  function items(){ return dd.querySelectorAll('.ac-item'); }
+
+  async function suggest(){
+    const q = (inp.value||'').toLowerCase().trim();
+    // Skip if same query already resolved (debounce guard)
+    if(q === _cachedQuery) return;
+    _cachedQuery = q;
+    // Debounce: wait 150ms after last keystroke before running expensive filter
+    clearTimeout(_suggestTimer);
+    activeIdx = -1;
+    if(!q || q.length < 1){ dd.classList.remove('open'); return; }
+    _suggestTimer = setTimeout(async () => {
+      const currentQ = (inp.value||'').toLowerCase().trim();
+      if(!currentQ || currentQ.length < 1){ dd.classList.remove('open'); return; }
+      if(currentQ === lastQuery) return;
+      lastQuery = currentQ;
+
+    let matches;
+    if(source==='chips'){
+      await ensureChipList();
+      matches = CHIP_LIST.filter(c=>
+        c.name.toLowerCase().includes(q) || c.vendor.toLowerCase().includes(q) || c.arch.toLowerCase().includes(q)
+      ).slice(0,15);
+    } else {
+      await ensureModelList();
+      matches = MODEL_LIST.filter(m=>
+        m.id.toLowerCase().includes(q) || m.author.toLowerCase().includes(q)
+      ).slice(0,15);
+    }
+
+    if(!matches.length){ dd.classList.remove('open'); return; }
+
+    dd.innerHTML = matches.map((m,i)=>{
+      let name = source==='chips' ? (getPickName?getPickName(m):m.name) : m.id;
+      let meta = source==='chips'
+        ? `${esc(m.vendor)} · ${esc(m.type||'')} · VRAM ${m.vram||'?'}GB`
+        : `${esc(m.params)}B ${esc(m.arch||'')} · ${esc((m.downloads||0)>1e6?(m.downloads/1e6).toFixed(1)+'M':(m.downloads||0)>1e3?(m.downloads/1e3).toFixed(1)+'K':m.downloads)}↓`;
+      let tag = source==='chips'
+        ? (m.tier==='datacenter'?`<span class="ac-tag" style="background:rgba(129,140,248,0.15);color:var(--accent)">数据中心</span>`:'')
+        : (m.tag?`<span class="ac-tag" style="background:rgba(59,130,246,0.08);color:var(--blue)">${esc(m.tag)}</span>`:'');
+      // Use chip name (not numeric id) for the pick value
+      let pickValue = source==='chips' ? name : m.id;
+      return `<div class="ac-item" data-idx="${i}" data-name="${esc(pickValue)}">
+        <span class="ac-name">${esc(name)}</span>${tag}<span class="ac-meta">${meta}</span>
+      </div>`;
+    }).join('');
+    dd.classList.add('open');
+    });  // end setTimeout
+  }  // end suggest()
+
+  // keyboard navigation
+  inp.addEventListener('keydown', async function(e){
+    const all = items();
+    if(e.key==='ArrowDown'){
+      e.preventDefault();
+      if(!all.length){ await suggest(); return; }
+      activeIdx = Math.min(activeIdx+1, all.length-1);
+      all.forEach(el=>el.classList.remove('active'));
+      if(all[activeIdx]) {
+        all[activeIdx].classList.add('active');
+        all[activeIdx].scrollIntoView({block:'nearest'});
+      }
+    } else if(e.key==='ArrowUp'){
+      e.preventDefault();
+      activeIdx = Math.max(activeIdx-1, 0);
+      all.forEach(el=>el.classList.remove('active'));
+      if(all[activeIdx]) all[activeIdx].classList.add('active');
+    } else if(e.key==='Enter'){
+      e.preventDefault();
+      if(activeIdx>=0 && all[activeIdx]){
+        const name = all[activeIdx].dataset.name;
+        activeIdx = -1;
+        if(!multi) inp.value = name;          // update input so _wireEnterFallback sees the picked value
+        inp._acPickFired = true;              // suppress duplicate blur/Enter fires
+        setTimeout(() => { if(inp) inp._acPickFired = false; }, 300);
+        onPick(name);
+        if(!multi) dd.classList.remove('open');
+      } else {
+        dd.classList.remove('open');
+        activeIdx = -1;
+      }
+    } else if(e.key==='Escape'){
+      dd.classList.remove('open');
+      activeIdx = -1;
+    }
+  });
+
+  inp.addEventListener('input', suggest);
+  inp.addEventListener('focus', suggest);
+
+  // Close on click outside
+  document.addEventListener('click', e=>{
+    if(!e.target.closest(`#${dropdownId}`) && !e.target.closest(`#${inputId}`)){
+      dd.classList.remove('open'); activeIdx = -1;
+    }
+  });
+}
+
+/* Global delegated mousedown on all .ac-dropdown children */
+document.addEventListener('mousedown', function(e){
+  const item = e.target.closest('.ac-item');
+  if(!item) return;
+  const dd = item.closest('.ac-dropdown');
+  if(!dd) return;
+  e.preventDefault();
+  const name = item.dataset.name;
+  const wrapper = dd.closest('.autocomplete-wrapper');
+  const inp = wrapper ? wrapper.querySelector('.ac-input') : null;
+  if(!inp || !name) return;
+  // Call the stored onPick callback
+  if(inp._acOnPick) {
+    inp._acOnPick(name);
+    if(!inp._acMulti) inp.value = name;
+  } else {
+    inp.value = name;
+  }
+  dd.classList.remove('open');
+  inp._acPickFired = true;
+  setTimeout(() => { if(inp) inp._acPickFired = false; }, 300);
+});
+
+/**
+ * Wire the onPick callback to fire on both:
+ * - Keyboard Enter with dropdown item selected (handled in initAutocomplete keydown)
+ * - Mouse click on dropdown item (pickAcItem + acPickFired flag)
+ */
+function _wireEnterFallback(inputId, onPick, multi){
+  const inp = $(inputId);
+  if(!inp) return;
+  inp.addEventListener('keydown', function(e){
+    if(e.key==='Enter'){
+      // If dropdown was just clicked (acPickFired), let the click do its thing
+      if(inp._acPickFired){ inp._acPickFired = false; return; }
+      // If dropdown is open and has a selection, the initAutocomplete Enter handler runs first
+      // This handler runs AFTER, so check if dropdown is still open
+      const dd = inp.closest('.autocomplete-wrapper')?.querySelector('.ac-dropdown');
+      if(dd && dd.classList.contains('open')) return; // initAutocomplete handler will handle it
+      // No dropdown open — user just pressed Enter in the input
+      const val = inp.value.trim();
+      if(val) {
+        inp._acPickFired = true;              // suppress duplicate blur fire
+        setTimeout(() => { if(inp) inp._acPickFired = false; }, 300);
+        onPick(val);
+      }
+    }
+  });
+  // ── Focus/blur based change detection ──
+  // Only fire onPick on blur when the user actually modified the text,
+  // not on every navigation (tab switch, card click, etc.).
+  let _focusVal = '';
+  inp.addEventListener('focus', function(){
+    _focusVal = inp.value;
+  });
+  // Fire onPick on blur if user typed a value manually and left the field
+  inp.addEventListener('blur', function(){
+    setTimeout(() => {
+      const dd2 = inp.closest('.autocomplete-wrapper')?.querySelector('.ac-dropdown');
+      if(dd2 && dd2.classList.contains('open')) return; // dropdown still open, mousedown will fire
+      if(inp._acPickFired) return; // already handled by pick
+      const val = inp.value.trim();
+      if(val && val !== _focusVal) onPick(val);
+    }, 150);
+  });
+}
+
+function esc(s){
+  if(!s&&s!==0)return'';
+  const d=document.createElement('div');d.textContent=String(s);return d.innerHTML;
+}
+function fmtNum(n){
+  if(!n)return'?';n=parseInt(n);if(n>1e9)return (n/1e9).toFixed(1)+'B';
+  if(n>1e6)return (n/1e6).toFixed(1)+'M';if(n>1e3)return (n/1e3).toFixed(1)+'K';
+  return n.toLocaleString();
+}
+function fmtVal(v, unit=''){
+  if(v===null||v===undefined||v==='')return'—';
+  return esc(v)+(unit?' '+unit:'');
+}
+
+async function fetchJSON(url, opts={}){
+  try{
+    const r = await fetch(url, opts);
+    if(!r.ok){const t=await r.text();throw new Error(r.status+': '+t.slice(0,200))}
+    return await r.json();
+  }catch(e){return {_error: e.message}}
+}
+
+function regionBadge(region){
+  return region==='domestic'
+    ? '<span class="card-vendor vendor-domestic">国产</span>'
+    : '<span class="card-vendor vendor-foreign">海外</span>';
+}
+
+/* ═══════════════════ TABS ═══════════════════ */
+const TABS = [
+  {id:'agent',label:'💬 智能助手',action:()=>{$('chat-input').focus()}},
+  {id:'chips',label:'🔍 芯片搜索',action:()=>searchChipsInit()},
+  {id:'models',label:'🧠 模型搜索',action:()=>searchModelsInit()},
+  {id:'recommend',label:'🎯 算力推荐',action:()=>initRecommend()},
+  {id:'compat',label:'🔗 兼容性',action:()=>searchCompatInit()},
+  {id:'status',label:'📊 系统状态',action:()=>loadStatus()},
+];
+
+(function buildNav(){
+  const nav = $('main-nav');
+  nav.innerHTML = TABS.map((t,i)=>`<button data-tab="${t.id}" ${i===0?'class="active"':''}>${t.label}</button>`).join('');
+  nav.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      STATE.currentTab=btn.dataset.tab;
+      nav.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      const panel=document.getElementById('tab-'+btn.dataset.tab);
+      if(panel)panel.classList.add('active');
+      const def=TABS.find(t=>t.id===btn.dataset.tab);
+      if(def&&def.action)def.action();
+    });
+  });
+})();
+
+/* ═══════════════════ CHIP SEARCH ═══════════════════ */
+async function searchChipsInit(){
+  // Build filter UI with vendor dropdown
+  const vendorOptions = STATE.vendors.length
+    ? `<select id="chip-vendor"><option value="">全部厂商</option>${STATE.vendors.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')}</select>`
+    : '';
+  $('chip-filters').innerHTML = `
+    <div class="autocomplete-wrapper" style="flex:1;min-width:160px">
+      <input type="text" id="chip-search" class="ac-input" placeholder="搜索芯片… (名称/厂商/架构)" autocomplete="off">
+      <div class="ac-dropdown" id="chip-ac-dropdown"></div>
+    </div>
+    ${vendorOptions}
+    <select id="chip-region"><option value="">全部地区</option><option value="domestic">国产</option><option value="foreign">海外</option></select>
+    <select id="chip-usage"><option value="">全部用途</option><option value="train">训练</option><option value="inference">推理</option><option value="both">训推一体</option></select>
+    <div class="vram-slider">显存<label>≥<input type="number" id="chip-vram-min" placeholder="0" min="0" step="8">GB</label></div>
+    <button class="btn" onclick="searchChips()">搜索</button>
+  `;
+
+  if(!STATE.vendors.length){
+    const data = await fetchJSON(`${API}/chips?limit=200`);
+    if(!data._error && data.chips){
+      STATE.vendors = [...new Set(data.chips.map(c=>c.vendor_display).filter(Boolean))].sort();
+      searchChipsInit(); // rerender with vendors
+      return;
+    }
+  }
+
+  // Autocomplete: pick → search immediately; Enter on empty → search current value
+  initAutocomplete('chip-search', 'chip-ac-dropdown', 'chips', (name)=>{
+    $('chip-search').value = name;
+    searchChips();
+  });
+  _wireEnterFallback('chip-search', (name)=>{ searchChips(); });
+  try {
+    await fetchJSON(`${API}/chips?limit=200`, {});
+  } catch(e) {}
+  ensureChipList(); // fire-and-forget: preload autocomplete list in background
+  searchChips();
+}
+
+/* ── Pagination ── */
+const CHIP_PAGE_STATE = { page: 1, limit: 18, params: '', count: 0 };
+const MODEL_PAGE_STATE = { page: 1, limit: 18, params: '', count: 0 };
+const COMPAT_PAGE_STATE = { page: 1, limit: 10, params: '', count: 0 };
+let _pager_click = false; // flag: avoid resetting page when pager clicks
+
+function searchByState(){
+  // Dispatch based on which panel is visible
+  _pager_click = true;
+  const tab = document.querySelector('.tab-panel.active');
+  if(tab && tab.id === 'tab-models') { searchModels(); }
+  else if(tab && tab.id === 'tab-compat') { searchCompat(); }
+  else { searchChips(); }
+}
+
+function buildPager(cur, limit, total, stateVar){
+  if(total <= limit) return '';
+  var totalPages = Math.ceil(total / limit);
+  var pages = [];
+  for(var i=1; i<=totalPages; i++){
+    if(i===1 || i===totalPages || (i>=cur-2 && i<=cur+2)) pages.push(i);
+    else if(pages[pages.length-1]!=='...') pages.push('...');
+  }
+  return '<div class="pager" style="display:flex;justify-content:center;align-items:center;gap:4px;margin-top:16px;flex-wrap:wrap">'+
+    '<button class="btn pager-btn" style="min-width:32px;padding:4px 8px" '+(cur<=1?'disabled':'')+' onclick="'+stateVar+'='+1+';searchByState()">«</button>'+
+    '<button class="btn pager-btn" style="min-width:32px;padding:4px 8px" '+(cur<=1?'disabled':'')+' onclick="'+stateVar+'='+(cur-1)+';searchByState()">‹</button>'+
+    pages.map(function(p){return p==='...'?'<span style="padding:4px 8px;color:var(--text3)">...</span>':'<button class="btn pager-btn '+(p===cur?'active':'')+'" style="min-width:32px;padding:4px 8px;'+(p===cur?'background:var(--accent2);color:#fff;font-weight:700':'')+'" onclick="'+stateVar+'='+p+';searchByState()">'+p+'</button>';}).join('')+
+    '<button class="btn pager-btn" style="min-width:32px;padding:4px 8px" '+(cur>=totalPages?'disabled':'')+' onclick="'+stateVar+'='+(cur+1)+';searchByState()">›</button>'+
+    '<button class="btn pager-btn" style="min-width:32px;padding:4px 8px" '+(cur>=totalPages?'disabled':'')+' onclick="'+stateVar+'='+totalPages+';searchByState()">»</button>'+
+  '</div>';
+}
+
+async function searchChips(){
+  if(!_pager_click){CHIP_PAGE_STATE.page=1;}
+  _pager_click = false;
+  const loading=$('chip-loading'), results=$('chip-results'), sum=$('chip-summary');
+  show(loading);results.innerHTML='';sum.textContent='';
+
+  const params = new URLSearchParams();
+  const s=($('chip-search')||{}).value; if(s&&s.trim())params.set('search',s.trim());
+  const v=($('chip-vendor')||{}).value; if(v)params.set('vendor',v);
+  const r=($('chip-region')||{}).value; if(r)params.set('region',r);
+  const u=($('chip-usage')||{}).value; if(u)params.set('usage',u);
+  const vm=($('chip-vram-min')||{}).value; if(vm)params.set('vram_min',vm);
+  params.set('limit', String(CHIP_PAGE_STATE.limit));
+  params.set('offset', String((CHIP_PAGE_STATE.page - 1) * CHIP_PAGE_STATE.limit));
+
+  const data = await fetchJSON(`${API}/chips?${params}`);
+  hide(loading);
+  if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+
+  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 个芯片`+
+    (data.count > CHIP_PAGE_STATE.limit ? ` · 第 <b>${CHIP_PAGE_STATE.page}</b> / <b>${Math.ceil(data.count/CHIP_PAGE_STATE.limit)}</b> 页` : '')+
+    `</span>`;
+  if(!data.chips||!data.chips.length){results.innerHTML='<div class="empty">未找到匹配的芯片</div>';return}
+
+  results.innerHTML = data.chips.map(c=>{
+    const isUndisclosed = c.production_status === '未公开发布';
+    const cardStyle = isUndisclosed ? 'opacity:0.7' : '';
+    return `
+    <div class="card" onclick="openChipProfile('${c.id}')" style="${cardStyle}">
+      <div class="card-header">
+        ${regionBadge(c.vendor_region)}
+        <span style="font-size:0.75rem;color:var(--text2)">${esc(c.vendor_display)}</span>
+        ${c.cloud_available && parseInt(c.cloud_available) >= 1 ? `<span class="tag cloud">☁ 云可用</span>` : ''}
+        ${isUndisclosed?`<span class="tag undisclosed">⚠ 未公开</span>`:''}
+      </div>
+      <div class="card-model">${esc(c.chip_model)}</div>
+      <div class="card-series">${esc(c.chip_series||'')} · ${esc(c.chip_type||'')} · ${esc(c.architecture||'')}</div>
+      <div class="card-stats">
+        <div class="card-stat"><span class="label">显存</span><span class="value">${fmtVal(c.vram_gb,'GB')} ${esc(c.vram_type||'')}</span></div>
+        <div class="card-stat"><span class="label">带宽</span><span class="value">${fmtVal(c.vram_bw_gb_s,'GB/s')}</span></div>
+        <div class="card-stat"><span class="label">TDP</span><span class="value">${fmtVal(c.tdp_w,'W')}</span></div>
+        <div class="card-stat"><span class="label">单价</span><span class="value">${fmtVal(c.price_cny_wan,'万')}</span></div>
+      </div>
+      ${c.precision_perf?`<div class="card-tags"><span class="tag precision">${esc(c.precision_perf)}</span></div>`:''}
+      <div class="card-tags">
+        ${c.production_status?`<span class="tag ${isUndisclosed?'undisclosed':''}">${esc(c.production_status)}</span>`:''}
+        ${c.process_node_nm?`<span class="tag">${esc(c.process_node_nm)}nm</span>`:''}
+      </div>
+      ${(c._benchmark_count||c._compat_count)?`<div class="card-meta">
+        ${c._benchmark_count?`<span title="评测数据">📊 ${c._benchmark_count}条实测</span>`:''}
+        ${c._compat_count?`<span title="兼容模型">🔗 ${c._compat_count}个兼容</span>`:''}
+      </div>`:''}
+    </div>
+  `}).join('');
+
+  results.innerHTML += buildPager(CHIP_PAGE_STATE.page, CHIP_PAGE_STATE.limit, data.count, 'CHIP_PAGE_STATE.page');
+}
+
+/* ── Chip detail ── */
+const FIELD_LABELS = {
+  vendor:'厂商', vendor_display:'厂商显示名', vendor_region:'厂商地区', chip_series:'芯片系列',
+  chip_model:'芯片型号', chip_type:'芯片类型', usage:'用途', tier:'等级',
+  architecture:'架构', arch_codename:'架构代号', generation:'代际', process_node_nm:'制程(nm)',
+  foundry:'代工厂', die_size_mm2:'芯片面积(mm²)', transistors_b:'晶体管数(B)',
+  package_type:'封装类型', is_chiplet:'Chiplet',
+  vram_gb:'显存(GB)', vram_type:'显存类型', vram_bus_bit:'显存位宽(bit)',
+  vram_bw_gb_s:'显存带宽(GB/s)', vram_clock_mhz:'显存频率(MHz)',
+  compute_units:'计算单元', tensor_cores:'Tensor Core', rt_cores:'RT Core',
+  shading_units:'着色单元', sm_count:'SM数量',
+  l1_cache_kb:'L1缓存(KB)', l2_cache_mb:'L2缓存(MB)', on_chip_sram_mb:'片上SRAM(MB)',
+  precision_support:'精度支持', precision_perf:'精度性能',
+  base_clock_mhz:'基础频率(MHz)', boost_clock_mhz:'加速频率(MHz)', tdp_w:'TDP(W)',
+  max_power_w:'最大功耗(W)', psu_w:'建议电源(W)', power_connector:'电源接口',
+  board_length_mm:'板长(mm)', board_width_mm:'板宽(mm)', slot_width:'槽位宽度',
+  form_factor:'板型', bus_interface:'总线接口',
+  interconnect_bw_gb_s:'互联带宽(GB/s)', interconnect_tech:'互联技术', network_interface:'网络接口',
+  software_stack:'软件栈', driver_support:'驱动支持', framework_support:'框架支持',
+  cloud_available:'云端可用',
+  price_usd:'价格(USD)', price_cny_wan:'价格(万元)', price_period:'价格周期', price_notes:'价格备注',
+  release_date:'发布日期', production_status:'量产状态', eol_date:'EOL日期',
+  target_market:'目标市场', is_released:'已发布', expected_release_date:'预计发布日期',
+  known_specs:'已知规格', unconfirmed_items:'未确认项',
+  description:'芯片描述', highlights:'亮点', limitations:'局限',
+  target_workloads:'目标负载', typical_deployment:'典型部署', competitor_comparison:'竞品对比',
+  ecosystem:'生态评估', maturity_level:'成熟度', developer_community:'开发者社区',
+  documentation_quality:'文档质量', toolchain:'工具链', is_opensource:'开源',
+  model_id:'模型ID', author:'作者', pipeline_tag:'任务类型', library_name:'框架',
+  tags:'标签', downloads:'下载量', likes:'点赞', last_modified:'最后更新',
+  private:'私有', gated:'访问限制', architecture_family:'架构族',
+  total_params_b:'参数量(B)', config_json:'配置JSON', card_data_json:'模型卡JSON',
+  api_response_json:'API原始响应', created_at:'创建时间', updated_at:'更新时间',
+};
+
+const CHIP_GROUPS = [
+  ['identity','标识'],['architecture','架构与制程'],['memory','显存'],
+  ['compute_units','计算单元'],['cache','缓存'],['precision','精度性能'],
+  ['clock_power_physical','时钟/功耗/物理'],['interconnect','互联'],
+  ['software','软件栈'],['pricing','价格'],['lifecycle','生命周期'],
+  ['description','芯片描述'],['ecosystem','生态评估'],
+];
+
+async function openChipProfile(id){
+  const overlay=$('detail-overlay'), panel=$('detail-panel');
+  panel.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  overlay.classList.add('open');
+
+  const data = await fetchJSON(`${API}/chips/${id}`);
+  if(data._error){panel.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+  const chip = data.chip || {};
+
+  const groupsHtml = CHIP_GROUPS.map(([key,label])=>{
+    const g = chip[key];
+    if(!g||Object.keys(g).length===0)return'';
+    const fp = data.field_provenance || {};
+    const fields = Object.entries(g)
+      .filter(([k])=>k!=='id'&&!k.startsWith('_'))
+      .map(([k,v])=>{
+        const prov = fp[k];
+        const hasProv = prov && prov.history && prov.history.length > 0;
+        let tooltipHtml = '';
+        if(hasProv){
+          const latest = prov.history[0];
+          const isOff = latest.is_official === '1';
+          tooltipHtml = `<div class="prov-tooltip" onmouseenter="var r=this.getBoundingClientRect();if(r.top<0)this.style.bottom='auto';else this.style.top='auto'">
+            <div class="pt-src">${esc((latest.source_url||'').slice(0,120))}</div>
+            <div class="pt-meta">${esc(latest.source_type||'?')} · ${esc(latest.confidence||'?')} · ${esc((latest.updated_at||'').slice(0,16))}${isOff?' · ✓官方':' · ⚠非官方'}</div>
+            ${prov.update_count>1?`<div class="pt-meta" style="margin-top:2px">${prov.update_count}次变更</div>`:''}
+          </div>`;
+        }
+        return `<div class="group-field"><span class="key">${esc(FIELD_LABELS[k]||k)}</span><span class="val${hasProv?' val-has-provenance':''}">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}${tooltipHtml}</span></div>`;
+      })
+      .join('');
+    return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${label}</div><div class="group-body">${fields}</div></div>`:'';
+  }).join('');
+
+  // Benchmarks section — API returns grouped benchmark records
+  function pickPath(o, keys){for(const k of keys){if(o==null)return null;o=o[k]}return o}
+  // Helper to render groups by key
+  function renderDetailGroups(groupKeys){
+    return groupKeys.map(key=>{
+      const label = (CHIP_GROUPS_MAP||{})[key] || key;
+      const g = chip[key];
+      if(!g||Object.keys(g).length===0)return'';
+      const fp = data.field_provenance || {};
+      const fields = Object.entries(g)
+        .filter(([k])=>k!=='id'&&!k.startsWith('_'))
+        .map(([k,v])=>{
+          const prov = fp[k];
+          const hasProv = prov && prov.history && prov.history.length > 0;
+          let tooltipHtml = '';
+          if(hasProv){
+            const latest = prov.history[0];
+            const isOff = latest.is_official === '1';
+            tooltipHtml = `<div class="prov-tooltip" onmouseenter="var r=this.getBoundingClientRect();if(r.top<0)this.style.bottom='auto';else this.style.top='auto'">
+              <div class="pt-src">${esc((latest.source_url||'').slice(0,120))}</div>
+              <div class="pt-meta">${esc(latest.source_type||'?')} · ${esc(latest.confidence||'?')} · ${esc((latest.updated_at||'').slice(0,16))}${isOff?' · ✓官方':' · ⚠非官方'}</div>
+              ${prov.update_count>1?`<div class="pt-meta" style="margin-top:2px">${prov.update_count}次变更</div>`:''}
+            </div>`;
+          }
+          return `<div class="group-field"><span class="key">${esc(FIELD_LABELS[k]||k)}</span><span class="val${hasProv?' val-has-provenance':''}">${v!=null?esc(String(v)):'<i style="color:var(--text3)">—</i>'}${tooltipHtml}</span></div>`;
+        })
+        .join('');
+      return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${label}</div><div class="group-body">${fields}</div></div>`:'';
+    }).join('');
+  }
+  // Build group map
+  const CHIP_GROUPS_MAP = {};
+  CHIP_GROUPS.forEach(([k,v])=>{ CHIP_GROUPS_MAP[k]=v; });
+
+  let bmHtml = '';
+  if(data.benchmarks&&data.benchmarks.length){
+    bmHtml = `<div class="group">
+      <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">📊 评测数据 (${data.benchmarks.length})</div>
+      <div class="group-body" style="grid-template-columns:1fr">
+        ${data.benchmarks.map(b=>{
+          const bmId = pickPath(b,['identity','model_id'])||'?';
+          const meta = b.test_metadata||{}, inf = b.inference_metrics||{}, tr = b.training_metrics||{};
+          const perf = [inf.throughput_tok_s?inf.throughput_tok_s+' tok/s':'', tr.mfu_pct?tr.mfu_pct+'% MFU':'', inf.memory_peak_mb?inf.memory_peak_mb+'MB peak':''].filter(Boolean).join(' ');
+          return `<div style="font-size:0.75rem;padding:6px;background:var(--bg3);border-radius:4px;margin:1px 0">
+            <b>${esc(bmId)}</b> · ${esc(meta.workload_type||'')} · ${esc(meta.suite_name||'')}<br>
+            ${perf?`<span style="color:var(--accent)">${perf}</span>`:''}
+            ${meta.test_date?`<span style="color:var(--text3)"> · ${esc(meta.test_date)}</span>`:''}
+          </div>`;
+        }).join('')}
+      </div></div>`;
+  }
+
+  // Compat section — API returns grouped compatibility records
+  let compHtml = '';
+  if(data.compatibilities&&data.compatibilities.length){
+    compHtml = `<div class="group">
+      <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">🔗 兼容模型 (${data.compatibilities.length})</div>
+      <div class="group-body" style="grid-template-columns:1fr">
+        ${data.compatibilities.map(c=>{
+          const idn = c.identity||{}, det = c.compat_details||{};
+          return `<div style="font-size:0.75rem;padding:6px;background:var(--bg3);border-radius:4px;margin:1px 0">
+            <b>${esc(idn.model_id)}</b> ·
+            <span style="color:${det.compat_status==='verified'?'var(--green)':'var(--orange)'}">${esc(det.compat_status)}</span>
+            · ${esc(det.framework||'')} · ${esc(det.precision||'')}
+            ${det.notes?`<br><span style="color:var(--text3)">${esc(det.notes)}</span>`:''}
+          </div>`;
+        }).join('')}
+      </div></div>`;
+  }
+
+  // Provenance section — per-field history
+  const provHtml = renderFieldProvenance(data.field_provenance);
+
+  panel.innerHTML = `
+    <div class="detail-header">
+      <h2>${esc(chip.identity?.chip_model||'Chip')} <small style="color:var(--text3);font-weight:400;font-size:0.85rem">ID:${id}</small></h2>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-tabs" id="detail-tabs">
+      <button class="detail-tab active" onclick="switchDetailTab(event,'tab-basic')">📋 基本信息</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-compute')">⚡ 计算参数</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-physical')">🔧 物理信息</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-bench')">📊 兼容评测</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-provenance')">📝 溯源记录</button>
+	      <button class="detail-tab" onclick="switchDetailTab(event,'tab-reference')">🔗 部署参考</button>
+    </div>
+    <div class="detail-body" id="detail-body">
+      <div class="detail-tab-panel active" id="tab-basic">${renderDetailGroups(['identity','architecture','memory','interconnect','price','status'])}</div>
+      <div class="detail-tab-panel" id="tab-compute">${renderDetailGroups(['compute_units','precision','tdp'])}</div>
+      <div class="detail-tab-panel" id="tab-physical">${renderDetailGroups(['physical','cache','package'])}</div>
+      <div class="detail-tab-panel" id="tab-bench">${bmHtml}${compHtml}</div>
+      <div class="detail-tab-panel" id="tab-provenance">${provHtml}</div>
+	            <div class="detail-tab-panel" id="tab-reference" style="padding:16px"><div style="padding:12px;background:var(--bg3);border-radius:6px;font-size:0.85rem;display:flex;align-items:center;gap:8px"><span style="font-size:1.2rem">🔗</span><a href="https://docs.vllm.ai/projects/ascend/zh-cn/v0.18.0/tutorials/models/Qwen3.6-35B-A3B.html#deployment" target="_blank" rel="noopener" style="color:var(--accent)">vLLM Ascend 部署参考 — Qwen3.6-35B-A3B</a></div></div>
+    </div>
+  `;
+}
+function closeDetail(){$('detail-overlay').classList.remove('open')}
+
+function switchDetailTab(evt, panelId){
+  const tabs = document.querySelectorAll('#detail-tabs .detail-tab');
+  tabs.forEach(t=>t.classList.remove('active'));
+  evt.target.classList.add('active');
+  const panels = document.querySelectorAll('#detail-body .detail-tab-panel');
+  panels.forEach(p=>p.classList.remove('active'));
+  document.getElementById(panelId).classList.add('active');
+}
+
+/* ═══════════════════ MODEL SEARCH ═══════════════════ */
+async function searchModelsInit(){
+  $('model-filters').innerHTML = `
+    <div class="autocomplete-wrapper" style="flex:1;min-width:160px">
+      <input type="text" id="model-search" class="ac-input" placeholder="搜索模型… (名称/作者)" autocomplete="off">
+      <div class="ac-dropdown" id="model-ac-dropdown"></div>
+    </div>
+    <select id="model-arch"><option value="">全部架构</option><option value="dense">Dense</option><option value="moe">MoE</option></select>
+    <div class="vram-slider">参数量<label>≥<input type="number" id="model-params-min" placeholder="0" min="0" step="1">B</label></div>
+    <input type="text" id="model-for-chip" placeholder="按芯片反查…" style="max-width:180px">
+    <button class="btn" onclick="searchModels()">搜索</button>
+  `;
+  initAutocomplete('model-search', 'model-ac-dropdown', 'models', (name)=>{
+    $('model-search').value = name;
+    searchModels();
+  });
+  _wireEnterFallback('model-search', (name)=>{ searchModels(); });
+  searchModels();
+}
+
+async function searchModels(){
+  if(!_pager_click){MODEL_PAGE_STATE.page=1;}
+  _pager_click = false;
+  const loading=$('model-loading'), results=$('model-results'), sum=$('model-summary');
+  show(loading);results.innerHTML='';sum.textContent='';
+
+  const params = new URLSearchParams();
+  const s=($('model-search')||{}).value; if(s&&s.trim())params.set('search',s.trim());
+  const a=($('model-arch')||{}).value; if(a)params.set('architecture',a);
+  const pm=($('model-params-min')||{}).value; if(pm)params.set('params_min',pm);
+  const fc=($('model-for-chip')||{}).value; if(fc&&fc.trim())params.set('for_chip',fc.trim());
+  params.set('limit', String(MODEL_PAGE_STATE.limit));
+  params.set('offset', String((MODEL_PAGE_STATE.page - 1) * MODEL_PAGE_STATE.limit));
+
+  const data = await fetchJSON(`${API}/models?${params}`);
+  hide(loading);
+  if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+
+  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 个模型`+
+    (data.count > MODEL_PAGE_STATE.limit ? ` · 第 <b>${MODEL_PAGE_STATE.page}</b> / <b>${Math.ceil(data.count/MODEL_PAGE_STATE.limit)}</b> 页` : '')+
+    `</span>`;
+  if(!data.models||!data.models.length){results.innerHTML='<div class="empty">未找到匹配的模型</div>';return}
+
+  results.innerHTML = data.models.map(m=>`
+    <div class="card" onclick="openModelProfile('${m.id}')">
+      <div class="card-header">
+        <span class="card-vendor vendor-foreign">${esc(m.author||'?')}</span>
+        ${m.architecture_family?`<span class="tag arch">${esc(m.architecture_family)}</span>`:''}
+        ${m.pipeline_tag?`<span class="tag compat">${esc(m.pipeline_tag)}</span>`:''}
+      </div>
+      <div class="card-model" style="font-size:0.9rem;word-break:break-all">${esc(m.model_id)}</div>
+      <div class="card-stats">
+        <div class="card-stat"><span class="label">参数量</span><span class="value">${fmtVal(m.total_params_b,'B')}</span></div>
+        <div class="card-stat"><span class="label">下载</span><span class="value">${fmtNum(m.downloads)}</span></div>
+        <div class="card-stat"><span class="label">点赞</span><span class="value">${fmtNum(m.likes)}</span></div>
+        <div class="card-stat"><span class="label">库</span><span class="value">${esc(m.library_name||'')}</span></div>
+      </div>
+    </div>
+  `).join('');
+
+  results.innerHTML += buildPager(MODEL_PAGE_STATE.page, MODEL_PAGE_STATE.limit, data.count, 'MODEL_PAGE_STATE.page');
+}
+
+const MODEL_GROUP_LABELS = {
+  identity:'标识', stats:'统计', access:'访问信息',
+  architecture:'架构', raw:'原始数据'
+};
+
+async function openModelProfile(id){
+  const overlay=$('detail-overlay'), panel=$('detail-panel');
+  panel.innerHTML='<div class="loading"><div class="spinner"></div></div>';
+  overlay.classList.add('open');
+
+  const data = await fetchJSON(`${API}/models/${id}`);
+  if(data._error){panel.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+  const model = data.model || {};
+
+  const _renderGroups = (...keys) => keys.map(key=>{
+    const g = model[key];
+    if(!g||Object.keys(g).length===0)return'';
+    const label = MODEL_GROUP_LABELS[key] || key;
+    const fields = Object.entries(g)
+      .filter(([k])=>k!=='id'&&!k.startsWith('_'))
+      .map(([k,v])=>`<div class="group-field"><span class="key">${esc(FIELD_LABELS[k]||k)}</span><span class="val">${v!=null?esc(String(v).slice(0,300)):'<i style="color:var(--text3)">—</i>'}</span></div>`)
+      .join('');
+    return fields?`<div class="group"><div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">${label}</div><div class="group-body">${fields}</div></div>`:'';
+  }).join('');
+
+  let compHtml = '';
+  if(data.compatible_chips&&data.compatible_chips.length){
+    compHtml = `<div class="group">
+      <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">🔗 兼容芯片 (${data.compatible_chips.length})</div>
+      <div class="group-body" style="grid-template-columns:1fr">
+        ${data.compatible_chips.map(c=>`<div style="font-size:0.75rem;padding:6px;background:var(--bg3);border-radius:4px;margin:1px 0">
+          <b>${esc(c.chip_model)}</b> ·
+          <span style="color:${c.compat_status==='verified'?'var(--green)':'var(--orange)'}">${esc(c.compat_status)}</span>
+          · ${esc(c.framework||'')} · ${esc(c.precision||'')}
+        </div>`).join('')}
+      </div></div>`;
+  }
+
+  // Provenance
+  const provHtml = renderFieldProvenance(data.field_provenance);
+
+  panel.innerHTML = `
+    <div class="detail-header">
+      <h2>${esc(model.identity?.model_id||'Model')} <small style="color:var(--text3);font-weight:400;font-size:0.85rem">ID:${id}</small></h2>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="detail-tabs" id="detail-tabs">
+      <button class="detail-tab active" onclick="switchDetailTab(event,'tab-model-basic')">📋 基本信息</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-model-tech')">⚡ 技术参数</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-model-compat')">🔗 兼容芯片</button>
+      <button class="detail-tab" onclick="switchDetailTab(event,'tab-model-prov')">📝 溯源记录</button>
+    </div>
+    <div class="detail-body" id="detail-body">
+      <div class="detail-tab-panel active" id="tab-model-basic">${_renderGroups('identity','stats','access')||'<div class="empty">暂无数据</div>'}</div>
+      <div class="detail-tab-panel" id="tab-model-tech">${_renderGroups('architecture','raw')||'<div class="empty">暂无数据</div>'}</div>
+      <div class="detail-tab-panel" id="tab-model-compat">${compHtml||'<div class="empty">暂无兼容芯片数据</div>'}</div>
+      <div class="detail-tab-panel" id="tab-model-prov">${provHtml||'<div class="empty">暂无溯源记录</div>'}</div>
+    </div>
+  `;
+}
+
+// ── Shared provenance renderer for both chip & model detail ──
+function renderFieldProvenance(fp) {
+  if(!fp || Object.keys(fp).length===0) return '';
+  const fieldsByGroup = {};
+  // Group by source official/non-official
+  const officialFields = [], unofficialFields = [];
+  Object.entries(fp).forEach(([fn, fi]) => {
+    const history = fi.history || [];
+    const isOfficial = history.length > 0 && history[0].is_official === '1';
+    (isOfficial ? officialFields : unofficialFields).push([fn, fi]);
+  });
+  const allFields = [...officialFields, ...unofficialFields];
+  const fieldsHtml = allFields.map(([fn, fi]) => {
+    const label = fi.field_label || FIELD_LABELS[fn] || fn;
+    const isOfficial = fi.history && fi.history[0] && fi.history[0].is_official === '1';
+    const historyRows = fi.history.map(h => `
+      <div class="prov-history-row">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <span style="color:var(--accent);font-weight:600;min-width:60px">${esc(String(h.new_value||'').slice(0,60))}</span>
+          ${h.old_value ? `<span style="color:var(--text3)">← ${esc(String(h.old_value).slice(0,40))}</span>` : ''}
+        </div>
+        <div style="font-size:0.65rem;color:var(--text3);margin-top:2px">
+          <span class="prov-src">${esc((h.source_url||'').slice(0,100))}</span>
+          <span> · ${esc(h.source_type||'')}</span>
+          <span> · ${esc(h.confidence||'')}</span>
+          ${h.is_official==='1'?' <span style="color:var(--green)">✓官方</span>':''}
+          <span style="float:right">${esc((h.updated_at||'').slice(0,16))}</span>
+        </div>
+      </div>
+    `).join('');
+    return `<div class="prov-field">
+      <div class="prov-field-header">
+        <b>${esc(label)}</b> <code style="color:var(--text3);font-size:0.7rem">${esc(fn)}</code>
+        ${isOfficial?' <span style="color:var(--green);font-size:0.68rem;font-weight:600">✓官方</span>':' <span style="color:var(--orange);font-size:0.68rem">⚠非官方</span>'}
+        ${fi.update_count>1?`<span style="color:var(--text3);font-size:0.65rem"> (${fi.update_count}次变更)</span>`:''}
+      </div>
+      <div class="prov-field-history">${historyRows}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="group collapsed">
+    <div class="group-header" onclick="this.parentElement.classList.toggle('collapsed')">📋 字段来源追溯 (${allFields.length}个字段 · ${officialFields.length}官方)</div>
+    <div class="group-body" style="grid-template-columns:1fr;max-height:44vh;overflow-y:auto;overflow-x:hidden;padding:8px 12px">
+      ${fieldsHtml}
+    </div></div>`;
+}
+
+/* ═══════════════════ RECOMMEND ═══════════════════ */
+let REC_SELECTED_MODELS = [];
+
+function initRecommend(){
+  STATE.vendors = STATE.vendors || [];
+  ensureModelList();
+  REC_SELECTED_MODELS = [];
+  $('rec-form').innerHTML = `
+    <div class="recommend-form">
+      <div class="form-group" style="grid-column:1/-1"><label>模型名称 * (多选，输入搜索 + 点击/回车选中，Backspace删除)</label>
+        <div id="model-tags" class="ac-tags"></div>
+        <div class="autocomplete-wrapper" style="flex:1;min-width:160px">
+          <input type="text" id="rec-model-input" class="ac-input" placeholder="输入模型名模糊搜索… (如 Qwen2.5-7B)" autocomplete="off">
+          <div class="ac-dropdown" id="rec-model-ac-dropdown"></div>
+        </div>
+        <input type="hidden" id="rec-model" value="">
+      </div>
+      <div class="form-group"><label>场景</label><select id="rec-scenario" onchange="updateRecForm()"><option value="train">训练</option><option value="quantize">量化</option><option value="inference">推理</option></select></div>
+      <div class="form-group" id="rec-stage-grp"><label>训练阶段</label><select id="rec-stage"><option value="sft">SFT (监督微调)</option><option value="cpt">CPT (持续预训练)</option><option value="rl">RL (强化学习)</option></select></div>
+      <div class="form-group" id="rec-method-grp"><label>训练方式</label><select id="rec-method"><option value="full_param">全参微调</option><option value="lora">LoRA (低秩适配)</option></select></div>
+      <div class="form-group" id="rec-quantize-method-grp" style="display:none"><label>量化方式</label><select id="rec-quantize-method"><option value="gptq">GPTQ</option><option value="awq">AWQ</option><option value="bitsandbytes">bitsandbytes</option><option value="gguf">GGUF</option></select></div>
+      <div class="form-group" id="rec-quantize-bits-grp" style="display:none"><label>量化比特</label><select id="rec-quantize-bits"><option value="int4">INT4</option><option value="int8">INT8</option><option value="fp8">FP8</option></select></div>
+      <div class="form-group" id="rec-quant-grp" style="display:none"><label>推理精度</label><select id="rec-quant"><option value="fp16">FP16 (全精度)</option><option value="int8">INT8</option><option value="int4_gptq">INT4 GPTQ</option><option value="int4_awq">INT4 AWQ</option><option value="gguf_q4">GGUF Q4</option><option value="gguf_q8">GGUF Q8</option></select></div>
+      <div class="form-group"><label>期望训练天数</label><input type="number" id="rec-days" placeholder="3" min="0.1" step="0.5"></div>
+      <div class="form-group"><label>训练数据量 (T tokens)</label><input type="number" id="rec-tokens" placeholder="自动推算" min="0.1" max="1000" step="0.5"></div>
+      <div class="form-group"><label>目标推理吞吐 (tok/s)</label><input type="number" id="rec-tps" placeholder="可选" min="0"></div>
+      <div class="form-group"><label>最大卡数</label><input type="number" id="rec-max-cards" placeholder="可选" min="1"></div>
+      <div class="form-group"><label>最小卡数</label><input type="number" id="rec-min-cards" placeholder="可选" min="1"></div>
+      <div class="form-group"><label>最高单价 (万元/片)</label><input type="number" id="rec-max-price" placeholder="可选" min="0"></div>
+      <div class="form-group"><label>优先国产</label><div class="toggle-row"><div class="toggle" id="rec-domestic" onclick="this.classList.toggle('on')"></div></div></div>
+      <div class="form-group"><label>优先厂商</label><select id="rec-vendor"><option value="">不限</option>${[...new Set(STATE.vendors)].map(v=>`<option>${esc(v)}</option>`).join('')}</select></div>
+      <div class="form-actions"><button class="btn" onclick="runRecommend()">🎯 推荐芯片方案</button></div>
+    </div>
+  `;
+
+  // Multi-select autocomplete for models
+  initAutocomplete('rec-model-input', 'rec-model-ac-dropdown', 'models', (name)=>{
+    if(!REC_SELECTED_MODELS.includes(name)){
+      REC_SELECTED_MODELS.push(name);
+      renderRecModelTags();
+    }
+    $('rec-model-input').value = '';
+  }, true);
+
+  // Backspace on empty input → remove last tag
+  $('rec-model-input').addEventListener('keydown', function(e){
+    if(e.key==='Backspace' && !this.value && REC_SELECTED_MODELS.length){
+      REC_SELECTED_MODELS.pop();
+      renderRecModelTags();
+    }
+  });
+
+  // SFT method depends on stage: only SFT shows method, RL/CPT are full_param only
+  $('rec-stage').addEventListener('change', function(){
+    const g = $('rec-method-grp');
+    if(this.value === 'sft'){ g.style.display=''; }
+    else { g.style.display='none'; $('rec-method').value='full_param'; }
+  });
+}
+
+function updateRecForm(){
+  const sc = $('rec-scenario').value;
+  const stageGrp = $('rec-stage-grp'), methodGrp = $('rec-method-grp'), quantGrp = $('rec-quant-grp');
+  const qMethGrp = $('rec-quantize-method-grp'), qBitsGrp = $('rec-quantize-bits-grp');
+  const daysEl = $('rec-days').parentElement, tokensEl = $('rec-tokens').parentElement, tpsEl = $('rec-tps').parentElement;
+  if(sc === 'train'){
+    stageGrp.style.display=''; methodGrp.style.display=''; quantGrp.style.display='none';
+    qMethGrp.style.display='none'; qBitsGrp.style.display='none';
+    daysEl.style.display=''; tokensEl.style.display=''; tpsEl.style.display='';
+    // SFT only: show method dropdown
+    if($('rec-stage').value === 'sft'){ methodGrp.style.display=''; }
+    else { methodGrp.style.display='none'; $('rec-method').value='full_param'; }
+  } else if(sc === 'quantize'){
+    stageGrp.style.display='none'; methodGrp.style.display='none'; quantGrp.style.display='none';
+    qMethGrp.style.display=''; qBitsGrp.style.display='';
+    daysEl.style.display='none'; tokensEl.style.display='none'; tpsEl.style.display='none';
+  } else {
+    stageGrp.style.display='none'; methodGrp.style.display='none'; quantGrp.style.display='';
+    qMethGrp.style.display='none'; qBitsGrp.style.display='none';
+    daysEl.style.display='none'; tokensEl.style.display='none'; tpsEl.style.display='';
+  }
+}
+
+function renderRecModelTags(){
+  const tagsEl = document.querySelector('#model-tags');
+  if(!tagsEl) return;
+  tagsEl.innerHTML = REC_SELECTED_MODELS.map((m,i)=>`<span class="ac-tag" onclick="REC_SELECTED_MODELS.splice(${i},1);renderRecModelTags()">${esc(m)} ✕</span>`).join('');
+  $('rec-model').value = REC_SELECTED_MODELS.join(',');
+}
+
+async function runRecommend(){
+  const loading=$('rec-loading'), results=$('rec-results');
+  show(loading);results.innerHTML='';
+
+  const model=$('rec-model').value.trim();
+  if(!model){results.innerHTML='<div class="error">请输入模型名称</div>';hide(loading);return}
+
+  const params = new URLSearchParams();
+  params.set('model',model);
+  const sc=$('rec-scenario').value; params.set('scenario',sc);
+  if(sc==='train'){
+    params.set('stage',$('rec-stage').value);
+    if($('rec-stage').value==='sft') params.set('method',$('rec-method').value);
+    else params.set('method','full_param');
+    const tokens=$('rec-tokens').value;if(tokens)params.set('training_tokens',tokens);
+    const days=$('rec-days').value;if(days)params.set('training_days',days);
+  } else if(sc==='quantize'){
+    params.set('method',$('rec-quantize-method').value);
+    params.set('quantize_bits',$('rec-quantize-bits').value);
+  } else {
+    params.set('quant',$('rec-quant').value);
+    const tps=$('rec-tps').value;if(tps)params.set('sla_tps',tps);
+  }
+  const mc=$('rec-max-cards').value;if(mc)params.set('max_cards',mc);
+  const mnc=$('rec-min-cards').value;if(mnc)params.set('min_cards',mnc);
+  const mp=$('rec-max-price').value;if(mp)params.set('max_price',mp);
+  if($('rec-domestic').classList.contains('on'))params.set('prefer_domestic','true');
+  const pv=$('rec-vendor').value;if(pv)params.set('prefer_vendor',pv);
+  params.set('limit','20');params.set('tier','datacenter');
+
+  const data = await fetchJSON(`${API}/chips/recommend?${params}`);
+  hide(loading);
+  if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+
+  const req = data.requirements||{};
+  const scoringMeta = data.scoring_meta||{};
+  const dimMeta = scoringMeta.dimensions||[];
+
+  results.innerHTML = `
+    <div class="info" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <span>模型: <b>${esc(data.model||'')}</b> · 场景: <b>${req.scenario_label||(req.scenario==='train'?'训练':'推理')}</b>
+      <a href="https://docs.vllm.ai/projects/ascend/zh-cn/v0.18.0/quick_start.html" target="_blank" rel="noopener" style="margin-left:8px;font-size:0.75rem;color:var(--accent);white-space:nowrap">📖 vLLM Ascend 部署指南 →</a>
+      · VRAM: <b>${req.min_vram_gb} GB</b>
+      ${req.vram_formula ? `· <span style="font-size:0.7rem;color:var(--text2)" title="${esc(req.vram_formula)}">${esc(req.vram_formula.substring(0,60))}…</span>` : ''}
+      · 候选: <b>${data.candidates?.length||0}</b> · 排除: <b>${data.rejected||0}</b></span>
+      <button class="btn" onclick="showMethodology()" style="font-size:0.75rem;padding:4px 12px">📖 算法说明</button>
+    </div>
+    ${(data.candidates||[]).map((c,i)=>{
+      const rec = c.recommend||{};
+      const scoring = c.scoring||{};
+      const dimNameMap = {};
+      dimMeta.forEach(m=>{ dimNameMap[m.id]=m; });
+      return `
+        <div class="rec-card ${i===0?'best':''}">
+          <div class="rec-rank">#${i+1} · 综合评分 ${scoring.total!=null?scoring.total:rec.score} / 100 · ${esc(c.chip_model)} <span style="color:var(--text2);font-weight:400">${esc(c.vendor_display||'')}</span></div>
+          <!-- Row 1: 计算与推荐 -->
+          <div class="rec-calc-row">
+            ${renderCalcRow(req, rec, c)}
+          </div>
+          <!-- Row 2: 芯片规格 + 完整画像按钮 -->
+          <div class="rec-chip-row">
+            <span class="chip-name">${esc(c.chip_model)}</span>
+            <span class="chip-meta">${esc(c.vendor_display||'')} · ${esc(c.vendor_region||'')} · ${esc(c.chip_type||'')}</span>
+            ${renderChipSpecInline(c)}
+            <button class="rec-profile-btn" onclick="openChipProfile('${esc(c.id||c.chip_model)}')">📋 完整画像</button>
+          </div>
+          <!-- Row 3: 评分细则 toggle -->
+          <div class="rec-scoring-toggle" id="scoring-toggle-${i}" onclick="toggleScoringDetail(${i})">
+            <span class="arrow">▶</span> 📊 评分细则
+          </div>
+          <div class="rec-scoring-panel" id="scoring-panel-${i}">
+            ${renderScoringDetail(scoring, dimNameMap)}
+          </div>
+          <div class="rec-rationale">${esc(rec.rationale||'')}</div>
+        </div>
+      `;
+    }).join('')}
+  `;
+}
+
+// ── Row 1: Calculation & recommendation params ──
+function renderCalcRow(req, rec, chip){
+  const items = [];
+  // VRAM
+  if(req.min_vram_gb != null){
+    const f = req.vram_formula || '';
+    items.push({label:'显存需求', value:`${req.min_vram_gb.toFixed(1)} GB`, detail:f.length>100?f.substring(0,97)+'…':f});
+  }
+  // Cards
+  items.push({label:'推荐卡数', value:`${rec.recommended_cards} 卡`, detail:`单卡${chip.vram_gb||'?'}GB · 显存约束${rec.vram_cards}卡${rec.recommended_cards!==rec.vram_cards?' → 算力约束'+rec.recommended_cards+'卡':''}`});
+  // Training time
+  if(rec.estimated_training_days != null){
+    const parts = [];
+    if(req.target_training_days) parts.push(`目标${req.target_training_days}天`);
+    if(req.training_tokens_T) parts.push(`${req.training_tokens_T}T tokens`);
+    items.push({label:'预计训练', value:`${rec.estimated_training_days.toFixed(1)} 天`, detail:parts.join(' · ')});
+  }
+  // SLA
+  const meets = rec.meets_sla==='true'||rec.meets_sla===true;
+  items.push({label:'满足SLA', value:meets?'✓ 是':'✗ 否', cls:meets?'color:var(--green)':'color:var(--red)'});
+  // Price
+  if(rec.total_cost_wan != null){
+    items.push({label:'总价', value:`${rec.total_cost_wan} 万`, detail:`${rec.recommended_cards||rec.vram_cards}卡 × ${chip.price_cny_wan||'?'}万/卡`});
+  }
+  if(!items.length) return '';
+  return items.map(it=>`
+    <div class="rec-calc-item">
+      <div class="rcl">${it.label}</div>
+      <div class="rcv${it.cls?'" style="'+it.cls:'"'}>${esc(it.value)}</div>
+      ${it.detail ? `<div class="rcd">${esc(it.detail)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// ── Row 2: Chip specs inline (comma-separated) ──
+function renderChipSpecInline(chip){
+  const specs = [
+    {key:'vram_gb', label:'显存', fmt:v=>v!=null?`${v} GB`:null},
+    {key:'tdp_w', label:'TDP', fmt:v=>v!=null?`${v} W`:null},
+    {key:'architecture', label:'架构', fmt:v=>v||null},
+    {key:'process_node_nm', label:'制程', fmt:v=>v!=null?`${v} nm`:null},
+    {key:'vram_bw_gb_s', label:'带宽', fmt:v=>v!=null?`${v} GB/s`:null},
+    {key:'precision_perf', label:'精度性能', fmt:v=>v||null},
+    {key:'price_cny_wan', label:'单价', fmt:v=>v!=null?`~${v} 万`:null},
+    {key:'interconnect_tech', label:'互联', fmt:v=>v||null},
+    {key:'maturity_level', label:'成熟度', fmt:v=>v||null},
+  ];
+  const parts = [];
+  specs.forEach(s=>{
+    const val = s.fmt(chip[s.key]);
+    if(val) parts.push({key:s.key, label:s.label, val});
+  });
+  return parts.map(s=>`<span class="chip-spec">${esc(s.label)}（${esc(s.val)}）</span>`).join('<span class="chip-spec-sep">|</span>');
+}
+
+// ── Row 3: Scoring detail panel (collapsible) ──
+function toggleScoringDetail(idx){
+  const toggle = document.getElementById('scoring-toggle-'+idx);
+  const panel = document.getElementById('scoring-panel-'+idx);
+  if(!toggle||!panel) return;
+  toggle.classList.toggle('open');
+  panel.classList.toggle('open');
+}
+
+function renderScoringDetail(scoring, dimNameMap) {
+  if (!scoring) return '<div class="empty">暂无评分数据</div>';
+
+  // v4.0: use categories structure
+  const cats = scoring.categories;
+  if (!cats) {
+    // Fallback: old flat dimensions
+    const dims = scoring.dimensions;
+    if (!dims) return '<div class="empty">暂无评分数据</div>';
+    return renderFlatScoringDetail(dims, dimNameMap);
+  }
+
+  const catOrder = [
+    {id:'compute_power', icon:'⚡'},
+    {id:'cost_effectiveness', icon:'💰'},
+    {id:'ecosystem_maturity', icon:'🌐'}
+  ];
+
+  const sections = catOrder.map(({id, icon}) => {
+    const cat = cats[id];
+    if (!cat) return '';
+    const subDims = cat.sub_dimensions || {};
+    const entries = Object.entries(subDims).filter(([,v]) => v.score > 0 || v.weight > 0);
+    if (!entries.length) return '';
+
+    return `<div class="rec-scoring-cat">
+      <div class="rec-scoring-cat-header">
+        ${icon} ${esc(cat.name_cn)}
+        <span style="color:var(--text2);font-size:0.65rem;font-weight:400">大类权重 ${(cat.weight*100).toFixed(0)}%</span>
+        <span class="cat-score">${cat.score.toFixed(1)} 分 · 加权 ${cat.weighted.toFixed(2)}</span>
+      </div>
+      ${entries.map(([dimId, v]) => {
+        const meta = dimNameMap[dimId] || {};
+        const name = meta.name_cn || dimId;
+        const subWt = meta.sub_weight || v.weight;
+        const catWt = cat.weight || 0;
+        const globalWt = subWt * catWt;
+        const raw = v.raw_values || {};
+        const detail = v.detail || '';
+        const formula = raw.formula || '';
+        const source = raw.source || raw.note || '';
+        const rawStr = Object.entries(raw).filter(([rk])=>rk!=='formula'&&rk!=='source'&&rk!=='note').map(([rk,rv])=>`${rk}=${typeof rv==='number'?rv.toFixed(2):rv}`).join(', ');
+
+        return `<div class="rec-scoring-dim">
+          <div class="dim-head">
+            <span class="dim-name">${esc(name)}</span>
+            <span class="dim-wbar">子权重 ${(subWt*100).toFixed(1)}% × ${(catWt*100).toFixed(0)}% = 全局 ${(globalWt*100).toFixed(1)}%</span>
+            <span style="font-weight:700;color:var(--accent);font-size:0.75rem;margin-left:auto">${v.score.toFixed(1)}<span style="font-size:0.6rem;color:var(--text3)">/10</span></span>
+            <span style="color:var(--text3);font-size:0.6rem">加权 ${v.weighted.toFixed(2)}</span>
+          </div>
+          <div class="dim-calc">${esc(detail)}</div>
+          ${formula ? `<div class="dim-formula">📐 公式: ${esc(formula)}</div>` : ''}
+          ${rawStr ? `<div class="dim-raw">📊 代入: ${esc(rawStr)}</div>` : ''}
+          ${source ? `<div class="dim-raw">📂 ${esc(source)}</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+
+  // Total score formula
+  const total = scoring.total!=null ? scoring.total.toFixed(1) : '?';
+  const cw = scoring.category_weights || {};
+  const catNames2 = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度'};
+  const totalParts = Object.entries(cw).filter(([,v])=>v>0).map(([k,v])=>
+    `${catNames2[k]||k}: ${cats[k]?.score?.toFixed(1)||'?'} × ${(v*100).toFixed(0)}% = ${cats[k]?.weighted?.toFixed(2)||'?'}`
+  );
+  const totalFormula = totalParts.length ? `总分 = (${totalParts.join(' + ')}) × 10 = ${total}` : `总分 = ${total}`;
+
+  return `<div style="font-size:0.68rem;color:var(--text3);margin-bottom:6px">📊 评分明细 v${scoring.version||'4.0'} — 3大类·11子维度</div>
+    ${sections}
+    <div style="margin-top:6px;padding:6px 10px;background:var(--bg4);border-radius:4px;font-size:0.7rem;color:var(--text)">
+      <b>总分计算</b>: ${esc(totalFormula)}
+    </div>`;
+}
+
+function renderFlatScoringDetail(dims, dimNameMap) {
+  // Legacy fallback
+  const entries = Object.entries(dims).filter(([,v])=>v.score>0||v.weight>0);
+  if (!entries.length) return '<div class="empty">暂无评分数据</div>';
+  return `<div style="font-size:0.68rem;color:var(--text3);margin-bottom:4px">📊 评分明细（旧版，无分类层级）</div>
+    ${entries.map(([dimId, v]) => {
+      const meta = dimNameMap[dimId] || {};
+      const name = meta.name_cn || dimId;
+      const raw = v.raw_values || {};
+      const detail = v.detail || '';
+      const formula = raw.formula || '';
+      const source = raw.source || raw.note || '';
+      const rawStr = Object.entries(raw).filter(([rk])=>rk!=='formula'&&rk!=='source'&&rk!=='note').map(([rk,rv])=>`${rk}=${typeof rv==='number'?rv.toFixed(2):rv}`).join(', ');
+      return `<div class="rec-scoring-dim">
+        <div class="dim-head">
+          <span class="dim-name">${esc(name)}</span>
+          <span style="font-weight:700;color:var(--accent);margin-left:auto">${v.score.toFixed(1)}<span style="font-size:0.6rem;color:var(--text3)">/10</span></span>
+          <span style="color:var(--text3);font-size:0.6rem">×${v.weight.toFixed(2)} = ${v.weighted.toFixed(1)}</span>
+        </div>
+        ${detail ? `<div class="dim-calc">${esc(detail)}</div>` : ''}
+        ${formula ? `<div class="dim-formula">📐 公式: ${esc(formula)}</div>` : ''}
+        ${rawStr ? `<div class="dim-raw">📊 代入: ${esc(rawStr)}</div>` : ''}
+        ${source ? `<div class="dim-raw">📂 ${esc(source)}</div>` : ''}
+      </div>`;
+    }).join('')}`;
+}
+
+// ── Score Tooltip (floating) ──
+let _tooltipEl = null;
+function getTooltip(){
+  if(!_tooltipEl){
+    _tooltipEl = document.createElement('div');
+    _tooltipEl.className = 'score-tooltip';
+    document.body.appendChild(_tooltipEl);
+  }
+  return _tooltipEl;
+}
+function showScoreTooltip(ev, data){
+  const tt = getTooltip();
+  const rawEntries = Object.entries(data.raw||{}).filter(([,v])=>v!=null&&v!==''&&String(v)!=='undefined');
+  const src = data.raw?.source || data.raw?.note;
+  tt.innerHTML = `
+    <div class="tt-title"><span>${esc(data.name)}</span><span class="tt-score">${data.score}<span style="font-size:0.65rem;color:var(--text3)">/10</span></span></div>
+    <div class="tt-formula">${esc(data.detail)}</div>
+    ${rawEntries.length ? '<div class="tt-raw">'+rawEntries.map(([k,v])=>`<span>${esc(k)}: <b>${esc(typeof v==='number'?v.toFixed(2):String(v))}</b></span>`).join(' ')+'</div>' : ''}
+    ${src ? '<div class="tt-raw" style="margin-top:3px;font-size:0.6rem;color:var(--text3)">📂 '+esc(String(src).slice(0,120))+'</div>' : ''}
+    <div class="tt-weight">权重: ${data.weight.toFixed(2)} · 加权: ${(data.score*data.weight).toFixed(2)}</div>
+  `;
+  tt.classList.add('visible');
+  moveScoreTooltip(ev);
+}
+function moveScoreTooltip(ev){
+  const tt = getTooltip();
+  const x = ev.clientX + 16, y = ev.clientY - 10;
+  const r = tt.getBoundingClientRect();
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const finalX = x + r.width > vw - 10 ? ev.clientX - r.width - 16 : x;
+  const finalY = y + r.height > vh - 10 ? ev.clientY - r.height - 10 : y;
+  tt.style.left = finalX + 'px';
+  tt.style.top = finalY + 'px';
+}
+function hideScoreTooltip(){
+  getTooltip().classList.remove('visible');
+}
+
+// ── Calculation Breakdown (collapsible) ──
+function renderCalcBreakdown(req, rec, chip, scoring){
+  const items = [];
+  // VRAM calculation
+  if(req.vram_formula){
+    items.push({label:'显存需求计算', value:req.min_vram_gb!=null?req.min_vram_gb.toFixed(1)+' GB':'?', detail:req.vram_formula});
+  }
+  // Cards
+  if(rec.vram_cards != null){
+    items.push({label:'显存约束最少卡数', value:rec.vram_cards+' 卡', detail:`单卡${chip.vram_gb||'?'}GB / 需要${req.min_vram_gb!=null?req.min_vram_gb.toFixed(1):'?'}GB → 向上取2幂次方`});
+  }
+  if(rec.recommended_cards != null && rec.recommended_cards !== rec.vram_cards){
+    items.push({label:'算力约束最少卡数', value:rec.recommended_cards+' 卡', detail:'按训练FLOPs需求计算所需卡数'});
+  }
+  // Training time
+  if(rec.estimated_training_days != null && req.target_training_days != null){
+    items.push({label:'预计训练时间', value:rec.estimated_training_days.toFixed(1)+' 天', detail:`目标: ${req.target_training_days}天 · 训练量: ${req.training_tokens_T||'?'}T tokens`});
+  }
+  // Price
+  if(rec.total_cost_wan != null){
+    items.push({label:'预估总价', value:rec.total_cost_wan+' 万元', detail:`${rec.recommended_cards||rec.vram_cards}卡 × ${chip.price_cny_wan||'?'}万/卡`});
+  }
+  // Category weights (v4.0: 3-category system)
+  const w = rec.scenario_weights || (scoring && scoring.category_weights);
+  if (w) {
+    const catNames = {compute_power:'算力性能(5维)', cost_effectiveness:'性价比(2维)', ecosystem_maturity:'生态成熟度(4维)'};
+    const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${catNames[k]||k}:${(v*100).toFixed(0)}%`).join(' ');
+    items.push({label:'大类权重分配', value:parts, detail:`总分=Σ(大类分×大类权重)×10, 子维度权重为固定比值`});
+  }
+  if(!items.length) return '';
+  return `<details class="calc-breakdown">
+    <summary>📐 计算过程</summary>
+    ${items.map(it=>`<div class="calc-item">
+      <div class="calc-label">${esc(it.label)}</div>
+      <div class="calc-value">${esc(it.value)}</div>
+      ${it.detail ? `<div class="calc-detail">${esc(it.detail)}</div>` : ''}
+    </div>`).join('')}
+  </details>`;
+}
+
+async function showMethodology() {
+  const overlay = document.getElementById('detail-overlay');
+  const panel = document.getElementById('detail-panel');
+  panel.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  overlay.classList.add('open');
+  try {
+    const data = await fetchJSON(`${API}/methodology`);
+    if (data._error) { panel.innerHTML = `<div class="error">${esc(data._error)}</div>`; return; }
+    const dims = data.scoring_dimensions || [];
+    panel.innerHTML = `
+      <div class="detail-header"><h2>📖 推荐算法说明 v${data.version||'2.0'}</h2>
+        <button class="detail-close" onclick="closeDetail()">✕</button>
+      </div>
+      <div class="detail-body">
+        <div class="group"><div class="group-header">卡数估算方法</div><div class="group-body" style="display:grid;grid-template-columns:1fr;gap:6px">
+          ${Object.entries(data.card_estimation||{}).map(([k,v])=>`<div class="group-field"><span class="key">${k}</span><span class="val">${esc(String(v))}</span></div>`).join('')}
+          <div class="group-field"><span class="key">total_score_formula</span><span class="val">${esc(data.total_score_formula||'')}</span></div>
+        </div></div>
+        <div class="group"><div class="group-header">硬约束条件</div><div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px">
+          ${(data.hard_constraints||[]).map(c=>`<div class="group-field"><span class="val">${esc(c)}</span></div>`).join('')}
+        </div></div>
+        <div class="group"><div class="group-header">评分维度 (3大类 × 11子维度)</div>
+        <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:6px">
+          ${dims.map(d=>`<div class="group-field" style="flex-direction:column;align-items:flex-start;gap:2px">
+            <span style="font-weight:600;color:var(--accent)">${esc(d.name_cn)} (${esc(d.name_en)}) <span style="font-size:0.6rem;color:var(--text3)">[${esc((d.category||'').replace('compute_power','算力性能').replace('cost_effectiveness','性价比').replace('ecosystem_maturity','生态成熟度'))}]</span></span>
+            <span style="color:var(--text2);font-size:0.73rem">${esc(d.desc||'')} · 单位: ${esc(d.unit||'')}</span>
+            <span style="color:var(--text3);font-size:0.68rem">子权重: ${((d.sub_weight||0)*100).toFixed(0)}%</span>
+          </div>`).join('')}
+        </div></div>
+        ${data.scenario_weights ? `
+        <div class="group"><div class="group-header">大类权重矩阵 (3大类)</div>
+        <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px;font-size:0.7rem">
+          ${Object.entries(data.scenario_weights).map(([scenario,w])=>{
+            const catNames = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度'};
+            const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${catNames[k]||k}:${(v*100).toFixed(0)}%`).join(', ');
+            return '<div class="group-field"><span class="key" style="font-weight:600">' + esc(scenario) + '</span><span class="val">' + esc(parts) + '</span></div>';
+          }).join('')}
+        </div></div>` : ''}
+      </div>`;
+  } catch(e) { panel.innerHTML = `<div class="error">加载失败: ${esc(e.message)}</div>`; }
+}
+
+/* ═══════════════════ COMPAT ═══════════════════ */
+async function searchCompatInit(){
+  $('compat-filters').innerHTML = `
+    <div class="autocomplete-wrapper" style="flex:1;min-width:160px">
+      <input type="text" id="compat-chip" class="ac-input" placeholder="芯片名称…" autocomplete="off">
+      <div class="ac-dropdown" id="compat-chip-dropdown"></div>
+    </div>
+    <div class="autocomplete-wrapper" style="flex:1;min-width:160px">
+      <input type="text" id="compat-model" class="ac-input" placeholder="模型名称…" autocomplete="off">
+      <div class="ac-dropdown" id="compat-model-dropdown"></div>
+    </div>
+    <select id="compat-status"><option value="">全部状态</option><option value="verified">verified</option><option value="vendor_claimed">vendor_claimed</option><option value="community">community</option></select>
+    <div class="toggle-row" title="只显示有 benchmark 实测数据的兼容记录"><div class="toggle" id="compat-has-bench" onclick="this.classList.toggle('on');searchCompat()"></div><label>有实测</label></div>
+    <button class="btn" onclick="searchCompat()">搜索</button>
+  `;
+  // Autocomplete: chip name — use chip_model name (NOT numeric id)
+  initAutocomplete('compat-chip', 'compat-chip-dropdown', 'chips', (name)=>{
+    $('compat-chip').value = name;
+    searchCompat();
+  });
+  _wireEnterFallback('compat-chip', (name)=>{ searchCompat(); });
+  // Autocomplete: model name
+  initAutocomplete('compat-model', 'compat-model-dropdown', 'models', (name)=>{
+    $('compat-model').value = name;
+    searchCompat();
+  });
+  // Also Enter fallback for compat model input
+  _wireEnterFallback('compat-model', (name)=>{ searchCompat(); });
+  searchCompat();
+}
+
+async function searchCompat(){
+  if(!_pager_click){COMPAT_PAGE_STATE.page=1;}
+  _pager_click = false;
+  const loading=$('compat-loading'), results=$('compat-results'), sum=$('compat-summary');
+  show(loading);results.innerHTML='';sum.textContent='';
+
+  const params = new URLSearchParams();
+  const chip=($('compat-chip')||{}).value;if(chip&&chip.trim())params.set('chip',chip.trim());
+  const model=($('compat-model')||{}).value;if(model&&model.trim())params.set('model',model.trim());
+  const st=($('compat-status')||{}).value;if(st)params.set('status',st);
+  if($('compat-has-bench').classList.contains('on')) params.set('has_benchmark','true');
+  params.set('limit', String(COMPAT_PAGE_STATE.limit));
+  params.set('offset', String((COMPAT_PAGE_STATE.page - 1) * COMPAT_PAGE_STATE.limit));
+
+  const data = await fetchJSON(`${API}/compat?${params}`);
+  hide(loading);
+  if(data._error){results.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+
+  sum.innerHTML = `<span style="font-size:0.8rem;color:var(--text3)">找到 <b>${data.count}</b> 条兼容记录`+
+    (data.count > COMPAT_PAGE_STATE.limit ? ` · 第 <b>${COMPAT_PAGE_STATE.page}</b> / <b>${Math.ceil(data.count/COMPAT_PAGE_STATE.limit)}</b> 页` : '')+
+    `</span>`;
+  if(!data.compatibilities||!data.compatibilities.length){results.innerHTML='<div class="empty">未找到匹配的兼容记录</div>';return}
+
+  results.innerHTML = data.compatibilities.map((c,i)=>renderCompatCard(c,i)).join('');
+  results.innerHTML += buildPager(COMPAT_PAGE_STATE.page, COMPAT_PAGE_STATE.limit, data.count, 'COMPAT_PAGE_STATE.page');
+
+  // Add delegated click handlers for expand/collapse
+  setTimeout(function(){
+    document.querySelectorAll('[id^="compat-title-"]').forEach(function(el){
+      el.onclick = function(){
+        var detailId = el.id.replace('compat-title-','compat-detail-');
+        var detail = document.getElementById(detailId);
+        if(detail) detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+      };
+    });
+  }, 50);
+}
+
+function renderCompatCard(c, idx){
+  var iden = c.identity || c;
+  var det = c.compat_details || c;
+  var ev = c.benchmark_evidence || {};
+  var hasBench = ev.count > 0;
+
+  function evBadge(el){
+    if(!el) return '';
+    var colors = {
+      official_benchmark: 'rgba(52,211,153,0.15);color:var(--green)',
+      peer_reviewed: 'rgba(129,140,248,0.15);color:var(--accent)',
+      open_audited_benchmark: 'rgba(96,165,250,0.15);color:var(--blue)',
+      community_parsed: 'rgba(251,146,60,0.15);color:var(--orange)',
+      internal_test: 'rgba(192,132,252,0.15);color:var(--purple)',
+    };
+    var style = colors[el] || 'rgba(107,114,128,0.12);color:var(--text2)';
+    return '<span style="font-size:0.62rem;padding:1px 5px;border-radius:3px;margin-left:4px;'+style+'">'+esc(el)+'</span>';
+  }
+
+  var srcLinks = (ev.source_urls||[]).map(function(u){
+    var short = u.length > 50 ? u.slice(0,50)+'…' : u;
+    return '<a href="'+esc(u)+'" target="_blank" rel="noopener" style="color:var(--accent);font-size:0.65rem" title="'+esc(u)+'">&#128279; '+esc(short)+'</a>';
+  });
+
+  var bmRows = (ev.benchmarks||[]).slice(0,5);
+  var bmDetails = bmRows.map(function(b){
+    var perf = (b.throughput_tok_s ? esc(b.throughput_tok_s)+' tok/s' : b.mfu_pct ? esc(b.mfu_pct)+'% MFU' : '-');
+    var srcCol = esc(b.source_type||b.test_date||'-');
+    var linkCol = (b.source_url ? '<a href="'+esc(b.source_url)+'" target="_blank" style="color:var(--accent)">link</a>' : '-');
+    return '<tr>'+
+      '<td>'+esc(b.evidence_level||b.confidence||'-')+'</td>'+
+      '<td>'+perf+'</td>'+
+      '<td>'+esc(b.precision||'-')+'</td>'+
+      '<td>'+esc(b.framework||'-')+'</td>'+
+      '<td>'+srcCol+'</td>'+
+      '<td>'+linkCol+'</td>'+
+    '</tr>';
+  }).join('');
+
+  var h = '';
+  h += '<div class="compat-card" style="background:var(--bg2);border:var(--border);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:8px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
+  h += '<div style="flex:1;min-width:200px">';
+
+  // Title row — clickable expand/collapse if has benchmarks
+  h += '<div style="font-weight:600;font-size:0.85rem;'+(hasBench?'cursor:pointer':'')+'"'+' id="compat-title-'+idx+'"'+'>';
+  h += '<span>'+esc(iden.chip_model)+' ↔ '+esc(iden.model_id)+'</span>';
+  if(hasBench) h += ' <span style="font-size:0.65rem;color:var(--green);margin-left:4px">▼</span>';
+  h += '</div>';
+
+  // Framework + precision
+  h += '<div style="font-size:0.73rem;color:var(--text2);margin-top:2px;display:flex;align-items:center;flex-wrap:wrap;gap:6px">';
+  h += esc(det.framework||'')+' · '+esc(det.precision||'');
+  if(det.verified_at) h += '<span style="color:var(--text3)"> · '+esc(det.verified_at)+'</span>';
+  h += '</div>';
+
+  // Benchmark evidence row
+  h += '<div style="font-size:0.7rem;color:var(--text3);margin-top:3px;display:flex;align-items:center;flex-wrap:wrap;gap:4px">';
+  if(hasBench){
+    h += '<span style="color:var(--green);font-weight:600">&#128202; '+ev.count+' 条实测</span>';
+    h += '<span> · 最高: '+(ev.max_throughput_tok_s ? esc(ev.max_throughput_tok_s)+' tok/s' : ev.max_mfu_pct ? esc(ev.max_mfu_pct)+'% MFU' : '—')+'</span>';
+    if(ev.top_evidence) h += evBadge(ev.top_evidence);
+  } else {
+    h += '<span style="color:var(--text3)">&#128202; 无实测</span>';
+  }
+  (ev.sources||[]).slice(0,3).forEach(function(s){
+    h += '<span style="font-size:0.62rem;background:var(--bg3);padding:1px 5px;border-radius:3px;color:var(--text2)">'+esc(s)+'</span>';
+  });
+  h += '</div>';
+
+  // Source links
+  if(srcLinks.length) h += '<div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:4px">'+srcLinks.slice(0,2).join('')+'</div>';
+  // Notes
+  if(det.notes) h += '<div style="font-size:0.68rem;color:var(--text3);margin-top:2px;font-style:italic">💬 '+esc(det.notes)+'</div>';
+  h += '</div>'; // end left side
+
+  // Status badge
+  var statusBg = det.compat_status==='verified'?'rgba(52,211,153,0.15)':det.compat_status==='vendor_claimed'?'rgba(251,146,60,0.15)':'rgba(96,165,250,0.15)';
+  var statusClr = det.compat_status==='verified'?'var(--green)':det.compat_status==='vendor_claimed'?'var(--orange)':'var(--blue)';
+  h += '<span style="font-size:0.75rem;padding:4px 10px;border-radius:4px;font-weight:600;flex-shrink:0;background:'+statusBg+';color:'+statusClr+'">'+esc(det.compat_status)+'</span>';
+  h += '</div>'; // end flex row
+
+  // Expandable benchmark details
+  if(bmRows.length){
+    h += '<div id="compat-detail-'+idx+'" style="display:none;margin-top:8px;border-top:var(--border);padding-top:8px">';
+    h += '<div style="font-size:0.7rem;font-weight:600;color:var(--text2);margin-bottom:4px">&#128202; 关联实测数据 ('+ev.count+'条中展示前5条)</div>';
+    h += '<div class="table-wrap" style="max-height:200px">';
+    h += '<table class="data-table" style="font-size:0.68rem">';
+    h += '<thead><tr><th>证据等级</th><th>性能</th><th>精度</th><th>框架</th><th>来源</th><th>链接</th></tr></thead>';
+    h += '<tbody>'+bmDetails+'</tbody>';
+    h += '</table></div></div>';
+  }
+  h += '</div>'; // end card
+  return h;
+}
+
+/* ═══════════════════ DB STATUS ═══════════════════ */
+async function loadStatus(){
+  const loading=$('status-loading'), cards=$('status-cards');
+  show(loading);
+  const data = await fetchJSON(`${API}/db/status`);
+  hide(loading);
+  if(data._error){cards.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+
+  const tables = data.tables||{};
+  // Also get provenance stats
+  const provData = await fetchJSON(`${API}/provenance/stats`);
+  let provExtra = '';
+  if(!provData._error && provData.total){
+    const bySource = provData.by_source_type || {};
+    const byConf = provData.by_confidence || {};
+    provExtra = `
+      <div style="font-size:0.7rem;color:var(--text2);margin-top:6px;line-height:1.5">
+        <div><b>来源分布:</b> ${Object.entries(bySource).map(([k,v])=>`${esc(k)}: ${v}`).join(' · ')}</div>
+        <div><b>置信度:</b> ${Object.entries(byConf).map(([k,v])=>`${esc(k)}: ${v}`).join(' · ')}</div>
+        <div><b>官方占比:</b> ${provData.by_is_official?.official||0} 官方 / ${provData.by_is_official?.unofficial||0} 非官方</div>
+      </div>`;
+  }
+
+  cards.innerHTML = `
+    <div class="stat-card"><div class="num">${tables.chips||0}</div><div class="lbl">芯片</div></div>
+    <div class="stat-card"><div class="num">${tables.models||0}</div><div class="lbl">模型</div></div>
+    <div class="stat-card"><div class="num">${tables.chip_model_benchmarks||0}</div><div class="lbl">评测数据</div></div>
+    <div class="stat-card"><div class="num">${tables.chip_model_compatibility||0}</div><div class="lbl">兼容性</div></div>
+    <div class="stat-card"><div class="num">${tables.field_provenance||0}</div><div class="lbl">来源追溯</div></div>
+    <div class="stat-card" style="grid-column:span 2">
+      <div class="num" style="font-size:0.85rem">${esc(data.database||'')}</div>
+      <div class="lbl">数据库路径</div>
+      ${provExtra}
+    </div>
+  `;
+}
+
+/* ═══════════════════ INIT ═══════════════════ */
+(function init(){
+  searchChipsInit();
+  loadStatus();
+})();
+</script>
+
+</body>
+</html>
