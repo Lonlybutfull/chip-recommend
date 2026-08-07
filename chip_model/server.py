@@ -41,8 +41,9 @@ from chip_model.database import (
     get_chip_benchmark_mfu,
     get_chip_benchmark_tps,
     get_chip_model_compat_count,
+    get_chip_source_credibility,
 )
-from chip_model.scoring import (  # v3.0 scoring engine
+from chip_model.scoring import (  # v4.2 scoring engine
     parse_fp16,
     round_up_pow2,
     RecommendContext,
@@ -393,8 +394,9 @@ def api_chip_recommend(
         bench_mfu_val = get_chip_benchmark_mfu(chip_model_name)
         bench_tps_val = get_chip_benchmark_tps(chip_model_name)
         compat_verified = get_chip_model_compat_count(chip_model_name)
+        official_ratio = get_chip_source_credibility(chip_model_name)
 
-        # ── v4.1 Scoring ──
+        # ── v4.2 Scoring ──
         ctx = RecommendContext(
             chip=chip_dict,
             model_params_B=total_params,
@@ -417,12 +419,11 @@ def api_chip_recommend(
             max_benchmark_mfu=bench_mfu_val,
             max_benchmark_tps=bench_tps_val,
             compat_verified_count=compat_verified,
+            official_ratio=official_ratio,
         )
 
         scoring_result = aggregate_score(
             ctx, cat_weights,
-            prefer_domestic=prefer_domestic,
-            prefer_vendor=prefer_vendor,
         )
 
         scored.append({
@@ -461,7 +462,7 @@ def api_chip_recommend(
             "max_price_wan": max_price,
         },
         "scoring_meta": {
-            "version": "4.1.0",
+            "version": "4.2.0",
             "scenario_label": scenario_label,
             "category_weights": cat_weights.to_dict(),
             "dimensions": DIMENSION_META,
@@ -518,10 +519,10 @@ def chip_recommend_candidate_v2(
 
 @app.get("/api/v1/methodology")
 def api_methodology():
-    """Return scoring methodology documentation for the UI (v4.1: 3-category system, 8 dimensions)."""
+    """Return scoring methodology documentation for the UI (v4.2: 3-category system, 9 dimensions)."""
     return {
-        "version": "4.1.0",
-        "description": "AISHPerf 芯片推荐引擎 — 3大类·8子维度 分层评分方法 (v4.1)",
+        "version": "4.2.0",
+        "description": "AISHPerf 芯片推荐引擎 — 3大类·9子维度 分层评分方法 (v4.2)",
         "card_estimation": {
             "vram_train": "总参数量(B) × 20 × 1.3 → 按单卡显存分摊 → 取2幂次方",
             "vram_train_lora": "总参数量(B) × 2.5 × 1.3 → 按单卡显存分摊 → 取2幂次方",

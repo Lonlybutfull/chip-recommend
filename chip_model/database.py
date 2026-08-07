@@ -1974,3 +1974,24 @@ def get_chip_model_compat_count(chip_model_name: str,
             (f"%{chip_model_name}%",),
         ).fetchone()
         return row["cnt"] if row else 0
+
+
+def get_chip_source_credibility(chip_model_name: str,
+                                  db_path: str | Path | None = None) -> float:
+    """Return official_ratio for a chip from field_provenance.
+
+    official_ratio = official_fields / total_fields (from field_provenance, table_name='chips').
+    Returns -1.0 if no provenance data exists.
+    """
+    with get_db(db_path, readonly=True) as db:
+        row = db.execute(
+            "SELECT "
+            "  CAST(SUM(CASE WHEN is_official='1' THEN 1 ELSE 0 END) AS REAL) as official, "
+            "  CAST(COUNT(*) AS REAL) as total "
+            "FROM field_provenance "
+            "WHERE table_name='chips' AND row_id = (SELECT id FROM chips WHERE chip_model LIKE ? LIMIT 1)",
+            (f"%{chip_model_name}%",),
+        ).fetchone()
+        if row and row["total"] and row["total"] > 0:
+            return row["official"] / row["total"]
+        return -1.0

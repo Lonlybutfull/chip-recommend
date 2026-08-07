@@ -1,27 +1,18 @@
 """
-AISHPerf Chip Recommendation Scoring Engine v4.1
+AISHPerf Chip Recommendation Scoring Engine v4.2
 
-8-dimension scoring with each dimension outputting 0.0-10.0,
+9-dimension scoring with each dimension outputting 0.0-10.0,
 weighted sum yields total 0-100.
 
-v4.1 changes:
-  - Removed D2 (vram_sufficiency) and D7 (sla_satisfaction) — minor / redundant
-  - D5 replaced: interconnect_quality → bandwidth_adequacy
-    New formula: total_bw = vram_bw_gb_s × cards; model bandwidth need ≤ 50% total → 10,
-    above 50% → linear decay to 0
-
-v3.4 changes:
-  - Missing-data fallback: replaced uniform 5.0 with per-dimension statistical
-    means computed from all 1,093 chips (real database distributions)
-  - Fixed parse_process_node() to handle pure numbers ("7"), TSMC naming ("4NP"),
-    and "5nm/6nm" dual-node notation (was dropping 96.6% of process_node values)
-  - Benchmark chip-name matching now uses normalized (lowercase, trimmed) lookup
-
-v3.3 changes:
-  - D1~D10 scoring formulas re-anchored on real chip data percentiles
-    (P50/P75/P90/P95/P99 from 1,093-chip distribution)
-  - D3 switched from price (0% coverage) to process_node_nm (98% coverage)
-  - D5 switched from interconnect_bw (4% coverage) to vram_bw_gb_s (88% coverage)
+v4.2 changes:
+  - Deleted: production_readiness, cost_efficiency (process_node), domestic_priority
+  - New: server_count_efficiency (8卡/节点=10, 多节点扣分)
+    framework_compat (major frameworks, split from software_compat)
+    toolchain_compat (minor toolchains, split from software_compat)
+    source_credibility (official source ratio)
+  - Modified: ecosystem_maturity → compatibility_score (renamed)
+    benchmark_evidence: no-data default 5.0 (was 6.2)
+    SUB_DIMS_ECOSYSTEM: compat 40% + framework 15% + toolchain 15% + benchmark 20% + source 10%
 
 All formulas have clear physical meaning, documented constants,
 and return traces for transparency.
@@ -205,21 +196,21 @@ class CategoryResult:
 # ── Sub-dimension composition (fixed ratios within each category) ──
 
 SUB_DIMS_COMPUTE_POWER = {
-    "compute_perf": 0.50,
-    "bandwidth_adequacy": 0.30,
-    "production_readiness": 0.20,
+    "compute_perf": 0.60,
+    "bandwidth_adequacy": 0.40,
 }
 
 SUB_DIMS_COST_EFFECTIVENESS = {
-    "cost_efficiency": 0.50,   # process_node_nm
-    "power_efficiency": 0.50,
+    "power_efficiency": 0.40,
+    "server_count_efficiency": 0.60,  # 8卡/节点 → 10, 多节点扣分
 }
 
 SUB_DIMS_ECOSYSTEM = {
-    "ecosystem_maturity": 0.40,
-    "software_compat": 0.20,
-    "benchmark_evidence": 0.30,
-    "domestic_priority": 0.10,
+    "compatibility_score": 0.40,      # renamed from ecosystem_maturity, cloud support + verified compat
+    "framework_compat": 0.15,         # major frameworks only, split from software_compat
+    "toolchain_compat": 0.15,         # minor toolchains only
+    "benchmark_evidence": 0.20,       # no-data default 5.0
+    "source_credibility": 0.10,       # official source ratio (low weight)
 }
 
 CATEGORY_DEFS = [
@@ -447,7 +438,7 @@ class ScoringResult:
     total_score: float = 0.0     # 0–100
     categories: dict[str, CategoryResult] = field(default_factory=dict)
     dimensions: dict[str, DimensionResult] = field(default_factory=dict)  # flat backward-compat
-    version: str = "4.1.0"
+    version: str = "4.2.0"
 
 
 @dataclass
@@ -474,6 +465,7 @@ class RecommendContext:
     max_benchmark_mfu: Optional[float] = None
     max_benchmark_tps: Optional[float] = None
     compat_verified_count: int = 0
+    official_ratio: float = -1.0       # source credibility: official / total (from field_provenance)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -652,54 +644,7 @@ def score_bandwidth_adequacy(vram_bw_gb_s: float, cards: int,
 
 
 # ═══════════════════════════════════════════════════════════
-# Dimension #3: 制程先进性 (Process Node) — weight 12-15%
-# Price data has 0% coverage in database (0/1093 chips).
-# Using process_node_nm instead (98% coverage, 1067/1093 chips).
-# ═══════════════════════════════════════════════════════════
-
-def score_process_node(process_node_nm: float) -> DimensionResult:
-    """Process node score based on actual 1067-chip distribution (97.6% coverage).
-
-    Data: mean=23.6nm, median=12nm, P25=7nm, P75=28nm, min=3nm, max=220nm.
-    Tier-based: 3-5nm=10, 6-7nm=8, 8-10nm=6, 12-16nm=4, 20-28nm=3, 40-55nm=2, >=90nm=1
-    Missing → statistical mean 5.3 (1067-chip average).
-    """
-    MEAN = 5.3  # statistical mean of 1067 chips (97.6% coverage)
-    nm = float(process_node_nm or 0)
-    if nm <= 0:
-        return DimensionResult(score=MEAN, detail=f"无制程数据 → 统计均值 {MEAN:.1f}/10",
-                               raw_values={"process_node_nm": 0, "source": "chip.process_node_nm (1067/1093 chips, 97.6% coverage)", "missing": True})
-    if nm <= 5:     score, tier = 10.0, "3-5nm (顶级)"
-    elif nm <= 7:   score, tier = 8.0,  "6-7nm (先进)"
-    elif nm <= 10:  score, tier = 6.0,  "8-10nm (主流)"
-    elif nm <= 16:  score, tier = 4.0,  "12-16nm (成熟)"
-    elif nm <= 28:  score, tier = 3.0,  "20-28nm"
-    elif nm <= 55:  score, tier = 2.0,  "40-55nm"
-    else:           score, tier = 1.0,  "≥90nm (老旧)"
-    detail = f"制程{nm:.0f}nm ({tier}) → {score:.0f}/10"
-    return DimensionResult(
-        score=score, detail=detail,
-        raw_values={"process_node_nm": nm, "tier": tier,
-                    "formula": "tier lookup: 3-5nm=10, 6-7=8, 8-10=6, 12-16=4, 20-28=3, 40-55=2, 90+=1",
-                    "source": "chip.process_node_nm (1067/1093 chips, 98% coverage)"},
-    )
-
-
-# Legacy alias — keep old name for backward compat in aggregate_score
-def score_cost_efficiency(fp16_tflops: float, price_cny_wan: float) -> DimensionResult:
-    """DEPRECATED: price data has 0% coverage. Use score_process_node instead.
-    Always returns neutral 5.0 with note about missing price data.
-    """
-    return DimensionResult(
-        score=5.0, detail="价格数据缺失(数据库覆盖率0%) → 中性分 5.0/10",
-        raw_values={"price_cny_wan": float(price_cny_wan or 0),
-                    "source": "chip.price_cny_wan (0/1093 chips — NO DATA)",
-                    "missing": True},
-    )
-
-
-# ═══════════════════════════════════════════════════════════
-# Dimension #4: 能效比 (Power Efficiency) — weight 8%
+# Dimension #3: 能效比 (Power Efficiency) — combined with server count
 # ═══════════════════════════════════════════════════════════
 
 def score_power_efficiency(fp16_tflops: float, tdp_w: float) -> DimensionResult:
@@ -742,13 +687,17 @@ def score_power_efficiency(fp16_tflops: float, tdp_w: float) -> DimensionResult:
 
 # ═══════════════════════════════════════════════════════════
 
-def score_ecosystem_maturity(cloud: int, compat_verified: int,
-                             has_frameworks: bool = False) -> DimensionResult:
+# ═══════════════════════════════════════════════════════════
+# Dimension #5: 兼容性评分 (Compatibility Score) — weight 40%
+# ═══════════════════════════════════════════════════════════
+
+def score_compatibility(cloud: int, compat_verified: int,
+                         has_frameworks: bool = False) -> DimensionResult:
     """Composite: cloud support (+3) + verified compat (+4 max, 0.8/ea) + frameworks (+3).
 
-    Max: 3 + 4 + 3 = 10.0. (v3.0: removed maturity_level — too abstract)
+    Max: 3 + 4 + 3 = 10.0.
     Coverage: cloud_available=0, software_stack=41, compatible_frameworks=19, verified_compat=10 rows.
-    Missing data → statistical mean 2.8 (48-chip average with any ecosystem signal).
+    Missing data → 5.0 (neutral, previously 2.8).
     """
     cloud_val = int(float(cloud or 0))
     compat_val = int(compat_verified or 0)
@@ -764,16 +713,15 @@ def score_ecosystem_maturity(cloud: int, compat_verified: int,
     if parts:
         detail = " + ".join(parts) + f" = {score:.1f}/10"
     else:
-        MEAN = 2.8  # statistical mean of 48 chips with any ecosystem data (4.4% coverage)
-        score = MEAN
-        detail = f"无生态数据 → 统计均值 {MEAN:.1f}/10"
+        score = 5.0  # neutral default
+        detail = f"无生态数据 → 默认 {score:.1f}/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
             "cloud_available": cloud_val,
             "compat_verified_count": compat_val,
             "has_frameworks": has_frameworks,
-            "formula": "min(cloud*3 + min(compat*0.8,4) + fw*3, 10)",
+            "formula": "min(cloud*3 + min(compat*0.8,4) + fw*3, 10); no-data→5.0",
             "source": "chip.cloud_available + chip_model_compatibility + chip.software_stack",
             "missing": not parts,
         },
@@ -781,127 +729,145 @@ def score_ecosystem_maturity(cloud: int, compat_verified: int,
 
 
 # ═══════════════════════════════════════════════════════════
-# Dimension #8: 生产就绪度 (Production Readiness) — weight 20%
+# Dimension #4: 服务器节点效率 (Server Count Efficiency) — weight 60%
+# 8卡（1节点）=10分，多节点扣分
 # ═══════════════════════════════════════════════════════════
 
-def score_production_readiness(status: str, is_released: str,
-                                fp16_tflops: float = 0.0) -> DimensionResult:
-    """How ready this chip is for production deployment.
+def score_server_count_efficiency(recommended_cards: int) -> DimensionResult:
+    """8 cards per node = 10 (optimal), more nodes → linear decay.
 
-    Data: 82% of chips have no production_status (896/1093). Among the 197 with status:
-    量产=162, 已发布=14, 未公开发布=7, others=14. Overall mean score=5.78 (all 1093 chips).
-    For missing status, infer from fp16 perf: >100T → likely production-grade → 7.0.
-    Unknown with no signals → statistical mean 5.8.
+    Formula: nodes = ceil(cards / 8)
+    1 node (≤8 cards) → 10
+    2 nodes (9-16) → 8
+    3 nodes (17-24) → 6
+    4 nodes (25-32) → 4
+    5+ nodes → max(0, 2 - 0.5 per extra node above 4)
     """
-    MEAN = 5.8  # statistical mean of all 1093 chips (100% have is_released or status)
-    s = str(status or "")
-    r = str(is_released or "")
-    if "量产" in s:
-        score, detail = 10.0, "已量产 → 10/10"
-    elif "已发布" in s:
-        score, detail = 7.0, "已发布 → 7/10"
-    elif r == "1":
-        score, detail = 5.0, "已发布(无明确状态) → 5/10"
-    elif "待发布" in s:
-        score, detail = 4.0, "待发布 → 4/10"
-    elif fp16_tflops > 100:
-        # High-performance chips without explicit status → likely production
-        score, detail = 7.0, f"FP16={fp16_tflops:.0f}T → 推测量产级 → 7/10"
+    cards = max(recommended_cards, 1)
+    nodes = (cards + 7) // 8  # ceiling division
+    if nodes <= 1:
+        score = 10.0
+        detail = f"{cards}卡 = 1节点 → 满分 10.0/10"
+    elif nodes <= 4:
+        score = 10.0 - (nodes - 1) * 2.0  # 1→10, 2→8, 3→6, 4→4
+        detail = f"{cards}卡 = {nodes}节点 → {score:.1f}/10"
     else:
-        score, detail = MEAN, f"状态未知 → 统计均值 {MEAN:.1f}/10"
+        score = max(0.0, 4.0 - (nodes - 4) * 0.5)  # 5→3.5, 6→3.0, ...
+        detail = f"{cards}卡 = {nodes}节点（>4） → {score:.1f}/10"
     return DimensionResult(
-        score=score, detail=detail,
-        raw_values={"production_status": s, "is_released": r,
-                    "fp16_tflops": fp16_tflops,
-                    "formula": "status lookup + fp16>100 inference bonus",
-                    "source": "chip.production_status (18% coverage) + chip.precision_perf"},
+        score=round(score, 2), detail=detail,
+        raw_values={
+            "recommended_cards": cards, "nodes": nodes,
+            "formula": "nodes=ceil(cards/8); 1→10, 2→8, 3→6, 4→4, >4→-0.5/node",
+        },
     )
 
 
-# ═══════════════════════════════════════════════════════════
-# Dimension #9: 软件栈兼容性 (Software Compatibility) — weight 8%
-# ═══════════════════════════════════════════════════════════
+# ── Framework and toolchain lists ──
 
-# Major frameworks worth 2.5 each, minor worth 1.0 each
 _MAJOR_FRAMEWORKS = ["pytorch", "tensorflow", "jax", "mindspore", "paddlepaddle", "vllm", "onnx"]
 _MINOR_FRAMEWORKS = ["deepspeed", "megatron", "fsdp", "tensorrt", "openvino", "triton",
                       "llama.cpp", "sglang", "lmdeploy", "text-generation-inference"]
 
 
-def score_software_compat(software_stack: str, compatible_frameworks: str) -> DimensionResult:
-    """Framework support breadth. 7 major × 2.5 = 17.5, capped at 10.
-    Coverage: software_stack=41 chips (3.7%), compatible_frameworks=19 chips (1.7%).
-    Missing data → statistical mean 5.8 (23-chip average with any framework signal).
-    D9 is bonus (weight=0.0 in weight budget), so missing score doesn't distort primary ranking.
+# ═══════════════════════════════════════════════════════════
+# Dimension #6: 框架兼容 (Framework Compatibility) — weight 15%
+# Major frameworks only
+# ═══════════════════════════════════════════════════════════
+
+def score_framework_compat(software_stack: str, compatible_frameworks: str) -> DimensionResult:
+    """Major framework support. 7 frameworks × 1.5, capped at 10.
+    No data → default 5.0.
     """
     fw_text = (str(software_stack or "") + " " + str(compatible_frameworks or "")).lower()
     major_hits = sum(1 for fw in _MAJOR_FRAMEWORKS if fw in fw_text)
-    minor_hits = sum(1 for fw in _MINOR_FRAMEWORKS if fw in fw_text)
-    score = min(major_hits * 2.5 + minor_hits * 1.0, 10.0)
-    if major_hits == 0 and minor_hits == 0:
-        MEAN = 5.8  # statistical mean of 23 chips with any framework data (2.1% coverage)
-        score = MEAN
-        detail = f"未检测到主流框架支持 → 统计均值 {MEAN:.1f}/10"
+    if major_hits == 0:
+        score = 5.0
+        detail = "未检测到主流框架支持 → 默认 5.0/10"
     else:
-        detail = f"主流框架×{major_hits} (+{major_hits*2.5}) + 工具链×{minor_hits} (+{minor_hits}) = {score:.1f}/10"
+        score = min(major_hits * 1.5, 10.0)
+        detail = f"主流框架×{major_hits} (+{major_hits*1.5:.1f}) = {score:.1f}/10"
     return DimensionResult(
         score=round(score, 2), detail=detail,
         raw_values={
-            "major_frameworks_found": major_hits, "minor_tools_found": minor_hits,
-            "formula": "min(major*2.5 + minor*1.0, 10)",
+            "major_frameworks_found": major_hits,
+            "formula": "min(major*1.5, 10); no-data→5.0",
             "source": "chip.software_stack + chip.compatible_frameworks",
-            "missing": major_hits == 0 and minor_hits == 0,
+            "missing": major_hits == 0,
         },
     )
 
 
 # ═══════════════════════════════════════════════════════════
-# Dimension #10: 实测验证度 (Benchmark Evidence) — weight 7-8%
+# Dimension #7: 工具链兼容 (Toolchain Compatibility) — weight 15%
+# Minor toolchains only
+# ═══════════════════════════════════════════════════════════
+
+def score_toolchain_compat(software_stack: str, compatible_frameworks: str) -> DimensionResult:
+    """Minor toolchain support. 10 tools × 0.8, capped at 8.
+    No data → default 5.0.
+    """
+    fw_text = (str(software_stack or "") + " " + str(compatible_frameworks or "")).lower()
+    minor_hits = sum(1 for fw in _MINOR_FRAMEWORKS if fw in fw_text)
+    if minor_hits == 0:
+        score = 5.0
+        detail = "未检测到工具链支持 → 默认 5.0/10"
+    else:
+        score = min(minor_hits * 0.8, 8.0)
+        detail = f"工具链×{minor_hits} (+{minor_hits*0.8:.1f}) = {score:.1f}/10"
+    return DimensionResult(
+        score=round(score, 2), detail=detail,
+        raw_values={
+            "minor_tools_found": minor_hits,
+            "formula": "min(minor*0.8, 8); no-data→5.0",
+            "source": "chip.software_stack + chip.compatible_frameworks",
+            "missing": minor_hits == 0,
+        },
+    )
+
+
+# ═══════════════════════════════════════════════════════════
+# Dimension #8: 实测验证度 (Benchmark Evidence) — weight 20%
 # ═══════════════════════════════════════════════════════════
 
 def score_benchmark_evidence(benchmark_count: int, max_mfu: Optional[float],
-                              max_tps: Optional[float], scenario: str) -> DimensionResult:
-    """Reward chips with real benchmark data.
+                              max_tps: Optional[float]) -> DimensionResult:
+    """Reward chips with real benchmark data. No data → 5.0 (neutral default).
 
-    Data: 430 distinct chips have benchmarks (table), but only 33 match chips table by name.
-    Among the 33: mean score=6.22, median=5.95.
-    Count-based tiers (primary): 0=missing, 1-3→5-6, 4-13→6-8, 13+→8-10.
-    MFU/TPS as bonus multipliers (×0.8-1.2) rather than primary score drivers.
-    Missing → statistical mean 6.2 (33-chip average).
+    Count-based: 0→5.0, 1-3→5.5-6.5, 4-13→6.5-8.5, 13+→8.5-9.5.
+    Modest MFU/TPS bonus (±0.5 max) rather than multiplier.
     """
     if benchmark_count == 0:
-        MEAN = 6.2  # statistical mean of 33 chips with matched benchmarks (3.0% coverage)
-        return DimensionResult(score=MEAN, detail=f"无实测benchmark数据 → 统计均值 {MEAN:.1f}/10",
+        return DimensionResult(score=5.0, detail="无实测benchmark数据 → 默认 5.0/10",
                                raw_values={"benchmark_count": 0,
                                            "source": "chip_model_benchmarks (33 matched / 430 total, 3% coverage)",
                                            "missing": True})
 
-    # Count-based base score
+    # Count-based base score (modest range)
     if benchmark_count <= 3:
-        base = 5.0 + benchmark_count / 3.0 * 1.0  # 1→5.3, 2→5.7, 3→6.0
-    elif benchmark_count <= 13:  # P90
-        base = 6.0 + (benchmark_count - 3) / 10.0 * 2.0  # 4→6.2, 13→8.0
+        base = 5.0 + benchmark_count / 3.0 * 1.5  # 1→5.5, 2→6.0, 3→6.5
+    elif benchmark_count <= 13:
+        base = 6.5 + (benchmark_count - 3) / 10.0 * 2.0  # 4→6.7, 13→8.5
     else:
-        base = min(8.0 + (benchmark_count - 13) / 87.0 * 2.0, 9.0)  # 100→10
+        base = min(8.5 + (benchmark_count - 13) / 87.0 * 1.0, 9.5)  # capped at 9.5
 
-    # MFU bonus (×0.9-1.1 multiplier)
+    # Modest MFU bonus (±0.25)
     mfu = float(max_mfu or 0)
-    mfu_mult = 1.0
-    if mfu > 30:
-        mfu_mult = 1.0 + min((mfu - 30) / 70.0, 0.1)  # 30%MFU→1.0, 100%→1.1
+    mfu_bonus = 0.0
+    if mfu > 40:
+        mfu_bonus = 0.25
     elif mfu > 0:
-        mfu_mult = 0.9  # low MFU penalty
+        mfu_bonus = -0.25
 
-    # TPS bonus (×0.9-1.1 multiplier)
+    # Modest TPS bonus (±0.25)
     tps = float(max_tps or 0)
-    tps_mult = 1.0
-    if tps > 1000:
-        tps_mult = 1.0 + min((tps - 1000) / 19000.0, 0.1)
+    tps_bonus = 0.0
+    if tps > 500:
+        tps_bonus = 0.25
     elif tps > 0:
-        tps_mult = 0.9
+        tps_bonus = -0.25
 
-    mult = (mfu_mult + tps_mult) / 2.0
-    score = min(base * mult, 10.0)
+    score = min(base + mfu_bonus + tps_bonus, 10.0)
 
     detail = f"{benchmark_count}条实测"
     if mfu > 0: detail += f" MFU={mfu:.0f}%"
@@ -913,35 +879,52 @@ def score_benchmark_evidence(benchmark_count: int, max_mfu: Optional[float],
         raw_values={
             "benchmark_count": benchmark_count, "max_mfu_pct": mfu,
             "max_throughput_tok_s": tps,
-            "base_score": round(base, 2), "mfu_multiplier": round(mfu_mult, 2),
-            "tps_multiplier": round(tps_mult, 2),
-            "formula": "count-based base(5-9) × MFU/TPS mult(0.9-1.1)",
-            "source": "chip_model_benchmarks — count from db, MFU/TPS as bonus",
+            "base_score": round(base, 2), "mfu_bonus": round(mfu_bonus, 2),
+            "tps_bonus": round(tps_bonus, 2),
+            "formula": "count-base(5.0-9.5) + MFU/TPS bonus(±0.25); no-data→5.0",
+            "source": "chip_model_benchmarks",
         },
     )
 
 
 # ═══════════════════════════════════════════════════════════
-# Dimension #11 (optional): 国产化优先 (Domestic Priority)
+# Dimension #9: 来源真实度 (Source Credibility) — weight 10%
 # ═══════════════════════════════════════════════════════════
 
-def score_domestic_priority(vendor_region: str, prefer_domestic: bool,
-                             prefer_vendor: Optional[str], chip_vendor: str) -> DimensionResult:
-    """Preference bonus. Not part of the 10-dim core but can be added as extra."""
-    region = str(vendor_region or "")
-    vendor = str(chip_vendor or "")
-    if prefer_vendor and prefer_vendor.lower() in vendor.lower():
-        score, detail = 10.0, f"厂商偏好匹配({prefer_vendor}) → 10/10"
-    elif prefer_domestic and region == "domestic":
-        score, detail = 10.0, "国产优先+国产芯片 → 10/10"
-    elif prefer_domestic:
-        score, detail = 0.0, "国产优先+非国产 → 0/10"
+def score_source_credibility(official_ratio: float) -> DimensionResult:
+    """How much of the chip's data comes from official sources.
+
+    official_ratio = official_fields / total_fields (from field_provenance)
+    ≥80% official → 10, ≥60% → 8, ≥40% → 7, ≥20% → 6, <20% → 5
+    No provenance data → 5.0 (neutral, data comes from web_crawl mostly)
+    """
+    if official_ratio < 0:
+        return DimensionResult(
+            score=5.0, detail="无来源溯源数据 → 默认 5.0/10",
+            raw_values={"official_ratio": 0, "missing": True},
+        )
+    if official_ratio >= 0.80:
+        score = 10.0
+        detail = f"官方来源 {official_ratio*100:.0f}%（≥80%）→ 10/10"
+    elif official_ratio >= 0.60:
+        score = 8.0
+        detail = f"官方来源 {official_ratio*100:.0f}%（60-80%）→ 8/10"
+    elif official_ratio >= 0.40:
+        score = 7.0
+        detail = f"官方来源 {official_ratio*100:.0f}%（40-60%）→ 7/10"
+    elif official_ratio >= 0.20:
+        score = 6.0
+        detail = f"官方来源 {official_ratio*100:.0f}%（20-40%）→ 6/10"
     else:
-        score, detail = 5.0, "无偏好 → 中性 5/10"
+        score = 5.0
+        detail = f"官方来源 {official_ratio*100:.0f}%（<20%）→ 5/10"
     return DimensionResult(
-        score=round(score, 2), detail=detail,
-        raw_values={"vendor_region": region, "prefer_domestic": prefer_domestic,
-                     "prefer_vendor": prefer_vendor},
+        score=score, detail=detail,
+        raw_values={
+            "official_ratio": round(official_ratio, 3),
+            "formula": "official_fields/total_fields; ≥80%=10, ≥60%=8, ≥40%=7, ≥20%=6, <20%=5",
+            "source": "field_provenance table — source_type + is_official",
+        },
     )
 
 
@@ -955,7 +938,7 @@ def aggregate_score(
     prefer_domestic: bool = False,
     prefer_vendor: Optional[str] = None,
 ) -> ScoringResult:
-    """v4.1: Compute all dimension scores, aggregate into 3 categories.
+    """v4.2: Compute all dimension scores, aggregate into 3 categories.
 
     Formula:
       total = Cat_A × w_A + Cat_B × w_B + Cat_C × w_C    (0-100 scale)
@@ -964,66 +947,56 @@ def aggregate_score(
 
     chip = ctx.chip
 
-    # ── Step 1: Compute all 8 sub-dimension scores ──
+    # ── Step 1: Compute all 9 sub-dimension scores ──
 
     dims: dict[str, DimensionResult] = {}
 
     # D1: 算力性能
     dims["compute_perf"] = score_compute_perf(ctx.fp16_tflops)
 
-    # D2: 带宽充裕度（替代旧互联扩展性+D2显存+D7 SLA）
+    # D2: 带宽充裕度
     dims["bandwidth_adequacy"] = score_bandwidth_adequacy(
         float(chip.get("vram_bw_gb_s", 0) or 0),
         ctx.recommended_cards,
         ctx.model_bandwidth_gb_s,
     )
 
-    # D3: 制程先进性 (cost_efficiency key kept for API compat)
-    _price_score = score_cost_efficiency(
-        ctx.fp16_tflops, float(chip.get("price_cny_wan", 0) or 0),
-    )
-    _process_nm = parse_process_node(str(chip.get("process_node_nm", "") or ""))
-    _process_score = score_process_node(_process_nm)
-    dims["cost_efficiency"] = _process_score if _process_nm > 0 else _price_score
-
-    # D4: 能效比
+    # D3: 能效比
     dims["power_efficiency"] = score_power_efficiency(
         ctx.fp16_tflops, float(chip.get("tdp_w", 0) or 0),
     )
 
-    # D6: 生态成熟度
+    # D4: 服务器节点效率
+    dims["server_count_efficiency"] = score_server_count_efficiency(ctx.recommended_cards)
+
+    # D5: 兼容性评分（原生态成熟度）
     has_fw = bool((chip.get("software_stack") or "").strip() or
                   (chip.get("compatible_frameworks") or "").strip())
-    dims["ecosystem_maturity"] = score_ecosystem_maturity(
+    dims["compatibility_score"] = score_compatibility(
         int(float(chip.get("cloud_available", 0) or 0)),
         ctx.compat_verified_count,
         has_frameworks=has_fw,
     )
 
-    # D7 (was D8): 生产就绪度
-    dims["production_readiness"] = score_production_readiness(
-        str(chip.get("production_status", "") or ""),
-        str(chip.get("is_released", "") or ""),
-        fp16_tflops=ctx.fp16_tflops,
-    )
-
-    # D8 (was D9): 软件栈兼容
-    dims["software_compat"] = score_software_compat(
+    # D6: 框架兼容
+    dims["framework_compat"] = score_framework_compat(
         str(chip.get("software_stack", "") or ""),
         str(chip.get("compatible_frameworks", "") or ""),
     )
 
-    # D9 (was D10): 实测验证度
-    dims["benchmark_evidence"] = score_benchmark_evidence(
-        ctx.benchmark_count, ctx.max_benchmark_mfu, ctx.max_benchmark_tps, ctx.scenario,
+    # D7: 工具链兼容
+    dims["toolchain_compat"] = score_toolchain_compat(
+        str(chip.get("software_stack", "") or ""),
+        str(chip.get("compatible_frameworks", "") or ""),
     )
 
-    # D10 (was D11): 国产化优先
-    dims["domestic_priority"] = score_domestic_priority(
-        str(chip.get("vendor_region", "") or ""),
-        prefer_domestic, prefer_vendor,
-        str(chip.get("vendor", "") or ""),
+    # D8: 实测验证度
+    dims["benchmark_evidence"] = score_benchmark_evidence(
+        ctx.benchmark_count, ctx.max_benchmark_mfu, ctx.max_benchmark_tps,
     )
+
+    # D9: 来源真实度
+    dims["source_credibility"] = score_source_credibility(ctx.official_ratio)
 
     # ── Step 2: Aggregate into 3 categories ──
 
@@ -1048,10 +1021,10 @@ def aggregate_score(
             # Build formula label (short dim names)
             short_names = {
                 "compute_perf": "D1算力", "bandwidth_adequacy": "D2带宽",
-                "production_readiness": "D7量产", "cost_efficiency": "D3制程",
-                "power_efficiency": "D4能效", "ecosystem_maturity": "D5生态",
-                "software_compat": "D8软件", "benchmark_evidence": "D9实测",
-                "domestic_priority": "D10国产",
+                "power_efficiency": "D3能效", "server_count_efficiency": "D4节点",
+                "compatibility_score": "D5兼容", "framework_compat": "D6框架",
+                "toolchain_compat": "D7工具", "benchmark_evidence": "D8实测",
+                "source_credibility": "D9来源",
             }
             sn = short_names.get(dim_id, dim_id)
             formula_parts.append(f"{sn}×{sub_w:.0%}")
@@ -1077,7 +1050,7 @@ def aggregate_score(
         total_score=round(total * 10, 1),  # scale to 0-100
         categories=categories,
         dimensions=dims,         # flat backward-compat
-        version="4.1.0",
+        version="4.2.0",
     )
 
 
@@ -1139,29 +1112,29 @@ def scoring_result_to_dict(sr: ScoringResult) -> dict:
 DIMENSION_META = [
     {"id": "compute_perf",          "name_cn": "算力性能",     "name_en": "Compute Performance",
      "desc": "单卡FP16/BF16理论算力(TFLOPS)", "unit": "TFLOPS",
-     "category": "compute_power", "sub_weight": 0.50},
+     "category": "compute_power", "sub_weight": 0.60},
     {"id": "bandwidth_adequacy",    "name_cn": "带宽充裕度",   "name_en": "Bandwidth Adequacy",
      "desc": "总显存带宽(vram_bw×卡数)相对模型带宽需求的充裕程度", "unit": "比率",
-     "category": "compute_power", "sub_weight": 0.30},
-    {"id": "cost_efficiency",       "name_cn": "制程先进性",   "name_en": "Process Node",
-     "desc": "芯片制程工艺(nm)，越小越先进", "unit": "nm",
-     "category": "cost_effectiveness", "sub_weight": 0.50},
+     "category": "compute_power", "sub_weight": 0.40},
     {"id": "power_efficiency",      "name_cn": "能效比",      "name_en": "Power Efficiency",
      "desc": "每瓦功耗产出的算力", "unit": "GFLOPS/W",
-     "category": "cost_effectiveness", "sub_weight": 0.50},
-    {"id": "ecosystem_maturity",    "name_cn": "生态成熟度",   "name_en": "Ecosystem Maturity",
+     "category": "cost_effectiveness", "sub_weight": 0.40},
+    {"id": "server_count_efficiency","name_cn": "节点效率",    "name_en": "Server Count Efficiency",
+     "desc": "8卡=1节点满分，多节点扣分", "unit": "节点数",
+     "category": "cost_effectiveness", "sub_weight": 0.60},
+    {"id": "compatibility_score",   "name_cn": "兼容性评分",   "name_en": "Compatibility Score",
      "desc": "云平台可用+已验证兼容模型数+框架支持", "unit": "综合分",
      "category": "ecosystem_maturity", "sub_weight": 0.40},
-    {"id": "production_readiness",  "name_cn": "生产就绪度",   "name_en": "Production Readiness",
-     "desc": "量产/已发布/未公开等状态", "unit": "等级",
-     "category": "compute_power", "sub_weight": 0.20},
+    {"id": "framework_compat",      "name_cn": "框架兼容",     "name_en": "Framework Compatibility",
+     "desc": "主流框架支持数(PyTorch/TF/JAX等)", "unit": "框架数",
+     "category": "ecosystem_maturity", "sub_weight": 0.15},
+    {"id": "toolchain_compat",      "name_cn": "工具链兼容",   "name_en": "Toolchain Compatibility",
+     "desc": "辅助工具链支持数(DeepSpeed/TensorRT等)", "unit": "工具数",
+     "category": "ecosystem_maturity", "sub_weight": 0.15},
     {"id": "benchmark_evidence",    "name_cn": "实测验证度",   "name_en": "Benchmark Evidence",
      "desc": "是否有实测benchmark数据(MFU/吞吐)", "unit": "证据分",
-     "category": "ecosystem_maturity", "sub_weight": 0.30},
-    {"id": "software_compat",       "name_cn": "软件栈兼容",   "name_en": "Software Compatibility",
-     "desc": "支持的主流框架和工具链数量", "unit": "框架数",
      "category": "ecosystem_maturity", "sub_weight": 0.20},
-    {"id": "domestic_priority",     "name_cn": "国产化优先",   "name_en": "Domestic Priority",
-     "desc": "国产/厂商偏好匹配加分", "unit": "偏好分",
+    {"id": "source_credibility",    "name_cn": "来源真实度",   "name_en": "Source Credibility",
+     "desc": "数据来源中官方资料占比", "unit": "比率",
      "category": "ecosystem_maturity", "sub_weight": 0.10},
 ]
