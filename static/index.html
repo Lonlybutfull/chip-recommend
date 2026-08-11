@@ -2002,32 +2002,39 @@ async function loadMethodology() {
       <div class="group" style="margin-bottom:20px">
         <div class="group-header">🧠 显存计算逻辑 — 各因子含义</div>
         <div class="group-body">
-          <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:14px">
-            <div style="font-weight:600;margin-bottom:6px">📐 通用公式</div>
-            <code style="font-size:0.85rem;display:block;margin-bottom:4px">${esc(data.vram_factors.formula_general||'')}</code>
-            <code style="font-size:0.85rem;display:block;color:var(--text2)">${esc(data.vram_factors.formula_cards||'')}</code>
-            ${data.vram_factors.note_moe ? `<div style="margin-top:6px;font-size:0.72rem;color:var(--orange)">⚠ ${esc(data.vram_factors.note_moe)}</div>` : ''}
+          <div style="background:linear-gradient(135deg,var(--bg3),var(--bg2));border:1px solid var(--bg4);border-radius:var(--radius);padding:18px 22px;margin-bottom:20px">
+            <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--accent)">📐 通用公式</div>
+            <div style="background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-family:Consolas,'Courier New',monospace;font-size:0.8rem;line-height:1.8">
+              <div>${esc(data.vram_factors.formula_general||'')}</div>
+              <div style="color:var(--text2)">${esc(data.vram_factors.formula_cards||'')}</div>
+            </div>
+            ${data.vram_factors.note_moe ? `<div style="margin-top:10px;font-size:0.72rem;color:var(--orange);display:flex;align-items:flex-start;gap:4px"><span>⚠️</span><span>${esc(data.vram_factors.note_moe)}</span></div>` : ''}
           </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px">
           ${(data.vram_factors.factors||[]).map(f => `
-            <div style="margin-bottom:16px">
-              <div style="font-weight:700;font-size:0.88rem;margin-bottom:6px;color:var(--accent)">🔹 ${esc(f.label)} <code style="font-size:0.75rem;font-weight:400">${esc(f.factor)}</code></div>
-              <div style="color:var(--text2);font-size:0.75rem;margin-bottom:8px">${esc(f.desc)}</div>
-              <div style="overflow-x:auto">
-                <table style="width:100%;font-size:0.76rem;border-collapse:collapse">
-                  <thead><tr style="background:var(--bg4)">
-                    <th style="padding:6px 10px;text-align:left;font-weight:600">场景</th>
-                    <th style="padding:6px 10px;text-align:center;font-weight:600;min-width:80px">取值</th>
-                    <th style="padding:6px 10px;text-align:left;font-weight:600">分解说明</th>
-                  </tr></thead>
-                  <tbody>${(f.values||[]).map(v => `<tr>
-                    <td style="padding:5px 10px;border-bottom:1px solid var(--bg4)">${esc(v.scenario)}</td>
-                    <td style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--bg4)"><span style="background:var(--bg3);padding:2px 8px;border-radius:4px;font-weight:600;white-space:nowrap">${esc(v.value)}</span></td>
-                    <td style="padding:5px 10px;border-bottom:1px solid var(--bg4);color:var(--text2)">${esc(v.breakdown)}</td>
-                  </tr>`).join('')}</tbody>
-                </table>
+            <div style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);padding:16px 18px">
+              <div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;display:flex;align-items:center;gap:8px">
+                <span style="color:var(--accent);font-size:1rem">🔹</span>
+                <span>${esc(f.label)}</span>
+                <code style="font-size:0.7rem;font-weight:400;color:var(--text3);background:var(--bg3);padding:1px 8px;border-radius:4px;margin-left:auto">${esc(f.factor)}</code>
               </div>
+              <div style="color:var(--text2);font-size:0.73rem;margin-bottom:10px">${esc(f.desc)}</div>
+              <table style="width:100%;font-size:0.74rem;border-collapse:collapse">
+                <thead><tr style="border-bottom:2px solid var(--bg4)">
+                  <th style="padding:6px 8px;text-align:left;font-weight:600;font-size:0.7rem;color:var(--text3);width:30%">场景</th>
+                  <th style="padding:6px 8px;text-align:center;font-weight:600;font-size:0.7rem;color:var(--text3);width:25%">取值</th>
+                  <th style="padding:6px 8px;text-align:left;font-weight:600;font-size:0.7rem;color:var(--text3)">说明</th>
+                </tr></thead>
+                <tbody>${(f.values||[]).map((v,i) => `<tr style="border-bottom:1px solid var(--bg4)${i===0?'':''}">
+                  <td style="padding:7px 8px;vertical-align:top;font-weight:600;font-size:0.72rem">${esc(v.scenario)}</td>
+                  <td style="padding:7px 8px;text-align:center;vertical-align:top"><code style="font-size:0.7rem;background:var(--bg3);padding:2px 6px;border-radius:3px;white-space:nowrap">${esc(v.value)}</code></td>
+                  <td style="padding:7px 8px;vertical-align:top;font-size:0.7rem;color:var(--text2);line-height:1.5">${esc(v.breakdown)}</td>
+                </tr>`).join('')}</tbody>
+              </table>
             </div>
           `).join('')}
+          </div>
         </div>
       </div>` : ''}
 
