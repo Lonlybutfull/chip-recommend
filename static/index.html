@@ -1997,6 +1997,40 @@ async function loadMethodology() {
         <p style="color:var(--text2);font-size:0.82rem;margin:0">AISHPerf 芯片推荐引擎 — 3大类 · 9子维度分层评分方法</p>
       </div>
 
+      <!-- VRAM Factors -->
+      ${data.vram_factors ? `
+      <div class="group" style="margin-bottom:20px">
+        <div class="group-header">🧠 显存计算逻辑 — 各因子含义</div>
+        <div class="group-body">
+          <div style="background:var(--bg3);border-radius:var(--radius-sm);padding:14px 18px;margin-bottom:14px">
+            <div style="font-weight:600;margin-bottom:6px">📐 通用公式</div>
+            <code style="font-size:0.85rem;display:block;margin-bottom:4px">${esc(data.vram_factors.formula_general||'')}</code>
+            <code style="font-size:0.85rem;display:block;color:var(--text2)">${esc(data.vram_factors.formula_cards||'')}</code>
+            ${data.vram_factors.note_moe ? `<div style="margin-top:6px;font-size:0.72rem;color:var(--orange)">⚠ ${esc(data.vram_factors.note_moe)}</div>` : ''}
+          </div>
+          ${(data.vram_factors.factors||[]).map(f => `
+            <div style="margin-bottom:16px">
+              <div style="font-weight:700;font-size:0.88rem;margin-bottom:6px;color:var(--accent)">🔹 ${esc(f.label)} <code style="font-size:0.75rem;font-weight:400">${esc(f.factor)}</code></div>
+              <div style="color:var(--text2);font-size:0.75rem;margin-bottom:8px">${esc(f.desc)}</div>
+              <div style="overflow-x:auto">
+                <table style="width:100%;font-size:0.76rem;border-collapse:collapse">
+                  <thead><tr style="background:var(--bg4)">
+                    <th style="padding:6px 10px;text-align:left;font-weight:600">场景</th>
+                    <th style="padding:6px 10px;text-align:center;font-weight:600;min-width:80px">取值</th>
+                    <th style="padding:6px 10px;text-align:left;font-weight:600">分解说明</th>
+                  </tr></thead>
+                  <tbody>${(f.values||[]).map(v => `<tr>
+                    <td style="padding:5px 10px;border-bottom:1px solid var(--bg4)">${esc(v.scenario)}</td>
+                    <td style="padding:5px 10px;text-align:center;border-bottom:1px solid var(--bg4)"><span style="background:var(--bg3);padding:2px 8px;border-radius:4px;font-weight:600;white-space:nowrap">${esc(v.value)}</span></td>
+                    <td style="padding:5px 10px;border-bottom:1px solid var(--bg4);color:var(--text2)">${esc(v.breakdown)}</td>
+                  </tr>`).join('')}</tbody>
+                </table>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : ''}
+
       <!-- Card Estimation -->
       <div class="group" style="margin-bottom:20px">
         <div class="group-header">🧮 卡数估算公式</div>

@@ -524,8 +524,8 @@ def api_methodology():
         "version": "4.2.0",
         "description": "AISHPerf 芯片推荐引擎 — 3大类·9子维度 分层评分方法 (v4.2)",
         "card_estimation": {
-            "vram_train": "总参数量(B) × 20 × 1.3 → 按单卡显存分摊 → 取2幂次方",
-            "vram_train_lora": "总参数量(B) × 2.5 × 1.3 → 按单卡显存分摊 → 取2幂次方",
+            "vram_train": "总参数量(B) × 20 × 1.25 → 按单卡显存分摊 → 取2幂次方",
+            "vram_train_lora": "总参数量(B) × 2.5 × 1.25 → 按单卡显存分摊 → 取2幂次方",
             "vram_quantize": "GPTQ:3.5×P×1.25 / AWQ:3.0×P×1.25 / bitsandbytes:2.5×P×1.25 / GGUF:2.5×P×1.25",
             "vram_inference": "总参数量(B) × 2 × 1.25 → 按单卡显存分摊 → 取2幂次方",
             "vram_inference_quant": "INT8:1.0×P×1.25 / INT4:0.5×P×1.25",
@@ -533,6 +533,38 @@ def api_methodology():
             "mfu_default": 0.30,
             "mfu_prefer_benchmark": "优先使用 chip_model_benchmarks 表的实测 MFU",
             "inference_throughput_formula": "min(compute_bound, memory_bound) × 0.30 效率因子",
+        },
+        "vram_factors": {
+            "title": "显存计算 — 各因子含义",
+            "formula_general": "min_vram_total = 总参数量(B) × bytes_per_param × safety_factor",
+            "formula_cards": "vram_cards = max(1, ceil(min_vram_total / chip_vram_gb) + 1) → 取2幂次方",
+            "note_moe": "MoE 模型：有效参数量 = min(总参数量, 激活参数量×2)，推理时只用激活参数量",
+            "factors": [
+                {"factor": "bytes_per_param", "label": "每参数字节数", "desc": "每个参数占用的显存字节数（含参数本身+梯度+优化器状态+激活值开销）", "values": [
+                    {"scenario": "训练·SFT全参", "value": "20 bytes/param", "breakdown": "FP16参数(2) + FP16梯度(2) + Adam m(4) + Adam v(4) + 激活值(8) ≈ 20"},
+                    {"scenario": "训练·CPT", "value": "20 bytes/param", "breakdown": "同SFT全参，包含完整优化器状态和激活值"},
+                    {"scenario": "训练·RL(PPO/GRPO)", "value": "25 bytes/param", "breakdown": "Actor(2) + Critic(2) + Ref模型(2) + 优化器(8-12) + 激活(6-8) ≈ 22-30，取25"},
+                    {"scenario": "训练·LoRA", "value": "2.5 bytes/param", "breakdown": "冻结基座(2) + LoRA适配器 + 无优化器状态，大幅降低显存需求"},
+                    {"scenario": "量化·GPTQ", "value": "3.5 bytes/param", "breakdown": "FP16模型(2) + Hessian矩阵缓冲区(1.5)"},
+                    {"scenario": "量化·AWQ", "value": "3.0 bytes/param", "breakdown": "FP16模型(2) + 激活统计缓冲区(1.0)"},
+                    {"scenario": "量化·bitsandbytes/GGUF", "value": "2.5 bytes/param", "breakdown": "FP16模型(2) + 量化缓冲区(0.5)"},
+                    {"scenario": "推理·FP16", "value": "2.0 bytes/param", "breakdown": "仅模型权重加载，无反向传播"},
+                    {"scenario": "推理·INT8", "value": "1.0 bytes/param", "breakdown": "INT8 量化权重 = 1 byte/param"},
+                    {"scenario": "推理·INT4/GPTQ/AWQ/GGUF", "value": "0.5 bytes/param", "breakdown": "INT4 量化权重 = 0.5 byte/param"},
+                ]},
+                {"factor": "safety_factor", "label": "安全系数", "desc": "为 KV Cache、中间激活、碎片化预留的额外空间", "values": [
+                    {"scenario": "训练场景", "value": "×1.25", "breakdown": "预留 25% 用于 KV Cache + 中间激活峰值"},
+                    {"scenario": "推理场景", "value": "×1.25", "breakdown": "预留 25% 用于 KV Cache + batch 开销"},
+                    {"scenario": "量化场景", "value": "×1.25", "breakdown": "预留 25% 用于校准数据 + 中间缓冲区"},
+                ]},
+                {"factor": "card_rounding", "label": "卡数取整规则", "desc": "最终推荐卡数取 2 的幂次方（1/2/4/8/16/32…），确保 NCCL 等集合通信效率最优", "values": [
+                    {"scenario": "通用", "value": "ceil → pow2", "breakdown": "先向上取整，再取最近的 ≥ 当前值 的 2 幂次方"},
+                ]},
+                {"factor": "mfu", "label": "MFU (Model FLOPs Utilization)", "desc": "实际算力利用率，理论峰值算力无法 100% 达到", "values": [
+                    {"scenario": "默认值", "value": "0.30 (30%)", "breakdown": "无实测数据时的保守估计，覆盖多数芯片"},
+                    {"scenario": "有实测数据", "value": "优先使用 chip_model_benchmarks", "breakdown": "取该芯片在 benchmark 表中的实测 MFU 均值"},
+                ]},
+            ],
         },
         "total_score_formula": "总分 = 算力性能×0.50 + 性价比×0.20 + 生态成熟度×0.30 (大类权重统一 5:2:3)",
         "scenario_weights": {
