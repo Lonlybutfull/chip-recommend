@@ -572,6 +572,12 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
   <div id="methodology-loading" class="loading" style="display:none"><div class="spinner"></div></div>
 </section>
 
+<!-- ═══ VRAM LOGIC ═══ -->
+<section id="tab-vram-logic" class="tab-panel">
+  <div id="vram-content" style="max-width:1200px;margin:0 auto"></div>
+  <div id="vram-loading" class="loading" style="display:none"><div class="spinner"></div></div>
+</section>
+
 <!-- ═══ STATUS ═══ -->
 <section id="tab-status" class="tab-panel">
   <div class="status-grid" id="status-cards"></div>
@@ -1005,6 +1011,7 @@ const TABS = [
   {id:'models',label:'🧠 模型搜索',action:()=>searchModelsInit()},
   {id:'recommend',label:'🎯 算力推荐',action:()=>initRecommend()},
   {id:'methodology',label:'📖 算法设计细则',action:()=>loadMethodology()},
+  {id:'vram-logic',label:'🧠 显存计算逻辑',action:()=>loadVramLogic()},
   {id:'compat',label:'🔗 兼容性',action:()=>searchCompatInit()},
   {id:'status',label:'📊 系统状态',action:()=>loadStatus()},
 ];
@@ -1997,47 +2004,6 @@ async function loadMethodology() {
         <p style="color:var(--text2);font-size:0.82rem;margin:0">AISHPerf 芯片推荐引擎 — 3大类 · 9子维度分层评分方法</p>
       </div>
 
-      <!-- VRAM Factors -->
-      ${data.vram_factors ? `
-      <div class="group" style="margin-bottom:20px">
-        <div class="group-header">🧠 显存计算逻辑 — 各因子含义</div>
-        <div class="group-body">
-          <div style="background:linear-gradient(135deg,var(--bg3),var(--bg2));border:1px solid var(--bg4);border-radius:var(--radius);padding:18px 22px;margin-bottom:20px">
-            <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--accent)">📐 通用公式</div>
-            <div style="background:var(--bg);border-radius:var(--radius-sm);padding:12px 16px;font-family:Consolas,'Courier New',monospace;font-size:0.8rem;line-height:1.8">
-              <div>${esc(data.vram_factors.formula_general||'')}</div>
-              <div style="color:var(--text2)">${esc(data.vram_factors.formula_cards||'')}</div>
-            </div>
-            ${data.vram_factors.note_moe ? `<div style="margin-top:10px;font-size:0.72rem;color:var(--orange);display:flex;align-items:flex-start;gap:4px"><span>⚠️</span><span>${esc(data.vram_factors.note_moe)}</span></div>` : ''}
-          </div>
-
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px">
-          ${(data.vram_factors.factors||[]).map(f => `
-            <div style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);padding:16px 18px">
-              <div style="font-weight:700;font-size:0.85rem;margin-bottom:4px;display:flex;align-items:center;gap:8px">
-                <span style="color:var(--accent);font-size:1rem">🔹</span>
-                <span>${esc(f.label)}</span>
-                <code style="font-size:0.7rem;font-weight:400;color:var(--text3);background:var(--bg3);padding:1px 8px;border-radius:4px;margin-left:auto">${esc(f.factor)}</code>
-              </div>
-              <div style="color:var(--text2);font-size:0.73rem;margin-bottom:10px">${esc(f.desc)}</div>
-              <table style="width:100%;font-size:0.74rem;border-collapse:collapse">
-                <thead><tr style="border-bottom:2px solid var(--bg4)">
-                  <th style="padding:6px 8px;text-align:left;font-weight:600;font-size:0.7rem;color:var(--text3);width:30%">场景</th>
-                  <th style="padding:6px 8px;text-align:center;font-weight:600;font-size:0.7rem;color:var(--text3);width:25%">取值</th>
-                  <th style="padding:6px 8px;text-align:left;font-weight:600;font-size:0.7rem;color:var(--text3)">说明</th>
-                </tr></thead>
-                <tbody>${(f.values||[]).map((v,i) => `<tr style="border-bottom:1px solid var(--bg4)${i===0?'':''}">
-                  <td style="padding:7px 8px;vertical-align:top;font-weight:600;font-size:0.72rem">${esc(v.scenario)}</td>
-                  <td style="padding:7px 8px;text-align:center;vertical-align:top"><code style="font-size:0.7rem;background:var(--bg3);padding:2px 6px;border-radius:3px;white-space:nowrap">${esc(v.value)}</code></td>
-                  <td style="padding:7px 8px;vertical-align:top;font-size:0.7rem;color:var(--text2);line-height:1.5">${esc(v.breakdown)}</td>
-                </tr>`).join('')}</tbody>
-              </table>
-            </div>
-          `).join('')}
-          </div>
-        </div>
-      </div>` : ''}
-
       <!-- Card Estimation -->
       <div class="group" style="margin-bottom:20px">
         <div class="group-header">🧮 卡数估算公式</div>
@@ -2135,8 +2101,10 @@ async function loadMethodology() {
 // Hash routing: #methodology → switch to tab
 (function(){
   if (location.hash === '#methodology') { switchToTab('methodology'); }
+  if (location.hash === '#vram-logic') { switchToTab('vram-logic'); }
   window.addEventListener('hashchange', ()=>{
     if (location.hash === '#methodology') switchToTab('methodology');
+    if (location.hash === '#vram-logic') switchToTab('vram-logic');
   });
 })();
 
@@ -2149,6 +2117,29 @@ function switchToTab(tabId) {
   if (btn) btn.classList.add('active');
   const def = TABS.find(t=>t.id===tabId);
   if (def && def.action) def.action();
+}
+
+
+
+/* VRAM LOGIC TAB */
+async function loadVramLogic(){
+  const c=$('vram-content'),l=$('vram-loading');
+  show(l);c.innerHTML='';
+  try{
+    const d=await fetchJSON(API+'/methodology');
+    if(d._error){c.innerHTML='<div class="error">'+esc(d._error)+'</div>';hide(l);return}
+    const vf=d.vram_factors;
+    if(!vf){c.innerHTML='<div class="error">无显存计算数据</div>';hide(l);return}
+    c.innerHTML='<div style="margin-bottom:24px"><h2 style="font-size:1.4rem;margin:0 0 6px">🧠 显存计算逻辑 <span style="font-size:0.75rem;color:var(--text3);font-weight:400">v'+esc(d.version||'4.2')+'</span></h2><p style="color:var(--text2);font-size:0.82rem;margin:0">显存约束卡数估算 — bytes_per_param × safety_factor → 取2幂次方</p></div>'+
+      '<div class="group" style="margin-bottom:20px"><div class="group-header">📐 通用公式</div><div class="group-body"><div style="background:var(--bg);border-radius:var(--radius-sm);padding:16px 20px;font-family:Consolas,\'Courier New\',monospace;font-size:0.88rem;line-height:2"><div style="font-weight:700;color:var(--accent)">'+esc(vf.formula_general||'')+'</div><div style="color:var(--text2)">'+esc(vf.formula_cards||'')+'</div></div>'+
+      (vf.note_moe?'<div style="margin-top:10px;font-size:0.74rem;color:var(--orange);display:flex;align-items:flex-start;gap:4px"><span>⚠️</span><span>'+esc(vf.note_moe)+'</span></div>':'')+'</div></div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:18px;margin-bottom:20px">'+
+      (vf.factors||[]).map(function(f){
+        var rows=(f.values||[]).map(function(v){return '<tr style="border-bottom:1px solid var(--bg4)"><td style="padding:9px 14px;vertical-align:top;font-weight:600;font-size:0.73rem">'+esc(v.scenario)+'</td><td style="padding:9px 14px;text-align:center;vertical-align:top"><code style="font-size:0.7rem;background:var(--bg3);padding:2px 8px;border-radius:4px;white-space:nowrap">'+esc(v.value)+'</code></td><td style="padding:9px 14px;vertical-align:top;font-size:0.72rem;color:var(--text2);line-height:1.55">'+esc(v.breakdown)+'</td></tr>';}).join('');
+        return '<div style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);overflow:hidden"><div style="background:linear-gradient(135deg,rgba(45,140,240,0.08),transparent);padding:14px 18px;border-bottom:1px solid var(--bg4)"><div style="font-weight:700;font-size:0.88rem;display:flex;align-items:center;gap:10px"><span style="color:var(--accent);font-size:1.1rem">🔹</span><span>'+esc(f.label)+'</span><code style="font-size:0.68rem;font-weight:400;color:var(--text3);background:var(--bg3);padding:2px 10px;border-radius:4px;margin-left:auto">'+esc(f.factor)+'</code></div><div style="color:var(--text2);font-size:0.73rem;margin-top:4px">'+esc(f.desc)+'</div></div><table style="width:100%;font-size:0.76rem;border-collapse:collapse"><thead><tr style="background:var(--bg3)"><th style="padding:8px 14px;text-align:left;font-weight:600;font-size:0.7rem;color:var(--text3);width:28%">场景</th><th style="padding:8px 14px;text-align:center;font-weight:600;font-size:0.7rem;color:var(--text3);width:22%">取值</th><th style="padding:8px 14px;text-align:left;font-weight:600;font-size:0.7rem;color:var(--text3)">分解说明</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+      }).join('')+'</div>';
+  }catch(e){c.innerHTML='<div class="error">加载失败: '+esc(e.message)+'</div>'}
+  hide(l);
 }
 
 /*  COMPAT  */
