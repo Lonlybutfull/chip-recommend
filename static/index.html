@@ -48,6 +48,15 @@ nav button{
 }
 nav button:hover{color:var(--accent);background:var(--bg3)}
 nav button.active{color:var(--accent);background:rgba(45,140,240,0.08)}
+.hermes-nav-btn{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:7px 14px;border-radius:16px;cursor:pointer;
+  font-size:0.78rem;font-weight:600;color:var(--purple);
+  background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.25);
+  transition:var(--transition);white-space:nowrap;text-decoration:none;
+  margin-right:6px;
+}
+.hermes-nav-btn:hover{background:rgba(139,92,246,0.16);border-color:var(--purple);color:var(--purple)}
 .api-link{
   color:var(--text2);font-size:0.8rem;font-weight:500;
   padding:7px 14px;border-radius:6px;text-decoration:none;
@@ -557,6 +566,12 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
   <div id="compat-loading" class="loading" style="display:none"><div class="spinner"></div></div>
 </section>
 
+<!-- ═══ METHODOLOGY ═══ -->
+<section id="tab-methodology" class="tab-panel">
+  <div id="methodology-content" style="max-width:1200px;margin:0 auto"></div>
+  <div id="methodology-loading" class="loading" style="display:none"><div class="spinner"></div></div>
+</section>
+
 <!-- ═══ STATUS ═══ -->
 <section id="tab-status" class="tab-panel">
   <div class="status-grid" id="status-cards"></div>
@@ -989,13 +1004,15 @@ const TABS = [
   {id:'chips',label:'🔍 芯片搜索',action:()=>searchChipsInit()},
   {id:'models',label:'🧠 模型搜索',action:()=>searchModelsInit()},
   {id:'recommend',label:'🎯 算力推荐',action:()=>initRecommend()},
+  {id:'methodology',label:'📖 算法设计细则',action:()=>loadMethodology()},
   {id:'compat',label:'🔗 兼容性',action:()=>searchCompatInit()},
   {id:'status',label:'📊 系统状态',action:()=>loadStatus()},
 ];
 
 (function buildNav(){
   const nav = $('main-nav');
-  nav.innerHTML = TABS.map((t,i)=>`<button data-tab="${t.id}" ${i===0?'class="active"':''}>${t.label}</button>`).join('');
+  nav.innerHTML = '<a href="http://61.172.167.201:8787" target="_blank" class="hermes-nav-btn" title="打开 Hermes WebUI（新标签页）">🧿 Hermes</a>'
+    + TABS.map((t,i)=>`<button data-tab="${t.id}" ${i===0?'class="active"':''}>${t.label}</button>`).join('');
   nav.querySelectorAll('button').forEach(btn=>{
     btn.addEventListener('click',()=>{
       STATE.currentTab=btn.dataset.tab;
@@ -1948,7 +1965,152 @@ async function showMethodology() {
   } catch(e) { panel.innerHTML = `<div class="error">加载失败: ${esc(e.message)}</div>`; }
 }
 
-/* ═══════════════════ COMPAT ═══════════════════ */
+/* ═══════════════════ METHODOLOGY TAB ═══════════════════ */
+async function loadMethodology() {
+  const content = $('methodology-content');
+  const loading = $('methodology-loading');
+  show(loading); content.innerHTML = '';
+  try {
+    const data = await fetchJSON(`${API}/methodology`);
+    if (data._error) { content.innerHTML = `<div class="error">${esc(data._error)}</div>`; hide(loading); return; }
+    const dims = data.scoring_dimensions || [];
+    const catMap = {
+      compute_power: {cn:'算力性能', icon:'⚡', desc:'单卡算力与带宽，决定训练/推理的根本上限'},
+      cost_effectiveness: {cn:'性价比', icon:'💰', desc:'能效 + 集群经济性，影响部署总成本'},
+      ecosystem_maturity: {cn:'生态成熟度', icon:'🌐', desc:'兼容性 + 工具链 + 实测验证 + 数据可信度'}
+    };
+    const catNameMap = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度'};
+
+    // Group dimensions by category
+    const groups = {};
+    dims.forEach(d => {
+      const cat = d.category || 'other';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(d);
+    });
+
+    const categoryOrder = ['compute_power','cost_effectiveness','ecosystem_maturity'];
+
+    content.innerHTML = `
+      <div style="margin-bottom:24px">
+        <h2 style="font-size:1.4rem;margin:0 0 6px">📖 推荐算法设计细则 <span style="font-size:0.75rem;color:var(--text3);font-weight:400">v${data.version||'4.2'}</span></h2>
+        <p style="color:var(--text2);font-size:0.82rem;margin:0">AISHPerf 芯片推荐引擎 — 3大类 · 9子维度分层评分方法</p>
+      </div>
+
+      <!-- Card Estimation -->
+      <div class="group" style="margin-bottom:20px">
+        <div class="group-header">🧮 卡数估算公式</div>
+        <div class="group-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:8px">
+          ${Object.entries(data.card_estimation||{}).map(([k,v]) => {
+            let label = k;
+            if (k.startsWith('vram_')) label = '<span style="color:var(--blue);font-weight:600">显存约束</span> → ' + k.replace('vram_','');
+            else if (k.startsWith('compute_')) label = '<span style="color:var(--orange);font-weight:600">算力约束</span> → ' + k.replace('compute_','');
+            else if (k.startsWith('mfu_')) label = '<span style="color:var(--green);font-weight:600">MFU</span> → ' + k.replace('mfu_','');
+            else if (k.startsWith('inference_')) label = '<span style="color:var(--purple);font-weight:600">推理吞吐</span> → ' + k.replace('inference_','');
+            return '<div class="group-field" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-size:0.7rem;color:var(--text3)">'+label+'</span><code style="font-size:0.73rem;word-break:break-all">'+esc(String(v))+'</code></div>';
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Category Overview Cards -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:20px">
+        ${categoryOrder.map(cat => {
+          const meta = catMap[cat] || {cn:cat, icon:'📌', desc:''};
+          const catDims = groups[cat] || [];
+          // Calculate cat weight from weights matrix
+          let catWeight = 0;
+          if (data.scenario_weights) {
+            const firstScenario = Object.values(data.scenario_weights)[0] || {};
+            catWeight = (firstScenario[cat] || 0) * 100;
+          }
+          return `<div style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);padding:18px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+              <span style="font-size:1.5rem">${meta.icon}</span>
+              <span style="font-weight:700;font-size:1rem">${meta.cn}</span>
+              ${catWeight > 0 ? `<span style="font-size:0.75rem;color:var(--accent);font-weight:600;background:rgba(45,140,240,0.1);padding:2px 8px;border-radius:10px">${catWeight.toFixed(0)}%</span>` : ''}
+            </div>
+            <p style="color:var(--text2);font-size:0.76rem;margin:0 0 12px">${meta.desc}</p>
+            ${catDims.map((d,i) => `<div style="border-left:3px solid var(--accent);padding:6px 0 6px 12px;margin-bottom:8px;background:var(--bg3);border-radius:0 var(--radius-sm) var(--radius-sm) 0">
+              <div style="font-weight:600;font-size:0.82rem">${esc(d.name_cn)} <span style="font-weight:400;font-size:0.68rem;color:var(--text3)">${esc(d.name_en)}</span></div>
+              <div style="color:var(--text2);font-size:0.72rem">${esc(d.desc||'')} · <span style="color:var(--text3)">单位: ${esc(d.unit||'')}</span></div>
+              <div style="margin-top:3px">
+                <span style="font-size:0.65rem;color:var(--text3);background:var(--bg4);padding:1px 8px;border-radius:4px">子权重 ${((d.sub_weight||0)*100).toFixed(0)}%</span>
+                ${i===0 ? '<span style="font-size:0.65rem;color:var(--text3);background:var(--bg4);padding:1px 8px;border-radius:4px;margin-left:4px">大类内占比最高</span>' : ''}
+              </div>
+            </div>`).join('')}
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Weight Matrix -->
+      ${data.scenario_weights ? `
+      <div class="group" style="margin-bottom:20px">
+        <div class="group-header">⚖️ 大类权重矩阵 <span style="font-size:0.7rem;color:var(--text3);font-weight:400">（所有场景统一 5:2:3）</span></div>
+        <div class="group-body" style="display:flex;justify-content:center">
+          <table style="width:auto;min-width:520px;font-size:0.85rem;border-collapse:collapse;margin:0 auto">
+            <thead><tr style="background:var(--bg3)">
+              <th style="padding:12px 18px;text-align:left;border-bottom:2px solid var(--bg4);font-weight:600">场景</th>
+              <th style="padding:12px 18px;text-align:center;border-bottom:3px solid var(--accent)">⚡ 算力性能 <span style="font-weight:400;font-size:0.7rem;color:var(--text3)">50%</span></th>
+              <th style="padding:12px 18px;text-align:center;border-bottom:3px solid var(--orange)">💰 性价比 <span style="font-weight:400;font-size:0.7rem;color:var(--text3)">20%</span></th>
+              <th style="padding:12px 18px;text-align:center;border-bottom:3px solid var(--green)">🌐 生态成熟度 <span style="font-weight:400;font-size:0.7rem;color:var(--text3)">30%</span></th>
+            </tr></thead>
+            <tbody>${Object.entries(data.scenario_weights).map(([scenario,w]) => {
+              const vals = {compute_power:w.compute_power||0, cost_effectiveness:w.cost_effectiveness||0, ecosystem_maturity:w.ecosystem_maturity||0};
+              return '<tr><td style="padding:10px 18px;font-weight:600;border-bottom:1px solid var(--bg4)">'+esc(scenario)+'</td>'
+                + '<td style="padding:10px 18px;text-align:center;border-bottom:1px solid var(--bg4)"><span style="background:rgba(45,140,240,0.12);padding:4px 14px;border-radius:12px;font-weight:700;color:var(--accent)">'+(vals.compute_power*100).toFixed(0)+'%</span></td>'
+                + '<td style="padding:10px 18px;text-align:center;border-bottom:1px solid var(--bg4)"><span style="background:rgba(245,158,11,0.12);padding:4px 14px;border-radius:12px;font-weight:700;color:var(--orange)">'+(vals.cost_effectiveness*100).toFixed(0)+'%</span></td>'
+                + '<td style="padding:10px 18px;text-align:center;border-bottom:1px solid var(--bg4)"><span style="background:rgba(16,185,129,0.12);padding:4px 14px;border-radius:12px;font-weight:700;color:var(--green)">'+(vals.ecosystem_maturity*100).toFixed(0)+'%</span></td></tr>';
+            }).join('')}</tbody>
+          </table>
+        </div>
+      </div>` : ''}
+
+      <!-- Hard Constraints -->
+      <div class="group" style="margin-bottom:20px">
+        <div class="group-header">🚫 硬约束条件</div>
+        <div class="group-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">
+          ${(data.hard_constraints||[]).map(c=>`<div class="group-field" style="align-items:center;gap:8px"><span style="font-size:0.75rem;color:var(--red);font-weight:600">✕</span><span class="val" style="font-size:0.78rem">${esc(c)}</span></div>`).join('')}
+        </div>
+      </div>
+
+      <!-- Scoring Philosophy -->
+      <div class="group" style="margin-bottom:20px">
+        <div class="group-header">💡 评分哲学</div>
+        <div class="group-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;font-size:0.78rem">
+          ${[
+            {k:'每维 0-100 分', v:'原始分 0-10 → ×10 统一百分制，总分直接累加'},
+            {k:'大类 5:2:3', v:'算力占50%最重要，生态30%次之，价格20%（统一权重，不随场景变化）'},
+            {k:'缺数据中性分', v:'数据缺失时给该维度总数的50%（如大类满分100给50），不排除芯片'},
+            {k:'实测优先', v:'chip_model_benchmarks 有实测 MFU/吞吐时优先使用，精度±10%'},
+            {k:'理论估算', v:'无实测数据时用公式估算，精度±50%，会在置信度中标记'},
+          ].map(r=>`<div class="group-field" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-weight:600;color:var(--accent);font-size:0.78rem">${r.k}</span><span style="color:var(--text2);font-size:0.73rem">${r.v}</span></div>`).join('')}
+        </div>
+      </div>
+    `;
+  } catch(e) { content.innerHTML = `<div class="error">加载失败: ${esc(e.message)}</div>`; }
+  hide(loading);
+}
+
+// Hash routing: #methodology → switch to tab
+(function(){
+  if (location.hash === '#methodology') { switchToTab('methodology'); }
+  window.addEventListener('hashchange', ()=>{
+    if (location.hash === '#methodology') switchToTab('methodology');
+  });
+})();
+
+function switchToTab(tabId) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  const panel = document.getElementById('tab-'+tabId);
+  if (panel) panel.classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  const btn = document.querySelector('nav button[data-tab="'+tabId+'"]');
+  if (btn) btn.classList.add('active');
+  const def = TABS.find(t=>t.id===tabId);
+  if (def && def.action) def.action();
+}
+
+/*  COMPAT  */
 async function searchCompatInit(){
   $('compat-filters').innerHTML = `
     <div class="autocomplete-wrapper" style="flex:1;min-width:160px">
