@@ -42,6 +42,7 @@ from chip_model.database import (
     get_chip_benchmark_tps,
     get_chip_model_compat_count,
     get_chip_source_credibility,
+    get_deployment_guide,
 )
 from chip_model.scoring import (  # v4.2 scoring engine
     parse_fp16,
@@ -481,6 +482,10 @@ def api_chip_recommend(
                 ),
                 score=s["score"],
                 scoring=s["scoring"],
+                deployment_guide=get_deployment_guide(
+                    s["chip"].get("chip_model", ""),
+                    model_id,
+                ),
             )
             for s in top
         ],
@@ -499,6 +504,7 @@ def chip_recommend_candidate_v2(
     total_cost_wan: float | None,
     score: float,
     scoring: dict,
+    deployment_guide: dict | None = None,
 ) -> dict:
     """Format one scored chip for v2 recommend output (includes dimension breakdown)."""
     # Reuse base candidate shape but add scoring
@@ -512,6 +518,7 @@ def chip_recommend_candidate_v2(
         score=score,
     )
     base["scoring"] = scoring
+    base["deployment_guide"] = deployment_guide
     return base
 
 

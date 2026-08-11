@@ -1287,6 +1287,157 @@ def get_link_library_stats(db_path: str | Path | None = None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# deployment_guides table
+# ---------------------------------------------------------------------------
+
+def get_deployment_guide(
+    chip_model: str,
+    model_id: str,
+    db_path: str | Path | None = None,
+) -> dict | None:
+    """Return the best-matching deployment guide for a chip×model pair.
+
+    Resolution order (first match wins):
+    1. Exact match on both chip_model and model_id
+    2. Match on model_id with chip_model=NULL (model-level guide)
+    3. Match on chip_model with model_id=NULL (chip-level guide)
+    """
+    with get_db(db_path, readonly=True) as db:
+        # 1. Exact chip+model match
+        row = db.execute(
+            """SELECT url, title, source_type, notes
+               FROM deployment_guides
+               WHERE chip_model = ? AND model_id = ?
+               LIMIT 1""",
+            (chip_model, model_id),
+        ).fetchone()
+        if row:
+            return dict(row)
+
+        # 2. Model-level guide (any chip)
+        row = db.execute(
+            """SELECT url, title, source_type, notes
+               FROM deployment_guides
+               WHERE model_id = ? AND (chip_model IS NULL OR chip_model = '')
+               LIMIT 1""",
+            (model_id,),
+        ).fetchone()
+        if row:
+            return dict(row)
+
+        # 3. Chip-level guide (any model)
+        row = db.execute(
+            """SELECT url, title, source_type, notes
+               FROM deployment_guides
+               WHERE chip_model = ? AND (model_id IS NULL OR model_id = '')
+               LIMIT 1""",
+            (chip_model,),
+        ).fetchone()
+        if row:
+            return dict(row)
+
+    return None
+
+
+def seed_deployment_guides(db_path: str | Path | None = None):
+    """Seed deployment_guides table with known Ascend vLLM guides.
+
+    Idempotent: skips entries whose (chip_model, model_id, url) already exists.
+    """
+    import datetime as _dt
+
+    ts = _dt.datetime.utcnow().isoformat() + "Z"
+
+    # ── Model-level guides (chip_model=NULL) ──
+    model_guides = [
+        ("Qwen/Qwen2.5-7B",              "Qwen2.5-7B"),
+        ("Qwen/Qwen2.5-7B-Instruct",     "Qwen2.5-7B"),
+        ("Qwen/Qwen2.5-32B-Instruct",    "Qwen2.5-7B"),
+        ("Qwen/Qwen2.5-72B-Instruct",    "Qwen2.5-7B"),
+        ("Qwen/Qwen2.5-Omni-7B",         "Qwen2.5-Omni"),
+        ("Qwen/Qwen3-235B-A22B",         "Qwen3-235B-A22B"),
+        ("Qwen/Qwen3-30B-A3B",           "Qwen3-30B-A3B"),
+        ("Qwen/Qwen3-8B",                "Qwen3-8B-W4A8"),
+        ("Qwen/Qwen3-32B",               "Qwen3-32B-W4A4"),
+        ("Qwen/Qwen3-Coder-30B-A3B",     "Qwen3-Coder-30B-A3B"),
+        ("Qwen/Qwen3-VL-235B-A22B",      "Qwen3-VL-235B-A22B-Instruct"),
+        ("Qwen/Qwen3-VL-30B-A3B",        "Qwen3-VL-30B-A3B-Instruct"),
+        ("Qwen/Qwen3.5-27B",             "Qwen3.5-27B-Qwen3.6-27B"),
+        ("Qwen/Qwen3.6-35B-A3B",         "Qwen3.6-35B-A3B"),
+        ("Qwen/Qwen3.5-397B-A17B",       "Qwen3.5-397B-A17B"),
+        ("Qwen/Qwen3-Embedding",         "Qwen3_embedding"),
+        ("Qwen/Qwen3-Reranker",          "Qwen3_reranker"),
+        ("deepseek-ai/DeepSeek-R1",      "DeepSeek-R1"),
+        ("deepseek-ai/DeepSeek-V3",      "DeepSeek-V3.1"),
+        ("deepseek-ai/DeepSeek-V3.1",    "DeepSeek-V3.1"),
+        ("deepseek-ai/DeepSeek-V3.2",    "DeepSeek-V3.2"),
+        ("deepseek-ai/DeepSeek-V4-Flash","DeepSeek-V4-Flash"),
+        ("deepseek-ai/DeepSeek-V4-Pro",  "DeepSeek-V4-Pro"),
+        ("deepseek-ai/DeepSeekOCR2",     "DeepSeekOCR2"),
+        ("THUDM/GLM-4-9B",              "GLM4.x"),
+        ("THUDM/GLM-4-9B-Chat",         "GLM4.x"),
+        ("THUDM/GLM-4V-9B",             "GLM4.x"),
+        ("THUDM/GLM-5-14B",             "GLM5"),
+        ("moonshotai/Kimi-K2-Thinking",  "Kimi-K2-Thinking"),
+        ("moonshotai/Kimi-K2.5",         "Kimi-K2.5"),
+        ("MiniMaxAI/MiniMax-M2",         "MiniMax-M2"),
+        ("PaddlePaddle/PaddleOCR-VL",    "PaddleOCR-VL"),
+    ]
+
+    ASCEND_BASE = "https://docs.vllm.ai/projects/ascend/zh-cn/v0.18.0"
+
+    with get_db(db_path) as db:
+        for model_id, page in model_guides:
+            url = f"{ASCEND_BASE}/tutorials/models/{page}.html"
+            title = f"vLLM Ascend 部署指南 — {page.replace('.html','')}"
+            # Skip if already exists
+            existing = db.execute(
+                "SELECT id FROM deployment_guides WHERE chip_model IS NULL AND model_id = ? AND url = ?",
+                (model_id, url),
+            ).fetchone()
+            if existing:
+                continue
+            db.execute(
+                """INSERT INTO deployment_guides
+                   (chip_model, model_id, url, title, source_type, notes, created_at, updated_at)
+                   VALUES (NULL, ?, ?, ?, 'official_doc', 'vLLM Ascend 部署指南', ?, ?)""",
+                (model_id, url, title, ts, ts),
+            )
+
+        # ── Chip-level guide (any model) for Ascend chips ──
+        # Find all Ascend chips
+        ascend_chips = db.execute(
+            """SELECT DISTINCT chip_model FROM chips
+               WHERE (vendor LIKE '%华为%' OR vendor LIKE '%昇腾%' OR vendor LIKE '%Ascend%'
+                      OR vendor_display LIKE '%华为%' OR vendor_display LIKE '%昇腾%' OR vendor_display LIKE '%Ascend%')
+                 AND chip_model IS NOT NULL AND chip_model != ''"""
+        ).fetchall()
+
+        for (chip_model,) in ascend_chips:
+            existing = db.execute(
+                "SELECT id FROM deployment_guides WHERE chip_model = ? AND model_id IS NULL",
+                (chip_model,),
+            ).fetchone()
+            if existing:
+                continue
+            db.execute(
+                """INSERT INTO deployment_guides
+                   (chip_model, model_id, url, title, source_type, notes, created_at, updated_at)
+                   VALUES (?, NULL, ?, ?, 'official_doc', 'Ascend 通用部署快速入门', ?, ?)""",
+                (
+                    chip_model,
+                    f"{ASCEND_BASE}/quick_start.html",
+                    "Ascend 部署总览",
+                    ts, ts,
+                ),
+            )
+
+        db.commit()
+
+    return {"model_guides": len(model_guides), "chip_guides": len(ascend_chips)}
+
+
+# ---------------------------------------------------------------------------
 # Unified output formatters — summary (minimal list) and profile (full grouped)
 # ---------------------------------------------------------------------------
 
@@ -1302,6 +1453,7 @@ _CHIP_SUMMARY_FIELDS = [
     "interconnect_tech",
     "price_cny_wan",
     "maturity_level", "production_status",
+    "deployment_links",
 ]
 
 

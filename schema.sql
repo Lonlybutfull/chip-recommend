@@ -282,3 +282,21 @@ CREATE TABLE IF NOT EXISTS link_library (
 
 CREATE INDEX IF NOT EXISTS idx_link_library_category ON link_library(category);
 CREATE INDEX IF NOT EXISTS idx_link_library_vendor ON link_library(vendor);
+
+-- ============================================================
+-- 7. 部署方案链接表
+-- ============================================================
+CREATE TABLE IF NOT EXISTS deployment_guides (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    chip_model    TEXT,           -- NULL/空 = 不限芯片（通用方案）
+    model_id      TEXT,           -- NULL/空 = 不限模型（芯片通用方案）
+    url           TEXT NOT NULL,  -- 部署方案 URL
+    title         TEXT,           -- 显示标题（如 "vLLM Ascend 部署指南"）
+    source_type   TEXT,           -- official_doc / community_guide / vendor_doc
+    notes         TEXT,           -- 备注（如适用的卡数、精度）
+    created_at    TEXT,
+    updated_at    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_deploy_chip ON deployment_guides(chip_model);
+CREATE INDEX IF NOT EXISTS idx_deploy_model ON deployment_guides(model_id);

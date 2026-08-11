@@ -304,6 +304,16 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
   transition:var(--transition);background:transparent;white-space:nowrap;flex-shrink:0;
 }
 .rec-profile-btn:hover{background:var(--accent);color:#fff}
+.rec-deploy-link{
+  display:inline-block;font-size:0.7rem;color:var(--green);cursor:pointer;
+  padding:4px 10px;border:1px solid var(--green);border-radius:4px;
+  transition:var(--transition);background:transparent;white-space:nowrap;
+  text-decoration:none;flex-shrink:0;margin-left:auto;
+}
+.rec-deploy-link:hover{background:var(--green);color:#fff}
+.rec-deploy-none{
+  font-size:0.68rem;color:var(--text3);white-space:nowrap;margin-left:auto;
+}
 /* ── Scoring detail panel (collapsible) ── */
 .rec-scoring-toggle{
   display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;font-weight:600;
@@ -471,6 +481,298 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 .login-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,140,240,0.12)}
 .login-error{font-size:0.75rem;color:var(--red);margin-bottom:10px;min-height:18px}
 .login-card .btn{width:100%;padding:11px;font-size:0.95rem;font-weight:600}
+
+/* ═══════════ Methodology & VRAM Tab Styling ═══════════ */
+/* ── Hero ── */
+.mg-hero{
+  background:linear-gradient(135deg, var(--bg2) 0%, rgba(45,140,240,0.06) 50%, var(--bg2) 100%);
+  border:1px solid var(--bg4); border-radius:var(--radius);
+  padding:28px 32px; margin-bottom:24px;
+}
+.mg-hero h2{font-size:1.5rem; margin:0 0 6px; color:var(--text); letter-spacing:-0.01em}
+.mg-hero .mg-ver{
+  display:inline-block; font-size:0.7rem; color:#fff; font-weight:600;
+  background:var(--accent); padding:3px 12px; border-radius:12px;
+  vertical-align:middle; margin-left:8px;
+}
+.mg-hero p{color:var(--text2); font-size:0.85rem; margin:0}
+
+/* ── Section title ── */
+.mg-section-title{
+  display:flex; align-items:center; gap:10px;
+  font-size:0.95rem; font-weight:700; color:var(--text);
+  margin-bottom:14px; padding-bottom:10px;
+  border-bottom:2px solid var(--bg4);
+}
+.mg-section-title .mg-section-icon{
+  width:36px; height:36px; display:flex; align-items:center; justify-content:center;
+  border-radius:10px; font-size:1.1rem; flex-shrink:0;
+}
+
+/* ── Formula cards grid ── */
+.mg-formula-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:12px; margin-bottom:24px;
+}
+.mg-formula-card{
+  background:var(--bg2); border:1px solid var(--bg4); border-radius:var(--radius);
+  padding:0; overflow:hidden;
+  transition:all 0.2s ease; cursor:default;
+}
+.mg-formula-card:hover{transform:translateY(-2px); box-shadow:var(--shadow-hover)}
+.mg-formula-card .mg-fc-head{
+  display:flex; align-items:center; gap:8px;
+  padding:10px 14px; font-size:0.72rem; font-weight:600;
+  letter-spacing:0.03em; text-transform:uppercase;
+}
+.mg-formula-card .mg-fc-body{
+  padding:12px 16px; display:flex; flex-direction:column; gap:6px;
+}
+.mg-formula-card .mg-fc-param{
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:0.72rem; color:var(--text2);
+  padding:4px 8px; background:var(--bg3); border-radius:4px;
+}
+.mg-formula-card .mg-fc-param code{color:var(--text); font-size:0.75rem; font-weight:600}
+.mg-fc-label{font-size:0.7rem; color:var(--text3); font-weight:500}
+.mg-fc-vram .mg-fc-head{background:rgba(59,130,246,0.08); color:var(--blue); border-left:3px solid var(--blue)}
+.mg-fc-compute .mg-fc-head{background:rgba(245,158,11,0.08); color:var(--orange); border-left:3px solid var(--orange)}
+.mg-fc-mfu .mg-fc-head{background:rgba(16,185,129,0.08); color:var(--green); border-left:3px solid var(--green)}
+.mg-fc-inference .mg-fc-head{background:rgba(139,92,246,0.08); color:var(--purple); border-left:3px solid var(--purple)}
+
+/* ── Category cards ── */
+.mg-cat-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:16px; margin-bottom:24px;
+}
+.mg-cat-card{
+  background:var(--bg2); border:1px solid var(--bg4); border-radius:var(--radius);
+  overflow:hidden; transition:all 0.2s ease;
+}
+.mg-cat-card:hover{transform:translateY(-2px); box-shadow:var(--shadow-hover)}
+.mg-cat-card .mg-cc-top{
+  padding:18px 20px 14px;
+  border-bottom:1px solid var(--bg4);
+}
+.mg-cat-card:nth-child(1) .mg-cc-top{background:linear-gradient(135deg, rgba(45,140,240,0.07), transparent)}
+.mg-cat-card:nth-child(2) .mg-cc-top{background:linear-gradient(135deg, rgba(245,158,11,0.07), transparent)}
+.mg-cat-card:nth-child(3) .mg-cc-top{background:linear-gradient(135deg, rgba(16,185,129,0.07), transparent)}
+.mg-cat-card .mg-cc-icon{font-size:1.6rem; margin-bottom:4px}
+.mg-cat-card .mg-cc-title-row{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+}
+.mg-cat-card .mg-cc-title{font-weight:700; font-size:1.05rem; color:var(--text)}
+.mg-cat-card .mg-cc-weight{
+  font-size:0.73rem; font-weight:700; padding:3px 12px;
+  border-radius:12px; letter-spacing:0.02em;
+}
+.mg-cat-card:nth-child(1) .mg-cc-weight{background:rgba(45,140,240,0.12); color:var(--accent)}
+.mg-cat-card:nth-child(2) .mg-cc-weight{background:rgba(245,158,11,0.12); color:var(--orange)}
+.mg-cat-card:nth-child(3) .mg-cc-weight{background:rgba(16,185,129,0.12); color:var(--green)}
+.mg-cat-card .mg-cc-desc{color:var(--text2); font-size:0.78rem; margin-top:6px}
+.mg-cat-card .mg-cc-body{padding:6px 12px 12px}
+
+/* ── Dimension items inside cat card ── */
+.mg-dim-item{
+  display:flex; align-items:flex-start; gap:12px;
+  padding:10px 12px; margin:4px 0;
+  background:var(--bg3); border-radius:var(--radius-sm);
+  transition:background 0.15s;
+}
+.mg-dim-item:hover{background:var(--bg4)}
+.mg-dim-item .mg-di-bar{
+  width:4px; height:100%; min-height:44px; border-radius:2px;
+  flex-shrink:0; align-self:stretch;
+}
+.mg-dim-item:nth-child(odd) .mg-di-bar{background:var(--accent)}
+.mg-dim-item:nth-child(even) .mg-di-bar{background:var(--purple)}
+.mg-dim-item .mg-di-content{flex:1; min-width:0}
+.mg-dim-item .mg-di-name{
+  font-weight:600; font-size:0.84rem; color:var(--text);
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+}
+.mg-dim-item .mg-di-name-en{font-weight:400; font-size:0.65rem; color:var(--text3)}
+.mg-dim-item .mg-di-desc{color:var(--text2); font-size:0.72rem; margin-top:2px}
+.mg-dim-item .mg-di-meta{display:flex; gap:6px; margin-top:6px; flex-wrap:wrap}
+.mg-dim-item .mg-di-tag{
+  font-size:0.64rem; padding:2px 10px; border-radius:4px;
+  background:var(--bg4); color:var(--text2); font-weight:500;
+}
+.mg-dim-item .mg-di-tag.primary{
+  background:rgba(45,140,240,0.1); color:var(--accent); font-weight:600;
+}
+
+/* ── Weight matrix table ── */
+.mg-weight-card{
+  background:var(--bg2); border:1px solid var(--bg4); border-radius:var(--radius);
+  overflow:hidden; margin-bottom:24px;
+}
+.mg-weight-card .mg-wc-head{
+  padding:14px 20px; border-bottom:1px solid var(--bg4);
+  display:flex; align-items:center; gap:10px;
+  font-weight:700; font-size:0.9rem; color:var(--text);
+  background:var(--bg3);
+}
+.mg-weight-card .mg-wc-body{padding:20px; overflow-x:auto}
+.mg-weight-table{width:100%; border-collapse:collapse; font-size:0.85rem}
+.mg-weight-table thead th{
+  padding:12px 18px; text-align:center; font-weight:600;
+  font-size:0.78rem; border-bottom:2px solid var(--bg4);
+  background:var(--bg2); position:sticky; top:0;
+}
+.mg-weight-table thead th:first-child{text-align:left}
+.mg-weight-table tbody td{
+  padding:12px 18px; text-align:center;
+  border-bottom:1px solid var(--bg4);
+  font-weight:500;
+}
+.mg-weight-table tbody td:first-child{text-align:left; font-weight:600}
+.mg-weight-table tbody tr:hover{background:rgba(45,140,240,0.03)}
+.mg-pill{
+  display:inline-block; padding:4px 16px; border-radius:14px;
+  font-weight:700; font-size:0.8rem; min-width:48px;
+}
+.mg-pill.blue{background:rgba(45,140,240,0.1); color:var(--accent)}
+.mg-pill.orange{background:rgba(245,158,11,0.1); color:var(--orange)}
+.mg-pill.green{background:rgba(16,185,129,0.1); color:var(--green)}
+
+/* ── Constraints ── */
+.mg-constraint-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:10px; margin-bottom:24px;
+}
+.mg-constraint-item{
+  display:flex; align-items:flex-start; gap:10px;
+  padding:14px 16px;
+  background:rgba(239,68,68,0.03); border:1px solid rgba(239,68,68,0.12);
+  border-radius:var(--radius-sm); border-left:3px solid var(--red);
+  transition:all 0.15s;
+}
+.mg-constraint-item:hover{background:rgba(239,68,68,0.06); border-color:rgba(239,68,68,0.25)}
+.mg-constraint-item .mg-ci-icon{
+  color:var(--red); font-weight:700; font-size:0.85rem;
+  flex-shrink:0; line-height:1.4;
+}
+.mg-constraint-item .mg-ci-text{font-size:0.82rem; color:var(--text); line-height:1.45}
+
+/* ── Philosophy grid ── */
+.mg-phil-grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+  gap:10px; margin-bottom:16px;
+}
+.mg-phil-item{
+  display:flex; gap:10px; align-items:flex-start;
+  padding:14px 16px; background:var(--bg2);
+  border:1px solid var(--bg4); border-radius:var(--radius-sm);
+  transition:all 0.15s;
+}
+.mg-phil-item:hover{transform:translateY(-1px); box-shadow:var(--shadow-hover)}
+.mg-phil-item .mg-pi-dot{
+  width:8px; height:8px; border-radius:50%; flex-shrink:0;
+  margin-top:6px; background:var(--purple);
+}
+.mg-phil-item .mg-pi-content{flex:1}
+.mg-phil-item .mg-pi-title{font-weight:700; color:var(--text); font-size:0.82rem}
+.mg-phil-item .mg-pi-desc{color:var(--text2); font-size:0.74rem; margin-top:2px; line-height:1.5}
+
+/* ── VRAM hero card ── */
+.vram-hero{
+  background:linear-gradient(135deg, var(--bg2) 0%, rgba(139,92,246,0.05) 50%, var(--bg2) 100%);
+  border:1px solid var(--bg4); border-radius:var(--radius);
+  padding:28px 32px; margin-bottom:24px;
+}
+.vram-hero h2{font-size:1.5rem; margin:0 0 4px}
+.vram-hero .vram-ver{
+  display:inline-block; font-size:0.7rem; color:#fff; font-weight:600;
+  background:var(--purple); padding:3px 12px; border-radius:12px;
+  vertical-align:middle; margin-left:8px;
+}
+.vram-hero p{color:var(--text2); font-size:0.85rem; margin:0}
+
+/* ── VRAM formula spotlight ── */
+.vram-spotlight{
+  background:var(--bg2); border:1px solid var(--bg4); border-radius:var(--radius);
+  overflow:hidden; margin-bottom:24px;
+}
+.vram-spotlight .vs-head{
+  padding:14px 20px; border-bottom:1px solid var(--bg4);
+  display:flex; align-items:center; gap:10px;
+  font-weight:700; font-size:0.9rem; color:var(--text);
+  background:linear-gradient(135deg, rgba(139,92,246,0.06), transparent);
+}
+.vram-spotlight .vs-body{padding:18px 24px}
+.vram-spotlight .vs-formula{
+  font-family:'SF Mono','Cascadia Code',Consolas,monospace;
+  font-size:0.92rem; line-height:1.9; font-weight:700; color:var(--accent);
+}
+.vram-spotlight .vs-formula2{
+  font-family:'SF Mono','Cascadia Code',Consolas,monospace;
+  font-size:0.84rem; line-height:1.9; color:var(--text2);
+  margin-top:6px; padding-top:6px; border-top:1px dashed var(--bg4);
+}
+.vram-spotlight .vs-note{
+  margin-top:10px; padding:10px 14px; background:rgba(245,158,11,0.06);
+  border:1px solid rgba(245,158,11,0.15); border-radius:var(--radius-sm);
+  font-size:0.76rem; color:var(--orange); display:flex; align-items:flex-start; gap:8px;
+}
+
+/* ── VRAM factor cards ── */
+.vram-factor-grid{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(440px,1fr));
+  gap:18px; margin-bottom:20px;
+}
+.vram-factor-card{
+  background:var(--bg2); border:1px solid var(--bg4); border-radius:var(--radius);
+  overflow:hidden; transition:all 0.2s ease;
+}
+.vram-factor-card:hover{transform:translateY(-2px); box-shadow:var(--shadow-hover)}
+.vram-factor-card .vf-head{
+  padding:16px 20px; border-bottom:1px solid var(--bg4);
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+}
+.vram-factor-card .vf-head-icon{
+  width:36px; height:36px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:1rem; flex-shrink:0;
+  background:rgba(45,140,240,0.08); color:var(--accent);
+}
+.vram-factor-card .vf-head-title{font-weight:700; font-size:0.9rem; color:var(--text); flex:1}
+.vram-factor-card .vf-head-code{
+  font-size:0.67rem; color:var(--text3); background:var(--bg3);
+  padding:3px 12px; border-radius:6px; font-family:'SF Mono',Consolas,monospace;
+}
+.vram-factor-card .vf-head-desc{
+  width:100%; font-size:0.74rem; color:var(--text2); margin-top:2px;
+}
+.vram-factor-card .vf-body{padding:0}
+.vram-factor-card .vf-body table{width:100%; border-collapse:collapse; font-size:0.76rem}
+.vram-factor-card .vf-body thead th{
+  padding:10px 14px; text-align:left; font-weight:600;
+  font-size:0.68rem; color:var(--text3); background:var(--bg3);
+  border-bottom:1px solid var(--bg4); text-transform:uppercase;
+  letter-spacing:0.04em;
+}
+.vram-factor-card .vf-body tbody td{
+  padding:10px 14px; border-bottom:1px solid var(--bg4);
+  vertical-align:top; color:var(--text);
+}
+.vram-factor-card .vf-body tbody tr:hover{background:rgba(45,140,240,0.02)}
+.vram-factor-card .vf-body tbody td:first-child{font-weight:600; font-size:0.74rem}
+.vram-factor-card .vf-body tbody td code{
+  font-size:0.68rem; background:var(--bg3); padding:2px 10px;
+  border-radius:4px; white-space:nowrap; font-weight:600;
+  color:var(--accent);
+}
+.vram-factor-card .vf-body tbody td:last-child{font-size:0.73rem; color:var(--text2); line-height:1.55}
+
+/* ── Responsive: shrink formula/factor grids on narrow screens ── */
+@media(max-width:500px){
+  .mg-formula-grid{grid-template-columns:1fr}
+  .vram-factor-grid{grid-template-columns:1fr}
+  .mg-cat-grid{grid-template-columns:1fr}
+  .mg-hero{padding:20px}
+  .vram-hero{padding:20px}
+}
 </style>
 </head>
 <body>
@@ -1609,6 +1911,16 @@ function renderRecModelTags(){
   $('rec-model').value = REC_SELECTED_MODELS.join(',');
 }
 
+/* ── Deployment link rendering ── */
+function renderDeployLink(c){
+  const guide = c.deployment_guide;
+  if(guide && guide.url){
+    return '<a href="'+esc(guide.url)+'" target="_blank" rel="noopener" class="rec-deploy-link" title="'
+           +esc(guide.url)+'">🔗 '+esc(guide.title||'部署方案')+'</a>';
+  }
+  return '<span class="rec-deploy-none">暂无部署方案</span>';
+}
+
 async function runRecommend(){
   const loading=$('rec-loading'), results=$('rec-results');
   show(loading);results.innerHTML='';
@@ -1668,11 +1980,12 @@ async function runRecommend(){
           <div class="rec-calc-row">
             ${renderCalcRow(req, rec, c)}
           </div>
-          <!-- Row 2: 芯片规格 + 完整画像按钮 -->
+          <!-- Row 2: 芯片规格 + 部署方案 + 完整画像按钮 -->
           <div class="rec-chip-row">
             <span class="chip-name">${esc(c.chip_model)}</span>
             <span class="chip-meta">${esc(c.vendor_display||'')} · ${esc(c.vendor_region||'')} · ${esc(c.chip_type||'')}</span>
             ${renderChipSpecInline(c)}
+            ${renderDeployLink(c)}
             <button class="rec-profile-btn" onclick="openChipProfile('${esc(c.id||c.chip_model)}')">📋 完整画像</button>
           </div>
           <!-- Row 3: 评分细则 toggle -->
@@ -1986,8 +2299,6 @@ async function loadMethodology() {
       cost_effectiveness: {cn:'性价比', icon:'💰', desc:'能效 + 集群经济性，影响部署总成本'},
       ecosystem_maturity: {cn:'生态成熟度', icon:'🌐', desc:'兼容性 + 工具链 + 实测验证 + 数据可信度'}
     };
-    const catNameMap = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度'};
-
     // Group dimensions by category
     const groups = {};
     dims.forEach(d => {
@@ -1999,99 +2310,122 @@ async function loadMethodology() {
     const categoryOrder = ['compute_power','cost_effectiveness','ecosystem_maturity'];
 
     content.innerHTML = `
-      <div style="margin-bottom:24px">
-        <h2 style="font-size:1.4rem;margin:0 0 6px">📖 推荐算法设计细则 <span style="font-size:0.75rem;color:var(--text3);font-weight:400">v${data.version||'4.2'}</span></h2>
-        <p style="color:var(--text2);font-size:0.82rem;margin:0">AISHPerf 芯片推荐引擎 — 3大类 · 9子维度分层评分方法</p>
+      <div class="mg-hero">
+        <h2>📖 推荐算法设计细则 <span class="mg-ver">v${data.version||'4.2'}</span></h2>
+        <p>AISHPerf 芯片推荐引擎 — 3大类 · 9子维度分层评分方法</p>
       </div>
 
-      <!-- Card Estimation -->
-      <div class="group" style="margin-bottom:20px">
-        <div class="group-header">🧮 卡数估算公式</div>
-        <div class="group-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:8px">
-          ${Object.entries(data.card_estimation||{}).map(([k,v]) => {
-            let label = k;
-            if (k.startsWith('vram_')) label = '<span style="color:var(--blue);font-weight:600">显存约束</span> → ' + k.replace('vram_','');
-            else if (k.startsWith('compute_')) label = '<span style="color:var(--orange);font-weight:600">算力约束</span> → ' + k.replace('compute_','');
-            else if (k.startsWith('mfu_')) label = '<span style="color:var(--green);font-weight:600">MFU</span> → ' + k.replace('mfu_','');
-            else if (k.startsWith('inference_')) label = '<span style="color:var(--purple);font-weight:600">推理吞吐</span> → ' + k.replace('inference_','');
-            return '<div class="group-field" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-size:0.7rem;color:var(--text3)">'+label+'</span><code style="font-size:0.73rem;word-break:break-all">'+esc(String(v))+'</code></div>';
-          }).join('')}
-        </div>
+      <!-- Section 1: Card Estimation -->
+      <div class="mg-section-title"><span class="mg-section-icon" style="background:rgba(59,130,246,0.08);color:var(--blue)">🧮</span>卡数估算公式</div>
+      <div class="mg-formula-grid">
+        ${Object.entries(data.card_estimation||{}).map(([k,v]) => {
+          let cls='', tag='';
+          if(k.startsWith('vram_')){cls='mg-fc-vram'; tag='显存约束';}
+          else if(k.startsWith('compute_')){cls='mg-fc-compute'; tag='算力约束';}
+          else if(k.startsWith('mfu_')){cls='mg-fc-mfu'; tag='MFU';}
+          else if(k.startsWith('inference_')){cls='mg-fc-inference'; tag='推理吞吐';}
+          const parts = k.replace(/^(vram_|compute_|mfu_|inference_)/,'').split('_');
+          const shortLabel = parts.join(' ');
+          return '<div class="mg-formula-card '+cls+'">'+
+            '<div class="mg-fc-head">'+tag+'</div>'+
+            '<div class="mg-fc-body">'+
+              '<div class="mg-fc-param"><span class="mg-fc-label">参数</span><span>'+esc(shortLabel)+'</span></div>'+
+              '<div class="mg-fc-param"><span class="mg-fc-label">公式</span><code>'+esc(String(v))+'</code></div>'+
+            '</div></div>';
+        }).join('')}
       </div>
 
-      <!-- Category Overview Cards -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:20px">
+      <!-- Section 2: Category Overview Cards -->
+      <div class="mg-section-title"><span class="mg-section-icon" style="background:rgba(16,185,129,0.08);color:var(--green)">📊</span>3大类 · 9子维度评分</div>
+      <div class="mg-cat-grid">
         ${categoryOrder.map(cat => {
           const meta = catMap[cat] || {cn:cat, icon:'📌', desc:''};
           const catDims = groups[cat] || [];
-          // Calculate cat weight from weights matrix
           let catWeight = 0;
           if (data.scenario_weights) {
             const firstScenario = Object.values(data.scenario_weights)[0] || {};
             catWeight = (firstScenario[cat] || 0) * 100;
           }
-          return `<div style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);padding:18px">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-              <span style="font-size:1.5rem">${meta.icon}</span>
-              <span style="font-weight:700;font-size:1rem">${meta.cn}</span>
-              ${catWeight > 0 ? `<span style="font-size:0.75rem;color:var(--accent);font-weight:600;background:rgba(45,140,240,0.1);padding:2px 8px;border-radius:10px">${catWeight.toFixed(0)}%</span>` : ''}
-            </div>
-            <p style="color:var(--text2);font-size:0.76rem;margin:0 0 12px">${meta.desc}</p>
-            ${catDims.map((d,i) => `<div style="border-left:3px solid var(--accent);padding:6px 0 6px 12px;margin-bottom:8px;background:var(--bg3);border-radius:0 var(--radius-sm) var(--radius-sm) 0">
-              <div style="font-weight:600;font-size:0.82rem">${esc(d.name_cn)} <span style="font-weight:400;font-size:0.68rem;color:var(--text3)">${esc(d.name_en)}</span></div>
-              <div style="color:var(--text2);font-size:0.72rem">${esc(d.desc||'')} · <span style="color:var(--text3)">单位: ${esc(d.unit||'')}</span></div>
-              <div style="margin-top:3px">
-                <span style="font-size:0.65rem;color:var(--text3);background:var(--bg4);padding:1px 8px;border-radius:4px">子权重 ${((d.sub_weight||0)*100).toFixed(0)}%</span>
-                ${i===0 ? '<span style="font-size:0.65rem;color:var(--text3);background:var(--bg4);padding:1px 8px;border-radius:4px;margin-left:4px">大类内占比最高</span>' : ''}
-              </div>
-            </div>`).join('')}
-          </div>`;
+          return '<div class="mg-cat-card">'+
+            '<div class="mg-cc-top">'+
+              '<div class="mg-cc-icon">'+meta.icon+'</div>'+
+              '<div class="mg-cc-title-row">'+
+                '<span class="mg-cc-title">'+esc(meta.cn)+'</span>'+
+                (catWeight > 0 ? '<span class="mg-cc-weight">'+catWeight.toFixed(0)+'%</span>' : '')+
+              '</div>'+
+              '<div class="mg-cc-desc">'+esc(meta.desc)+'</div>'+
+            '</div>'+
+            '<div class="mg-cc-body">'+
+              catDims.map((d,i) => {
+                const isPrimary = i === 0;
+                return '<div class="mg-dim-item">'+
+                  '<div class="mg-di-bar"></div>'+
+                  '<div class="mg-di-content">'+
+                    '<div class="mg-di-name">'+esc(d.name_cn)+' <span class="mg-di-name-en">'+esc(d.name_en)+'</span></div>'+
+                    '<div class="mg-di-desc">'+esc(d.desc||'')+' · 单位: '+esc(d.unit||'')+'</div>'+
+                    '<div class="mg-di-meta">'+
+                      '<span class="mg-di-tag'+(isPrimary?' primary':'')+'">子权重 '+((d.sub_weight||0)*100).toFixed(0)+'%</span>'+
+                      (isPrimary ? '<span class="mg-di-tag primary">大类内占比最高</span>' : '')+
+                    '</div>'+
+                  '</div></div>';
+              }).join('')+
+            '</div></div>';
         }).join('')}
       </div>
 
-      <!-- Weight Matrix -->
+      <!-- Section 3: Weight Matrix -->
       ${data.scenario_weights ? `
-      <div class="group" style="margin-bottom:20px">
-        <div class="group-header">⚖️ 大类权重矩阵 <span style="font-size:0.7rem;color:var(--text3);font-weight:400">（所有场景统一 5:2:3）</span></div>
-        <div class="group-body" style="display:flex;justify-content:center">
-          <table style="width:auto;min-width:520px;font-size:0.85rem;border-collapse:collapse;margin:0 auto">
-            <thead><tr style="background:var(--bg3)">
-              <th style="padding:12px 18px;text-align:left;border-bottom:2px solid var(--bg4);font-weight:600">场景</th>
-              <th style="padding:12px 18px;text-align:center;border-bottom:3px solid var(--accent)">⚡ 算力性能 <span style="font-weight:400;font-size:0.7rem;color:var(--text3)">50%</span></th>
-              <th style="padding:12px 18px;text-align:center;border-bottom:3px solid var(--orange)">💰 性价比 <span style="font-weight:400;font-size:0.7rem;color:var(--text3)">20%</span></th>
-              <th style="padding:12px 18px;text-align:center;border-bottom:3px solid var(--green)">🌐 生态成熟度 <span style="font-weight:400;font-size:0.7rem;color:var(--text3)">30%</span></th>
+      <div class="mg-section-title"><span class="mg-section-icon" style="background:rgba(245,158,11,0.08);color:var(--orange)">⚖️</span>大类权重矩阵<span style="font-size:0.73rem;color:var(--text3);font-weight:400;margin-left:6px">所有场景统一 5:2:3</span></div>
+      <div class="mg-weight-card">
+        <div class="mg-wc-body">
+          <table class="mg-weight-table">
+            <thead><tr>
+              <th>场景</th>
+              <th>⚡ 算力性能 <small style="font-weight:400;color:var(--text3)">50%</small></th>
+              <th>💰 性价比 <small style="font-weight:400;color:var(--text3)">20%</small></th>
+              <th>🌐 生态成熟度 <small style="font-weight:400;color:var(--text3)">30%</small></th>
             </tr></thead>
             <tbody>${Object.entries(data.scenario_weights).map(([scenario,w]) => {
               const vals = {compute_power:w.compute_power||0, cost_effectiveness:w.cost_effectiveness||0, ecosystem_maturity:w.ecosystem_maturity||0};
-              return '<tr><td style="padding:10px 18px;font-weight:600;border-bottom:1px solid var(--bg4)">'+esc(scenario)+'</td>'
-                + '<td style="padding:10px 18px;text-align:center;border-bottom:1px solid var(--bg4)"><span style="background:rgba(45,140,240,0.12);padding:4px 14px;border-radius:12px;font-weight:700;color:var(--accent)">'+(vals.compute_power*100).toFixed(0)+'%</span></td>'
-                + '<td style="padding:10px 18px;text-align:center;border-bottom:1px solid var(--bg4)"><span style="background:rgba(245,158,11,0.12);padding:4px 14px;border-radius:12px;font-weight:700;color:var(--orange)">'+(vals.cost_effectiveness*100).toFixed(0)+'%</span></td>'
-                + '<td style="padding:10px 18px;text-align:center;border-bottom:1px solid var(--bg4)"><span style="background:rgba(16,185,129,0.12);padding:4px 14px;border-radius:12px;font-weight:700;color:var(--green)">'+(vals.ecosystem_maturity*100).toFixed(0)+'%</span></td></tr>';
+              return '<tr>'+
+                '<td>'+esc(scenario)+'</td>'+
+                '<td><span class="mg-pill blue">'+(vals.compute_power*100).toFixed(0)+'%</span></td>'+
+                '<td><span class="mg-pill orange">'+(vals.cost_effectiveness*100).toFixed(0)+'%</span></td>'+
+                '<td><span class="mg-pill green">'+(vals.ecosystem_maturity*100).toFixed(0)+'%</span></td>'+
+              '</tr>';
             }).join('')}</tbody>
           </table>
         </div>
       </div>` : ''}
 
-      <!-- Hard Constraints -->
-      <div class="group" style="margin-bottom:20px">
-        <div class="group-header">🚫 硬约束条件</div>
-        <div class="group-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">
-          ${(data.hard_constraints||[]).map(c=>`<div class="group-field" style="align-items:center;gap:8px"><span style="font-size:0.75rem;color:var(--red);font-weight:600">✕</span><span class="val" style="font-size:0.78rem">${esc(c)}</span></div>`).join('')}
-        </div>
+      <!-- Section 4: Hard Constraints -->
+      <div class="mg-section-title"><span class="mg-section-icon" style="background:rgba(239,68,68,0.08);color:var(--red)">🚫</span>硬约束条件</div>
+      <div class="mg-constraint-grid">
+        ${(data.hard_constraints||[]).map(c=>
+          '<div class="mg-constraint-item">'+
+            '<span class="mg-ci-icon">✕</span>'+
+            '<span class="mg-ci-text">'+esc(c)+'</span>'+
+          '</div>'
+        ).join('')}
       </div>
 
-      <!-- Scoring Philosophy -->
-      <div class="group" style="margin-bottom:20px">
-        <div class="group-header">💡 评分哲学</div>
-        <div class="group-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;font-size:0.78rem">
-          ${[
-            {k:'每维 0-100 分', v:'原始分 0-10 → ×10 统一百分制，总分直接累加'},
-            {k:'大类 5:2:3', v:'算力占50%最重要，生态30%次之，价格20%（统一权重，不随场景变化）'},
-            {k:'缺数据中性分', v:'数据缺失时给该维度总数的50%（如大类满分100给50），不排除芯片'},
-            {k:'实测优先', v:'chip_model_benchmarks 有实测 MFU/吞吐时优先使用，精度±10%'},
-            {k:'理论估算', v:'无实测数据时用公式估算，精度±50%，会在置信度中标记'},
-          ].map(r=>`<div class="group-field" style="flex-direction:column;align-items:flex-start;gap:3px"><span style="font-weight:600;color:var(--accent);font-size:0.78rem">${r.k}</span><span style="color:var(--text2);font-size:0.73rem">${r.v}</span></div>`).join('')}
-        </div>
+      <!-- Section 5: Scoring Philosophy -->
+      <div class="mg-section-title"><span class="mg-section-icon" style="background:rgba(139,92,246,0.08);color:var(--purple)">💡</span>评分哲学</div>
+      <div class="mg-phil-grid">
+        ${[
+          {k:'每维 0-100 分', v:'原始分 0-10 → ×10 统一百分制，总分直接累加'},
+          {k:'大类 5:2:3', v:'算力占50%最重要，生态30%次之，价格20%（统一权重，不随场景变化）'},
+          {k:'缺数据中性分', v:'数据缺失时给该维度总数的50%（如大类满分100给50），不排除芯片'},
+          {k:'实测优先', v:'chip_model_benchmarks 有实测 MFU/吞吐时优先使用，精度±10%'},
+          {k:'理论估算', v:'无实测数据时用公式估算，精度±50%，会在置信度中标记'},
+        ].map(r=>
+          '<div class="mg-phil-item">'+
+            '<div class="mg-pi-dot"></div>'+
+            '<div class="mg-pi-content">'+
+              '<div class="mg-pi-title">'+esc(r.k)+'</div>'+
+              '<div class="mg-pi-desc">'+esc(r.v)+'</div>'+
+            '</div></div>'
+        ).join('')}
       </div>
     `;
   } catch(e) { content.innerHTML = `<div class="error">加载失败: ${esc(e.message)}</div>`; }
@@ -2130,13 +2464,36 @@ async function loadVramLogic(){
     if(d._error){c.innerHTML='<div class="error">'+esc(d._error)+'</div>';hide(l);return}
     const vf=d.vram_factors;
     if(!vf){c.innerHTML='<div class="error">无显存计算数据</div>';hide(l);return}
-    c.innerHTML='<div style="margin-bottom:24px"><h2 style="font-size:1.4rem;margin:0 0 6px">🧠 显存计算逻辑 <span style="font-size:0.75rem;color:var(--text3);font-weight:400">v'+esc(d.version||'4.2')+'</span></h2><p style="color:var(--text2);font-size:0.82rem;margin:0">显存约束卡数估算 — bytes_per_param × safety_factor → 取2幂次方</p></div>'+
-      '<div class="group" style="margin-bottom:20px"><div class="group-header">📐 通用公式</div><div class="group-body"><div style="background:var(--bg);border-radius:var(--radius-sm);padding:16px 20px;font-family:Consolas,\'Courier New\',monospace;font-size:0.88rem;line-height:2"><div style="font-weight:700;color:var(--accent)">'+esc(vf.formula_general||'')+'</div><div style="color:var(--text2)">'+esc(vf.formula_cards||'')+'</div></div>'+
-      (vf.note_moe?'<div style="margin-top:10px;font-size:0.74rem;color:var(--orange);display:flex;align-items:flex-start;gap:4px"><span>⚠️</span><span>'+esc(vf.note_moe)+'</span></div>':'')+'</div></div>'+
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:18px;margin-bottom:20px">'+
+    c.innerHTML=
+      '<div class="vram-hero">'+
+        '<h2>🧠 显存计算逻辑 <span class="vram-ver">v'+esc(d.version||'4.2')+'</span></h2>'+
+        '<p>显存约束卡数估算 — bytes_per_param × safety_factor → 取2幂次方</p>'+
+      '</div>'+
+      '<div class="vram-spotlight">'+
+        '<div class="vs-head">📐 通用公式</div>'+
+        '<div class="vs-body">'+
+          '<div class="vs-formula">'+esc(vf.formula_general||'')+'</div>'+
+          '<div class="vs-formula2">'+esc(vf.formula_cards||'')+'</div>'+
+          (vf.note_moe?'<div class="vs-note"><span>⚠️</span><span>'+esc(vf.note_moe)+'</span></div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="vram-factor-grid">'+
       (vf.factors||[]).map(function(f){
-        var rows=(f.values||[]).map(function(v){return '<tr style="border-bottom:1px solid var(--bg4)"><td style="padding:9px 14px;vertical-align:top;font-weight:600;font-size:0.73rem">'+esc(v.scenario)+'</td><td style="padding:9px 14px;text-align:center;vertical-align:top"><code style="font-size:0.7rem;background:var(--bg3);padding:2px 8px;border-radius:4px;white-space:nowrap">'+esc(v.value)+'</code></td><td style="padding:9px 14px;vertical-align:top;font-size:0.72rem;color:var(--text2);line-height:1.55">'+esc(v.breakdown)+'</td></tr>';}).join('');
-        return '<div style="background:var(--bg2);border:1px solid var(--bg4);border-radius:var(--radius);overflow:hidden"><div style="background:linear-gradient(135deg,rgba(45,140,240,0.08),transparent);padding:14px 18px;border-bottom:1px solid var(--bg4)"><div style="font-weight:700;font-size:0.88rem;display:flex;align-items:center;gap:10px"><span style="color:var(--accent);font-size:1.1rem">🔹</span><span>'+esc(f.label)+'</span><code style="font-size:0.68rem;font-weight:400;color:var(--text3);background:var(--bg3);padding:2px 10px;border-radius:4px;margin-left:auto">'+esc(f.factor)+'</code></div><div style="color:var(--text2);font-size:0.73rem;margin-top:4px">'+esc(f.desc)+'</div></div><table style="width:100%;font-size:0.76rem;border-collapse:collapse"><thead><tr style="background:var(--bg3)"><th style="padding:8px 14px;text-align:left;font-weight:600;font-size:0.7rem;color:var(--text3);width:28%">场景</th><th style="padding:8px 14px;text-align:center;font-weight:600;font-size:0.7rem;color:var(--text3);width:22%">取值</th><th style="padding:8px 14px;text-align:left;font-weight:600;font-size:0.7rem;color:var(--text3)">分解说明</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+        var rows=(f.values||[]).map(function(v){
+          return '<tr><td>'+esc(v.scenario)+'</td><td><code>'+esc(v.value)+'</code></td><td>'+esc(v.breakdown)+'</td></tr>';
+        }).join('');
+        return '<div class="vram-factor-card">'+
+          '<div class="vf-head">'+
+            '<div class="vf-head-icon">🔹</div>'+
+            '<div class="vf-head-title">'+esc(f.label)+'</div>'+
+            '<code class="vf-head-code">'+esc(f.factor)+'</code>'+
+            '<div class="vf-head-desc">'+esc(f.desc)+'</div>'+
+          '</div>'+
+          '<div class="vf-body"><table>'+
+            '<thead><tr><th>场景</th><th>取值</th><th>分解说明</th></tr></thead>'+
+            '<tbody>'+rows+'</tbody>'+
+          '</table></div>'+
+        '</div>';
       }).join('')+'</div>';
   }catch(e){c.innerHTML='<div class="error">加载失败: '+esc(e.message)+'</div>'}
   hide(l);
