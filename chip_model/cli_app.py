@@ -14,6 +14,7 @@ Schema: schema.sql (V2, 5 tables, all TEXT, field-level provenance)
 """
 
 import json
+import math
 import re
 import sqlite3
 import sys
@@ -416,7 +417,8 @@ def chip_recommend(
         price_wan = float(chip_dict.get("price_cny_wan", 0) or 0)
         cloud = int(float(chip_dict.get("cloud_available", 0) or 0))
 
-        vram_cards = max(1, int(min_vram_total / vram) + 1)
+        # Exact ceiling; an exact division must not receive an extra card.
+        vram_cards = max(1, math.ceil(min_vram_total / vram))
         vram_cards = _round_up_pow2(vram_cards)
         deadline_cards = vram_cards
         estimated_days = None

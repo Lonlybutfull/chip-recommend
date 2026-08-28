@@ -290,6 +290,7 @@ CREATE TABLE IF NOT EXISTS deployment_guides (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     chip_model    TEXT,           -- NULL/空 = 不限芯片（通用方案）
     model_id      TEXT,           -- NULL/空 = 不限模型（芯片通用方案）
+    backend       TEXT,           -- 运行时后端: cuda/rocm/ascend/mlu/biren/xpu/tpu/... (NULL=通用)
     url           TEXT NOT NULL,  -- 部署方案 URL
     title         TEXT,           -- 显示标题（如 "vLLM Ascend 部署指南"）
     source_type   TEXT,           -- official_doc / community_guide / vendor_doc
@@ -300,3 +301,4 @@ CREATE TABLE IF NOT EXISTS deployment_guides (
 
 CREATE INDEX IF NOT EXISTS idx_deploy_chip ON deployment_guides(chip_model);
 CREATE INDEX IF NOT EXISTS idx_deploy_model ON deployment_guides(model_id);
+CREATE INDEX IF NOT EXISTS idx_deploy_backend ON deployment_guides(backend);
