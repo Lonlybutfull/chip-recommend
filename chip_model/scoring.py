@@ -1,8 +1,16 @@
 """
-AISHPerf Chip Recommendation Scoring Engine v4.2
+AISHPerf Chip Recommendation Scoring Engine v4.4
 
-9-dimension scoring with each dimension outputting 0.0-100.0,
+8-dimension scoring with each dimension outputting 0.0-100.0,
 weighted sum yields total 0-100.
+
+v4.4 changes:
+  - 大类权重调整为生态成熟度40%、实测验证度30%、算力性能20%、性价比10%
+
+v4.3 changes:
+  - 3大类 → 4大类 (5:2:2:1)：新增「实测验证度」独立大类 (10%)，生态成熟度 30%→20%
+  - 删除「兼容性评分」维度（与框架/工具链兼容重复）
+  - SUB_DIMS_ECOSYSTEM: framework 40% + toolchain 40% + source 20%
 
 v4.2 changes:
   - All scores now 0-100 scale (was 0-10). Category scores, dimension scores, detail
@@ -19,6 +27,7 @@ and return traces for transparency.
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from dataclasses import dataclass, field
@@ -40,6 +49,151 @@ InferenceQuant = Literal["fp16", "int8", "int4_gptq", "int4_awq", "gguf_q4", "gg
 # VRAM estimation formulas per scenario
 # ═══════════════════════════════════════════════════════════
 
+# ── Model architecture params (KV cache / activation 需要) ──
+# config_json 覆盖率仅 ~9%，缺时用「典型 7B 模型」通用默认（标记 estimated）。
+ARCH_DEFAULTS = {
+    "num_layers": 32,       # Llama-7B/8B 量级典型层数
+    "num_kv_heads": 8,      # 典型 GQA (8 KV heads)
+    "head_dim": 128,        # 绝大多数模型 head_dim=128
+    "hidden_size": 4096,    # 7B 量级典型隐藏维度
+}
+
+
+def resolve_arch_params(config_json: str | None, total_params_b: float = 0.0) -> dict:
+    """从 config_json 解析 KV/激活值所需架构参数，缺则用通用默认（estimated=True）。
+
+    Returns {num_layers, num_kv_heads, head_dim, hidden_size, estimated}.
+    """
+    estimated = True
+    d: dict = {}
+    if config_json:
+        try:
+            parsed = json.loads(config_json) if isinstance(config_json, str) else config_json
+            if isinstance(parsed, dict):
+                d = parsed
+        except Exception:
+            d = {}
+
+    # Multimodal models (for example Qwen3.5-VL/MoE) keep language-model
+    # architecture fields under text_config.  Prefer that nested config so KV
+    # cache and activation estimates do not silently fall back to a 7B model.
+    text_d = d.get("text_config") if isinstance(d.get("text_config"), dict) else d
+
+    num_layers = text_d.get("num_hidden_layers") or text_d.get("num_layers") or None
+    num_heads = text_d.get("num_attention_heads") or None
+    num_kv_heads = text_d.get("num_key_value_heads") or None
+    head_dim = text_d.get("head_dim") or None
+    hidden_size = text_d.get("hidden_size") or None
+    layer_types = text_d.get("layer_types") or []
+    num_kv_layers = sum(1 for layer in layer_types if layer == "full_attention")
+    if not num_kv_layers:
+        num_kv_layers = num_layers
+
+    # head_dim 推导：head_dim = hidden_size / num_attention_heads
+    if head_dim is None and hidden_size and num_heads:
+        try:
+            head_dim = int(hidden_size) // int(num_heads)
+        except Exception:
+            head_dim = None
+
+    # 关键参数齐全 → 非估算
+    if num_layers and (num_kv_heads or num_heads) and head_dim and hidden_size:
+        estimated = False
+
+    return {
+        "num_layers": int(num_layers) if num_layers else ARCH_DEFAULTS["num_layers"],
+        "num_kv_layers": int(num_kv_layers) if num_kv_layers else ARCH_DEFAULTS["num_layers"],
+        "num_kv_heads": int(num_kv_heads) if num_kv_heads else (int(num_heads) if num_heads else ARCH_DEFAULTS["num_kv_heads"]),
+        "head_dim": int(head_dim) if head_dim else ARCH_DEFAULTS["head_dim"],
+        "hidden_size": int(hidden_size) if hidden_size else ARCH_DEFAULTS["hidden_size"],
+        "num_experts": int(text_d.get("num_experts") or text_d.get("num_local_experts") or 0),
+        "num_experts_per_tok": int(text_d.get("num_experts_per_tok") or 0),
+        "estimated": estimated,
+    }
+
+
+def resolve_moe_metadata(
+    model_id: str,
+    architecture_family: str,
+    total_params_b: float,
+    config_json: str | dict | None,
+) -> dict:
+    """Resolve MoE metadata without using active parameters as weight memory.
+
+    Configs expose expert counts but often not an exact activated-parameter
+    total. Prefer an explicit value, then the common ``-A3B`` name convention.
+    Do not derive it from top-k/expert-count because dense and shared layers
+    make that ratio physically incorrect.
+    """
+    parsed: dict = {}
+    if isinstance(config_json, dict):
+        parsed = config_json
+    elif config_json:
+        try:
+            candidate = json.loads(config_json)
+            parsed = candidate if isinstance(candidate, dict) else {}
+        except Exception:
+            parsed = {}
+    text_cfg = parsed.get("text_config") if isinstance(parsed.get("text_config"), dict) else parsed
+    model_type = str(text_cfg.get("model_type") or parsed.get("model_type") or "")
+    num_experts = int(text_cfg.get("num_experts") or text_cfg.get("num_local_experts") or 0)
+    experts_per_token = int(text_cfg.get("num_experts_per_tok") or 0)
+    is_moe = (
+        "moe" in str(architecture_family or "").lower()
+        or "moe" in model_type.lower()
+        or num_experts > 0
+    )
+
+    active_params = None
+    for key in ("active_params_b", "activated_params_b", "num_active_parameters_b"):
+        try:
+            value = float(text_cfg.get(key) or parsed.get(key) or 0)
+        except (TypeError, ValueError):
+            value = 0.0
+        if 0 < value < total_params_b:
+            active_params = value
+            break
+    if active_params is None and is_moe:
+        match = re.search(r"(?:^|[-_/])A(\d+(?:\.\d+)?)B(?:$|[-_/])", model_id or "", re.IGNORECASE)
+        if match:
+            value = float(match.group(1))
+            if 0 < value < total_params_b:
+                active_params = value
+
+    return {
+        "is_moe": is_moe,
+        "total_params_b": total_params_b,
+        "active_params_b": active_params,
+        "weight_params_b": total_params_b,
+        "parameter_basis": "total",
+        "num_experts": num_experts or None,
+        "experts_per_token": experts_per_token or None,
+        "note": (
+            "激活参数量只表示每个 token 参与计算的专家规模；标准常驻权重部署的显存按总参数量计算。"
+            if is_moe else None
+        ),
+    }
+
+
+def estimate_kv_cache_gb(arch: dict, max_context: int, concurrency: int) -> float:
+    """KV Cache 显存 (GB) = 2(K+V) × num_layers × num_kv_heads × head_dim × bytes × context × concurrency.
+
+    KV cache 默认按 BF16/FP16 (2 bytes/element) 保存，即使权重 INT4
+    量化也通常不会自动改变 KV 精度。FP8 KV Cache 属于需要后端显式支持的
+    独立优化，不能由权重量化选项推断。
+    """
+    kv_layers = arch.get("num_kv_layers") or arch["num_layers"]
+    per_token = 2 * kv_layers * arch["num_kv_heads"] * arch["head_dim"] * 2.0
+    total = per_token * max(1, max_context) * max(1, concurrency)
+    return total / 1e9
+
+
+def estimate_activation_gb(arch: dict, batch_size: int, seq_len: int) -> float:
+    """训练激活值显存 (GB) ≈ batch × seq × hidden × num_layers × 40 bytes（FP16 无梯度检查点，粗估）。"""
+    total = batch_size * seq_len * arch["hidden_size"] * arch["num_layers"] * 40.0
+    return total / 1e9
+
+
 def estimate_vram_total(
     params_B: float,
     scenario: str,                    # "train" | "quantize" | "inference"
@@ -48,57 +202,112 @@ def estimate_vram_total(
     quant: str = "fp16",              # inference: fp16/int8/int4_gptq/int4_awq/gguf_q4/gguf_q8
     quantize_bits: str = "int4",      # quantize: int8/int4/fp8
     moe_activated_B: float | None = None,
-) -> tuple[float, str]:
-    """Estimate total VRAM needed (GB) for a model under a scenario.
+    max_context: int = 4096,          # inference: input_len 缺省时的兼容回退值
+    concurrency: int = 1,             # inference: 目标并发请求数（目标显存与卡数）
+    input_len: int | None = None,     # inference: 单请求输入长度 (tokens)
+    output_len: int | None = None,    # inference: 单请求最大输出长度 (tokens)
+    batch_size: int = 1,              # train: batch size
+    seq_len: int = 2048,              # train: 样本长度 (tokens)
+    arch: dict | None = None,         # {num_layers, num_kv_heads, head_dim, hidden_size}
+) -> dict:
+    """Estimate VRAM (GB), including inference single-request and target tiers.
 
-    Returns (vram_gb, formula_description).
+    Returns {min_vram, full_vram, min_formula, full_formula, kv_cache_gb,
+             target_vram, weight_vram, ideal_kv_gb, total_context, calculation}.
+      - 推理: min/full 均表示最小部署 = 权重 + 单请求峰值 KV；
+              target = 权重 + 单请求峰值 KV × 目标并发。保留 min/full 双字段
+              只为 API 兼容，界面仅展示最小与目标并发两档。
+      - 训练:  min = 权重+优化器 + 激活值(batch×seq),  full = min（训练无独立全功能档）
+      - 量化:  min = full = 量化显存
     """
     P = params_B
+    arch = arch or {}
 
     if scenario == "train":
         safety = 1.25
         if stage == "cpt":
-            # CPT: weights(2) + gradients(2) + Adam m+v(8) + activations(6-8) ≈ 20 bytes/param
-            bytes_per = 20.0
+            # CPT: weights(2) + gradients(2) + Adam m+v(8) ≈ 12 bytes/param + activations(另算)
+            bytes_per = 12.0
             label = "CPT"
         elif stage == "sft":
             if method == "full_param":
-                # SFT full-param: same as CPT — optimizer states + gradients
-                bytes_per = 20.0
+                # SFT full-param: weights(2) + gradients(2) + Adam m+v(8) = 12 + activations(另算)
+                bytes_per = 12.0
                 label = "SFT(全参)"
             elif method == "lora":
                 # LoRA: load full frozen weights(2) + tiny trainable adapter + no optimizer for base
-                # ~2.5 bytes/param for the frozen base + LoRA overhead
                 bytes_per = 2.5
                 label = "SFT(LoRA)"
             else:
-                bytes_per = 20.0
+                bytes_per = 12.0
                 label = "SFT(full_param)"
         elif stage == "rl":
             # RL (PPO/GRPO): Actor(2) + Critic(2) + Ref model(2) + optimizer states(8-12)
-            # ≈ 22-30 bytes/param for 2-3 model copies + optimizer
             bytes_per = 25.0
             label = "RL(PPO/GRPO)"
         else:
-            bytes_per = 20.0
+            bytes_per = 12.0
             label = "训练(full)"
 
-        # MoE training: all experts need to be loaded
+        # MoE model state still contains every expert.  Activated parameters
+        # describe per-token compute, not the amount of resident model state.
+        # Expert parallelism may shard those weights across cards, which is
+        # already represented by dividing the total requirement by per-card
+        # VRAM during card-count estimation.
         effective_P = P
-        if moe_activated_B and moe_activated_B < P:
-            effective_P = min(P, moe_activated_B * 2.0)  # compromise for MoE training
-
-        vram = effective_P * bytes_per * safety
-        return round(vram, 1), f"{label}: {effective_P:.1f}B × {bytes_per} bytes/param × {safety} = {vram:.0f}GB"
+        weight_vram = effective_P * bytes_per * safety
+        act_gb = estimate_activation_gb(arch, batch_size, seq_len)
+        min_vram = weight_vram + act_gb
+        formula = (
+            f"{label}: {effective_P:.1f}B × {bytes_per} bytes/param × {safety} = {weight_vram:.0f}GB "
+            f"+ 激活值 {batch_size}×{seq_len}×{arch.get('hidden_size', 4096)}×{arch.get('num_layers', 32)}×40B = {act_gb:.1f}GB "
+            f"= {min_vram:.0f}GB"
+        )
+        return {
+            "min_vram": round(min_vram, 1),
+            "full_vram": round(min_vram, 1),
+            "min_formula": formula,
+            "full_formula": formula,
+            "kv_cache_gb": 0.0,
+            "weight_vram": round(weight_vram, 1),
+            "activation_vram": round(act_gb, 1),
+            "calculation": {
+                "parameter_basis": "total",
+                "total_params_b": P,
+                "active_params_b": moe_activated_B,
+                "is_moe": bool(moe_activated_B and moe_activated_B < P),
+                "safety_factor": safety,
+                "components": [
+                    {
+                        "id": "model_states",
+                        "label": "模型权重、梯度与优化器状态",
+                        "result_gb": round(weight_vram, 1),
+                        "formula": f"{P:.1f}B × {bytes_per:.1f} bytes/param × {safety:.2f} = {weight_vram:.1f} GB",
+                        "inputs": {"params_b": P, "bytes_per_param": bytes_per, "safety_factor": safety},
+                    },
+                    {
+                        "id": "activations",
+                        "label": "训练激活值",
+                        "result_gb": round(act_gb, 1),
+                        "formula": (
+                            f"{batch_size} batch × {seq_len} tokens × {arch.get('hidden_size', 4096)} hidden "
+                            f"× {arch.get('num_layers', 32)} layers × 40 bytes = {act_gb:.1f} GB"
+                        ),
+                        "inputs": {
+                            "batch_size": batch_size, "seq_len": seq_len,
+                            "hidden_size": arch.get("hidden_size", 4096),
+                            "num_layers": arch.get("num_layers", 32), "activation_bytes": 40,
+                        },
+                    },
+                ],
+                "minimum": {"total_gb": round(min_vram, 1), "component_ids": ["model_states", "activations"]},
+                "full": {"total_gb": round(min_vram, 1), "component_ids": ["model_states", "activations"]},
+            },
+        }
 
     elif scenario == "quantize":
         # ── Quantization scenario (v3.1): needs training-capable chips ──
         # Must hold FP16 full model + calibration data structures in VRAM.
-        # Different methods need different overhead:
-        #   GPTQ: needs Hessian matrix (~1.5× per layer being processed)
-        #   AWQ: needs activation statistics buffer (~1.0×)
-        #   bitsandbytes: lightweight, mainly the model + quant buffers (~0.5×)
-        #   GGUF: needs calibration dataset batches (~0.5×)
         safety = 1.25
         quantize_bytes = {
             "gptq": 3.5,           # 2.0 (FP16 model) + 1.5 (Hessian matrices)
@@ -112,12 +321,33 @@ def estimate_vram_total(
         bits_label = {"int8": "INT8", "int4": "INT4", "fp8": "FP8"}.get(quantize_bits, quantize_bits)
         label = f"量化({method_label}-{bits_label})"
 
-        # Quantization processes the full model (not just activated experts for MoE),
-        # since every layer needs calibration passes.
         effective_P = P
-
         vram = effective_P * bytes_per * safety
-        return round(vram, 1), f"{label}: {effective_P:.1f}B × {bytes_per} bytes/param × {safety} = {vram:.0f}GB"
+        formula = f"{label}: {effective_P:.1f}B × {bytes_per} bytes/param × {safety} = {vram:.0f}GB"
+        return {
+            "min_vram": round(vram, 1),
+            "full_vram": round(vram, 1),
+            "min_formula": formula,
+            "full_formula": formula,
+            "kv_cache_gb": 0.0,
+            "weight_vram": round(vram, 1),
+            "calculation": {
+                "parameter_basis": "total",
+                "total_params_b": P,
+                "active_params_b": moe_activated_B,
+                "is_moe": bool(moe_activated_B and moe_activated_B < P),
+                "safety_factor": safety,
+                "components": [{
+                    "id": "quantization_workspace",
+                    "label": "全量模型与量化工作区",
+                    "result_gb": round(vram, 1),
+                    "formula": f"{P:.1f}B × {bytes_per:.1f} bytes/param × {safety:.2f} = {vram:.1f} GB",
+                    "inputs": {"params_b": P, "bytes_per_param": bytes_per, "safety_factor": safety},
+                }],
+                "minimum": {"total_gb": round(vram, 1), "component_ids": ["quantization_workspace"]},
+                "full": {"total_gb": round(vram, 1), "component_ids": ["quantization_workspace"]},
+            },
+        }
 
     else:  # inference
         safety = 1.25
@@ -130,11 +360,103 @@ def estimate_vram_total(
         quant_label = {"fp16": "FP16", "int8": "INT8", "int4_gptq": "INT4-GPTQ",
                        "int4_awq": "INT4-AWQ", "gguf_q4": "GGUF Q4", "gguf_q8": "GGUF Q8"}.get(quant, quant)
 
-        # MoE inference: only activated experts
-        effective_P = moe_activated_B if moe_activated_B and moe_activated_B < P else P
+        # MoE inference routes each token through only a subset of experts, but
+        # the complete expert weight set must be resident across the deployment
+        # unless an explicit CPU/NVMe expert-offload mode is selected.  This
+        # estimator models the standard resident-weight deployment.
+        effective_P = P
+        weight_vram = effective_P * bytes_per * safety
 
-        vram = effective_P * bytes_per * safety
-        return round(vram, 1), f"推理({quant_label}): {effective_P:.1f}B × {bytes_per} bytes/param × {safety} = {vram:.0f}GB"
+        # 最小档（权重+单请求峰值KV）：峰值 KV 必须同时包含 prompt
+        # 和已生成 token。目标并发档只增加 KV 槽位，不重复计算常驻权重。
+        # max_context 仅作为未显式传 input_len 时的兼容回退值；它不再与
+        # input/output 使用两套互相冲突的口径。
+        _in = input_len if input_len and input_len > 0 else max_context
+        _out = output_len if output_len and output_len > 0 else 512
+        total_context = _in + _out
+        kv_request = estimate_kv_cache_gb(arch, total_context, 1)
+        target_concurrency = max(1, concurrency)
+        target_kv = kv_request * target_concurrency
+
+        # 推理不再展示“仅权重、无法承载完整请求”的最小档。兼容字段
+        # min_vram/full_vram 均表示最小部署（权重 + 1份峰值KV）。
+        full_vram = weight_vram + kv_request
+        min_vram = full_vram
+        target_vram = weight_vram + target_kv
+        full_formula = (
+            f"推理({quant_label})最小部署: 权重 {weight_vram:.1f}GB + "
+            f"KV Cache(({_in}输入+{_out}输出) × 1请求) {kv_request:.1f}GB = {full_vram:.0f}GB"
+        )
+        min_formula = full_formula
+        target_formula = (
+            f"目标并发显存: 权重 {weight_vram:.1f}GB + 单请求峰值KV {kv_request:.3f}GB "
+            f"× {target_concurrency}请求 = {target_vram:.1f}GB"
+        )
+        return {
+            "min_vram": round(min_vram, 1),
+            "full_vram": round(full_vram, 1),
+            "min_vram_raw": min_vram,
+            "full_vram_raw": full_vram,
+            "min_formula": min_formula,
+            "full_formula": full_formula,
+            "kv_cache_gb": round(kv_request, 3),
+            "kv_cache_gb_raw": kv_request,
+            "target_kv_gb": round(target_kv, 3),
+            "target_kv_gb_raw": target_kv,
+            "target_vram": round(target_vram, 1),
+            "target_vram_raw": target_vram,
+            "target_formula": target_formula,
+            "weight_vram": round(weight_vram, 1),
+            "weight_vram_raw": weight_vram,
+            "ideal_kv_gb": round(kv_request, 3),
+            "ideal_kv_gb_raw": kv_request,
+            "total_context": total_context,
+            "calculation": {
+                "parameter_basis": "total",
+                "total_params_b": P,
+                "active_params_b": moe_activated_B,
+                "is_moe": bool(moe_activated_B and moe_activated_B < P),
+                "safety_factor": safety,
+                "components": [
+                    {
+                        "id": "weights",
+                        "label": f"{quant_label} 模型权重",
+                        "result_gb": round(weight_vram, 1),
+                        "formula": f"{P:.1f}B × {bytes_per:.1f} bytes/param × {safety:.2f} = {weight_vram:.1f} GB",
+                        "inputs": {"params_b": P, "bytes_per_param": bytes_per, "safety_factor": safety},
+                    },
+                    {
+                        "id": "kv_cache_request",
+                        "label": "单请求峰值 KV Cache",
+                        "result_gb": round(kv_request, 3),
+                        "formula": (
+                            f"2(K/V) × {arch.get('num_kv_layers', arch.get('num_layers', 32))} layers "
+                            f"× {arch.get('num_kv_heads', 8)} KV heads × {arch.get('head_dim', 128)} head_dim "
+                            f"× 2 bytes/element（BF16/FP16 KV精度） × "
+                            f"({_in}输入 + {_out}输出) tokens × 1请求 = {kv_request:.3f} GB"
+                        ),
+                        "inputs": {
+                            "num_kv_layers": arch.get("num_kv_layers", arch.get("num_layers", 32)),
+                            "num_kv_heads": arch.get("num_kv_heads", 8),
+                            "head_dim": arch.get("head_dim", 128),
+                            "kv_cache_dtype": "BF16/FP16",
+                            "bytes_per_element": 2,
+                            "input_tokens": _in, "output_tokens": _out,
+                            "total_context": total_context, "requests": 1,
+                        },
+                    },
+                ],
+                "minimum": {"total_gb": round(full_vram, 1), "component_ids": ["weights", "kv_cache_request"]},
+                "full": {"total_gb": round(full_vram, 1), "component_ids": ["weights", "kv_cache_request"]},
+                "target_concurrency": {
+                    "total_gb": round(target_vram, 1),
+                    "weight_gb": round(weight_vram, 1),
+                    "kv_total_gb": round(target_kv, 3),
+                    "requests": target_concurrency,
+                    "formula": target_formula,
+                },
+            },
+        }
 
 
 def estimate_training_flops(params_B: float, tokens_T: float) -> float:
@@ -155,27 +477,30 @@ def estimate_training_flops(params_B: float, tokens_T: float) -> float:
 #   Quantize:  compute=40%, cost=20%, ecosystem=40%
 #
 # Sub-dimension ratios are FIXED (not scenario-dependent):
-#   Compute:  D1(30%) + D2(30%) + D5(15%) + D7(10%) + D8(15%)
-#   Cost:     D3(50%) + D4(50%)
-#   Ecosystem: D6(40%) + D9(20%) + D10(30%) + D11(10%)
+#   Compute:   compute_perf(90%) + bandwidth_adequacy(10%)
+#   Cost:      power_efficiency(60%) + server_count_efficiency(40%)
+#   Ecosystem: framework_compat(40%) + toolchain_compat(40%) + source_credibility(20%)
+#   Benchmark: benchmark_evidence(100%)
 # ═══════════════════════════════════════════════════════════
 
 
 @dataclass
 class CategoryWeights:
-    """3-category weight preset. Sum must be 1.0."""
-    compute_power: float = 0.50
-    cost_effectiveness: float = 0.25
-    ecosystem_maturity: float = 0.25
+    """4-category weight preset. Sum must be 1.0."""
+    compute_power: float = 0.20
+    cost_effectiveness: float = 0.10
+    ecosystem_maturity: float = 0.40
+    benchmark_evidence: float = 0.30
 
     def validate(self) -> bool:
-        return abs(self.compute_power + self.cost_effectiveness + self.ecosystem_maturity - 1.0) < 0.001
+        return abs(self.compute_power + self.cost_effectiveness + self.ecosystem_maturity + self.benchmark_evidence - 1.0) < 0.001
 
     def to_dict(self) -> dict:
         return {
+            "ecosystem_maturity": self.ecosystem_maturity,
+            "benchmark_evidence": self.benchmark_evidence,
             "compute_power": self.compute_power,
             "cost_effectiveness": self.cost_effectiveness,
-            "ecosystem_maturity": self.ecosystem_maturity,
         }
 
 
@@ -195,42 +520,46 @@ class CategoryResult:
 # ── Sub-dimension composition (fixed ratios within each category) ──
 
 SUB_DIMS_COMPUTE_POWER = {
-    "compute_perf": 0.60,
-    "bandwidth_adequacy": 0.40,
+    "compute_perf": 0.90,
+    "bandwidth_adequacy": 0.10,
 }
 
 SUB_DIMS_COST_EFFECTIVENESS = {
-    "power_efficiency": 0.40,
-    "server_count_efficiency": 0.60,  # 8卡/节点 → 10, 多节点扣分
+    "power_efficiency": 0.60,
+    "server_count_efficiency": 0.40,  # 8卡/节点 → 10, 多节点扣分
 }
 
 SUB_DIMS_ECOSYSTEM = {
-    "compatibility_score": 0.40,      # renamed from ecosystem_maturity, cloud support + verified compat
-    "framework_compat": 0.15,         # major frameworks only, split from software_compat
-    "toolchain_compat": 0.15,         # minor toolchains only
-    "benchmark_evidence": 0.20,       # no-data default 5.0
-    "source_credibility": 0.10,       # official source ratio (low weight)
+    "framework_compat": 0.40,         # major frameworks only
+    "toolchain_compat": 0.40,         # minor toolchains only
+    "source_credibility": 0.20,       # official source ratio
+}
+
+SUB_DIMS_BENCHMARK = {
+    "benchmark_evidence": 1.0,        # standalone category: 实测验证度
 }
 
 CATEGORY_DEFS = [
+    {"id": "ecosystem_maturity", "name_cn": "生态成熟度", "name_en": "Ecosystem Maturity",
+     "sub_dims": SUB_DIMS_ECOSYSTEM},
+    {"id": "benchmark_evidence", "name_cn": "实测验证度", "name_en": "Benchmark Evidence",
+     "sub_dims": SUB_DIMS_BENCHMARK},
     {"id": "compute_power", "name_cn": "算力性能", "name_en": "Compute Capability",
      "sub_dims": SUB_DIMS_COMPUTE_POWER},
     {"id": "cost_effectiveness", "name_cn": "性价比", "name_en": "Cost-Effectiveness",
      "sub_dims": SUB_DIMS_COST_EFFECTIVENESS},
-    {"id": "ecosystem_maturity", "name_cn": "生态成熟度", "name_en": "Ecosystem Maturity",
-     "sub_dims": SUB_DIMS_ECOSYSTEM},
 ]
 
 # ── Category weight presets for each scenario ──
 
 CAT_WEIGHTS_TRAIN = CategoryWeights(
-    compute_power=0.50, cost_effectiveness=0.20, ecosystem_maturity=0.30,
+    compute_power=0.20, cost_effectiveness=0.10, ecosystem_maturity=0.40, benchmark_evidence=0.30,
 )
 CAT_WEIGHTS_INFER = CategoryWeights(
-    compute_power=0.50, cost_effectiveness=0.20, ecosystem_maturity=0.30,
+    compute_power=0.20, cost_effectiveness=0.10, ecosystem_maturity=0.40, benchmark_evidence=0.30,
 )
 CAT_WEIGHTS_QUANTIZE = CategoryWeights(
-    compute_power=0.50, cost_effectiveness=0.20, ecosystem_maturity=0.30,
+    compute_power=0.20, cost_effectiveness=0.10, ecosystem_maturity=0.40, benchmark_evidence=0.30,
 )
 
 # ── Scenario → (CategoryWeights, label) lookup ──
@@ -437,7 +766,7 @@ class ScoringResult:
     total_score: float = 0.0     # 0–100
     categories: dict[str, CategoryResult] = field(default_factory=dict)
     dimensions: dict[str, DimensionResult] = field(default_factory=dict)  # flat backward-compat
-    version: str = "4.2.0"
+    version: str = "4.4.0"
 
 
 @dataclass
@@ -544,6 +873,93 @@ def round_up_pow2(n: int) -> int:
     return _next_pow2(n)
 
 
+def estimate_card_count(required_vram_gb: float, per_card_vram_gb: float) -> dict:
+    """Return transparent VRAM-based card sizing without an arbitrary cap.
+
+    The raw count uses mathematical ceiling.  In particular, an exact division
+    such as 512GB / 128GB stays at four cards instead of being over-counted.
+    The deployment count is then rounded to a power of two for the topology
+    convention used by this recommendation engine.
+    """
+    required = max(0.0, float(required_vram_gb or 0.0))
+    per_card = float(per_card_vram_gb or 0.0)
+    if per_card <= 0:
+        raise ValueError("per_card_vram_gb must be greater than zero")
+    raw_cards = max(1, math.ceil(required / per_card))
+    rounded_cards = round_up_pow2(raw_cards)
+    return {
+        "required_vram_gb": round(required, 1),
+        "per_card_vram_gb": round(per_card, 1),
+        "raw_cards": raw_cards,
+        "rounded_cards": rounded_cards,
+        "formula": (
+            f"ceil({required:.1f} GB ÷ {per_card:.1f} GB/卡) = {raw_cards} 卡"
+            f" → 向上取2的幂 = {rounded_cards} 卡"
+        ),
+    }
+
+
+def estimate_inference_concurrency_cards(
+    weight_vram_gb: float,
+    per_request_kv_gb: float,
+    concurrency: int,
+    per_card_vram_gb: float,
+    *,
+    per_card_tps: float | None = None,
+    per_request_tps: float | None = None,
+) -> dict:
+    """Size a shared inference deployment pool for target concurrency.
+
+    Resident weights are loaded once across the model-parallel pool.  Each
+    concurrent request contributes one peak KV allocation.  A throughput floor
+    is applied only when both measured per-card throughput and an explicit
+    per-request throughput target are available; there is no hidden 60-second
+    latency assumption.
+    """
+    requests = max(1, int(concurrency or 1))
+    weight = max(0.0, float(weight_vram_gb or 0.0))
+    per_request_kv = max(0.0, float(per_request_kv_gb or 0.0))
+    target_kv = per_request_kv * requests
+    target_vram = weight + target_kv
+    capacity = estimate_card_count(target_vram, per_card_vram_gb)
+
+    throughput_raw = None
+    throughput_rounded = None
+    if per_card_tps and per_card_tps > 0 and per_request_tps and per_request_tps > 0:
+        aggregate_tps = requests * per_request_tps
+        throughput_raw = max(1, math.ceil(aggregate_tps / per_card_tps))
+        throughput_rounded = round_up_pow2(throughput_raw)
+
+    rounded = max(capacity["rounded_cards"], throughput_rounded or 1)
+    formula = (
+        f"目标并发显存 = 权重 {weight:.1f}GB + 单请求KV {per_request_kv:.3f}GB × "
+        f"{requests} = {target_vram:.1f}GB；ceil({target_vram:.1f}÷{float(per_card_vram_gb):.1f})"
+        f" = {capacity['raw_cards']}卡 → 取2的幂 = {capacity['rounded_cards']}卡"
+    )
+    if throughput_raw is not None:
+        formula += (
+            f"；吞吐约束 ceil({requests}×{per_request_tps:.1f}÷{per_card_tps:.1f})"
+            f" = {throughput_raw}卡 → 取2的幂 = {throughput_rounded}卡；最终取较大值 = {rounded}卡"
+        )
+
+    return {
+        "basis": "shared_pool_capacity",
+        "weight_vram_gb": round(weight, 1),
+        "per_request_kv_gb": round(per_request_kv, 3),
+        "target_kv_gb": round(target_kv, 3),
+        "target_vram_gb": round(target_vram, 1),
+        "target_concurrency": requests,
+        "capacity_raw_cards": capacity["raw_cards"],
+        "capacity_rounded_cards": capacity["rounded_cards"],
+        "throughput_raw_cards": throughput_raw,
+        "throughput_rounded_cards": throughput_rounded,
+        "raw_cards": max(capacity["raw_cards"], throughput_raw or 1),
+        "rounded_cards": rounded,
+        "formula": formula,
+        "assumption": "按可统一分片和调度的显存池估算，常驻权重仅加载一份；实际后端若限制最大并行度，需再按实例复制校核。",
+    }
+
+
 # ═══════════════════════════════════════════════════════════
 # Dimension #1: 算力性能 (Compute Performance) — weight 15-20%
 # ═══════════════════════════════════════════════════════════
@@ -587,7 +1003,7 @@ def score_compute_perf(fp16_tflops: float) -> DimensionResult:
 
 
 # ═══════════════════════════════════════════════════════════
-# Dimension #2: 带宽充裕度 (Bandwidth Adequacy) — weight 30%
+# Dimension #2: 带宽充裕度 (Bandwidth Adequacy) — 计算大类内权重 10%
 # ═══════════════════════════════════════════════════════════
 
 def score_bandwidth_adequacy(vram_bw_gb_s: float, cards: int,
@@ -685,49 +1101,7 @@ def score_power_efficiency(fp16_tflops: float, tdp_w: float) -> DimensionResult:
 
 
 # ═══════════════════════════════════════════════════════════
-
-# ═══════════════════════════════════════════════════════════
-# Dimension #5: 兼容性评分 (Compatibility Score) — weight 40%
-# ═══════════════════════════════════════════════════════════
-
-def score_compatibility(cloud: int, compat_verified: int,
-                         has_frameworks: bool = False) -> DimensionResult:
-    """Composite: cloud support (+30) + verified compat (+40 max, 8/ea) + frameworks (+30).
-
-    Max: 30 + 40 + 30 = 100.
-    Missing data → 50 (neutral, previously 2.8).
-    """
-    cloud_val = int(float(cloud or 0))
-    compat_val = int(compat_verified or 0)
-    cloud_score = 30.0 if cloud_val >= 1 else 0.0
-    compat_score = min(compat_val * 8.0, 40.0)
-    fw_score = 30.0 if has_frameworks else 0.0
-
-    score = min(cloud_score + compat_score + fw_score, 100.0)
-    parts = []
-    if cloud_score: parts.append(f"云可用+{cloud_score:.0f}")
-    if compat_score > 0: parts.append(f"兼容{compat_val}条→+{compat_score:.0f}")
-    if fw_score: parts.append(f"框架+{fw_score:.0f}")
-    if parts:
-        detail = " + ".join(parts) + f" = {score:.0f}/100"
-    else:
-        score = 50.0  # neutral default
-        detail = f"无生态数据 → 默认 {score:.0f}/100"
-    return DimensionResult(
-        score=round(score, 2), detail=detail,
-        raw_values={
-            "cloud_available": cloud_val,
-            "compat_verified_count": compat_val,
-            "has_frameworks": has_frameworks,
-            "formula": "min(cloud*30 + min(compat*8,40) + fw*30, 100); no-data→50",
-            "source": "chip.cloud_available + chip_model_compatibility + chip.software_stack",
-            "missing": not parts,
-        },
-    )
-
-
-# ═══════════════════════════════════════════════════════════
-# Dimension #4: 服务器节点效率 (Server Count Efficiency) — weight 60%
+# Dimension #4: 服务器节点效率 (Server Count Efficiency) — weight 40%
 # 8卡（1节点）=10分，多节点扣分
 # ═══════════════════════════════════════════════════════════
 
@@ -934,16 +1308,16 @@ def aggregate_score(
     ctx: RecommendContext,
     cat_weights: CategoryWeights,
 ) -> ScoringResult:
-    """v4.2: Compute all dimension scores, aggregate into 3 categories.
+    """v4.4: Compute all dimension scores, aggregate into 4 categories.
 
     Formula:
-      total = Cat_A × w_A + Cat_B × w_B + Cat_C × w_C    (0-100 scale)
+      total = Σ(Cat_score × Cat_weight)    (0-100 scale)
     where each category score = Σ(sub_dim_score × sub_weight) within category.
     """
 
     chip = ctx.chip
 
-    # ── Step 1: Compute all 9 sub-dimension scores ──
+    # ── Step 1: Compute all 8 sub-dimension scores ──
 
     dims: dict[str, DimensionResult] = {}
 
@@ -965,36 +1339,27 @@ def aggregate_score(
     # D4: 服务器节点效率
     dims["server_count_efficiency"] = score_server_count_efficiency(ctx.recommended_cards)
 
-    # D5: 兼容性评分（原生态成熟度）
-    has_fw = bool((chip.get("software_stack") or "").strip() or
-                  (chip.get("compatible_frameworks") or "").strip())
-    dims["compatibility_score"] = score_compatibility(
-        int(float(chip.get("cloud_available", 0) or 0)),
-        ctx.compat_verified_count,
-        has_frameworks=has_fw,
-    )
-
-    # D6: 框架兼容
+    # D5: 框架兼容
     dims["framework_compat"] = score_framework_compat(
         str(chip.get("software_stack", "") or ""),
         str(chip.get("compatible_frameworks", "") or ""),
     )
 
-    # D7: 工具链兼容
+    # D6: 工具链兼容
     dims["toolchain_compat"] = score_toolchain_compat(
         str(chip.get("software_stack", "") or ""),
         str(chip.get("compatible_frameworks", "") or ""),
     )
 
-    # D8: 实测验证度
+    # D7: 实测验证度
     dims["benchmark_evidence"] = score_benchmark_evidence(
         ctx.benchmark_count, ctx.max_benchmark_mfu, ctx.max_benchmark_tps,
     )
 
-    # D9: 来源真实度
+    # D8: 来源真实度
     dims["source_credibility"] = score_source_credibility(ctx.official_ratio)
 
-    # ── Step 2: Aggregate into 3 categories ──
+    # ── Step 2: Aggregate into 4 categories ──
 
     categories: dict[str, CategoryResult] = {}
     total = 0.0
@@ -1018,9 +1383,8 @@ def aggregate_score(
             short_names = {
                 "compute_perf": "D1算力", "bandwidth_adequacy": "D2带宽",
                 "power_efficiency": "D3能效", "server_count_efficiency": "D4节点",
-                "compatibility_score": "D5兼容", "framework_compat": "D6框架",
-                "toolchain_compat": "D7工具", "benchmark_evidence": "D8实测",
-                "source_credibility": "D9来源",
+                "framework_compat": "D5框架", "toolchain_compat": "D6工具",
+                "benchmark_evidence": "D7实测", "source_credibility": "D8来源",
             }
             sn = short_names.get(dim_id, dim_id)
             formula_parts.append(f"{sn}×{sub_w:.0%}")
@@ -1046,7 +1410,7 @@ def aggregate_score(
         total_score=round(total, 1),  # direct weighted sum (0-100)
         categories=categories,
         dimensions=dims,         # flat backward-compat
-        version="4.2.0",
+        version="4.4.0",
     )
 
 
@@ -1108,29 +1472,34 @@ def scoring_result_to_dict(sr: ScoringResult) -> dict:
 DIMENSION_META = [
     {"id": "compute_perf",          "name_cn": "算力性能",     "name_en": "Compute Performance",
      "desc": "单卡FP16/BF16理论算力(TFLOPS)", "unit": "TFLOPS",
-     "category": "compute_power", "sub_weight": 0.60},
+     "explain_cn": "看单卡FP16/BF16理论算力；分数越高，单卡计算能力通常越强。",
+     "category": "compute_power", "sub_weight": 0.90},
     {"id": "bandwidth_adequacy",    "name_cn": "带宽充裕度",   "name_en": "Bandwidth Adequacy",
      "desc": "总显存带宽(vram_bw×卡数)相对模型带宽需求的充裕程度", "unit": "比率",
-     "category": "compute_power", "sub_weight": 0.40},
+     "explain_cn": "看推荐卡的总显存带宽能否覆盖模型需求；余量越大，越不容易受访存瓶颈限制，也越能应对更多并发请求。",
+     "category": "compute_power", "sub_weight": 0.10},
     {"id": "power_efficiency",      "name_cn": "能效比",      "name_en": "Power Efficiency",
      "desc": "每瓦功耗产出的算力", "unit": "GFLOPS/W",
-     "category": "cost_effectiveness", "sub_weight": 0.40},
+     "explain_cn": "看每瓦功耗可提供多少算力；分数越高，同等计算量的电力和散热成本通常越低。",
+     "category": "cost_effectiveness", "sub_weight": 0.60},
     {"id": "server_count_efficiency","name_cn": "节点效率",    "name_en": "Server Count Efficiency",
      "desc": "8卡=1节点满分，多节点扣分", "unit": "节点数",
-     "category": "cost_effectiveness", "sub_weight": 0.60},
-    {"id": "compatibility_score",   "name_cn": "兼容性评分",   "name_en": "Compatibility Score",
-     "desc": "云平台可用+已验证兼容模型数+框架支持", "unit": "综合分",
-     "category": "ecosystem_maturity", "sub_weight": 0.40},
+     "explain_cn": "按每节点8卡估算部署规模；节点越少，互联、运维和部署复杂度通常越低。",
+     "category": "cost_effectiveness", "sub_weight": 0.40},
     {"id": "framework_compat",      "name_cn": "框架兼容",     "name_en": "Framework Compatibility",
      "desc": "主流框架支持数(PyTorch/TF/JAX等)", "unit": "框架数",
-     "category": "ecosystem_maturity", "sub_weight": 0.15},
+     "explain_cn": "看PyTorch、TensorFlow、JAX等主流框架的支持情况；支持越多，模型迁移和部署越容易。",
+     "category": "ecosystem_maturity", "sub_weight": 0.40},
     {"id": "toolchain_compat",      "name_cn": "工具链兼容",   "name_en": "Toolchain Compatibility",
      "desc": "辅助工具链支持数(DeepSpeed/TensorRT等)", "unit": "工具数",
-     "category": "ecosystem_maturity", "sub_weight": 0.15},
-    {"id": "benchmark_evidence",    "name_cn": "实测验证度",   "name_en": "Benchmark Evidence",
-     "desc": "是否有实测benchmark数据(MFU/吞吐)", "unit": "证据分",
-     "category": "ecosystem_maturity", "sub_weight": 0.20},
+     "explain_cn": "看DeepSpeed、TensorRT、Triton等辅助工具的支持情况；支持越完整，训练和推理优化越方便。",
+     "category": "ecosystem_maturity", "sub_weight": 0.40},
     {"id": "source_credibility",    "name_cn": "来源真实度",   "name_en": "Source Credibility",
      "desc": "数据来源中官方资料占比", "unit": "比率",
-     "category": "ecosystem_maturity", "sub_weight": 0.10},
+     "explain_cn": "看评分数据中官方资料所占比例；分数越高，评分所依据的数据通常越可信。",
+     "category": "ecosystem_maturity", "sub_weight": 0.20},
+    {"id": "benchmark_evidence",    "name_cn": "实测验证度",   "name_en": "Benchmark Evidence",
+     "desc": "是否有实测benchmark数据(MFU/吞吐)", "unit": "证据分",
+     "explain_cn": "看真实benchmark的数量和质量；分数越高，越能用实测结果验证理论规格。",
+     "category": "benchmark_evidence", "sub_weight": 1.0},
 ]

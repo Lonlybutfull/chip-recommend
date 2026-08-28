@@ -6,13 +6,14 @@ Usage:
 """
 
 import re
+import math
 from contextlib import asynccontextmanager
 from typing import Annotated, Optional
 
 from fastapi import FastAPI, Query, Path, Body, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from scalar_fastapi import get_scalar_api_reference, Theme
 
@@ -43,6 +44,8 @@ from chip_model.database import (
     get_chip_model_compat_count,
     get_chip_source_credibility,
     get_deployment_guide,
+    classify_backend,
+    get_model_config_json,
 )
 from chip_model.scoring import (  # v4.2 scoring engine
     parse_fp16,
@@ -63,7 +66,11 @@ from chip_model.scoring import (  # v4.2 scoring engine
     get_category_weights,
     CATEGORY_DEFS,
     estimate_vram_total,
+    estimate_card_count,
+    estimate_inference_concurrency_cards,
     estimate_training_flops,
+    resolve_arch_params,
+    resolve_moe_metadata,
     DimensionResult,
     ScoringResult,
     aggregate_score,
@@ -201,6 +208,25 @@ def api_chip_search(
                         include_provenance=include_provenance)
 
 
+def _max_per_card_tps(bench_records: list[dict] | None) -> float | None:
+    """从 benchmark 记录里取最大单卡实测吞吐 (throughput_tok_s / chip_count)。
+
+    用于推理理想档的「吞吐上限」锚定。返回 None 表示无实测数据。
+    """
+    best: float | None = None
+    for r in bench_records or []:
+        try:
+            tps = float(r.get("throughput_tok_s") or 0)
+            cnt = int(r.get("chip_count") or 1)
+        except (ValueError, TypeError):
+            continue
+        if tps > 0 and cnt > 0:
+            per_card = tps / cnt
+            if best is None or per_card > best:
+                best = per_card
+    return best
+
+
 @app.get("/api/v1/chips/recommend")
 def api_chip_recommend(
     model: str = Query(..., description="Model name (fuzzy match)",
@@ -220,6 +246,12 @@ def api_chip_recommend(
     prefer_domestic: bool = Query(False, description="Prefer domestic chips"),
     prefer_vendor: Optional[str] = Query(None, description="Prefer vendor"),
     tco_weight: float = Query(0.0, ge=0.0, le=0.3, description="TCO dimension weight 0.0-0.3"),
+    max_context: int = Query(4096, ge=1, description="推理: input_len 未提供时的兼容回退值"),
+    concurrency: int = Query(1, ge=1, description="推理: 目标并发请求数"),
+    input_len: Optional[int] = Query(None, ge=1, description="推理: 单请求输入长度 (tokens)"),
+    output_len: Optional[int] = Query(None, ge=1, description="推理: 单请求最大输出长度 (tokens)"),
+    batch_size: int = Query(1, ge=1, description="训练: batch size"),
+    seq_len: int = Query(2048, ge=1, description="训练: 样本长度 (tokens)"),
     limit: int = Query(5, le=20),
 ):
     """Recommend chips for a model × scenario × constraints.  v3.1 quantize scenario.
@@ -243,25 +275,14 @@ def api_chip_recommend(
     model_id = str(model_data.get("model_id", "") or "")
     arch_family = str(model_data.get("architecture_family", "") or "")
 
-    # 2a. Detect MoE models
-    import re as _re
-    moe_activated = None
-    m = _re.search(r'-A(\d+(?:\.\d+)?)\s*B', model_id)
-    if not m:
-        m = _re.search(r'A(\d+(?:\.\d+)?)\s*B', model_id)
-    if not m and arch_family.lower().startswith('moe'):
-        nums = _re.findall(r'[-/](\d+(?:\.\d+)?)\s*B', model_id)
-        if len(nums) >= 2:
-            lower = min(float(n) for n in nums)
-            m = _re.match(rf'{lower}', str(lower))
-    if m:
-        moe_activated = float(m.group(1))
-        if scenario == "inference":
-            print(f"[INFO] MoE model detected: {total_params}B total, {moe_activated}B activated → using activated for VRAM")
+    # 2a. Resolve MoE metadata. Active parameters describe per-token compute;
+    # resident weight memory is always based on total parameters in this mode.
+    config_raw = get_model_config_json(model_id) or model_data.get("config_json", "") or ""
+    moe_meta = resolve_moe_metadata(model_id, arch_family, total_params, config_raw)
+    moe_activated = moe_meta.get("active_params_b")
 
     # 2b. Check quantized model in model data
     import json as _json
-    config_raw = model_data.get("config_json", "") or ""
     is_quantized = False
     quant_bits = None
     try:
@@ -274,13 +295,28 @@ def api_chip_recommend(
     if scenario == "train" and is_quantized:
         raise HTTPException(400, f"量化模型 {model_id} 只能用于推理场景，不支持训练")
 
-    # 3. Calculate VRAM + FLOPs with v3.1 fine-grained formulas
-    min_vram_total, vram_formula = estimate_vram_total(
+    # 3. Calculate VRAM (minimum / complete single-request tiers) + FLOPs.
+    # For inference, one request's peak KV cache always covers input + output.
+    inference_input_len = input_len if input_len and input_len > 0 else max_context
+    inference_output_len = output_len if output_len and output_len > 0 else 512
+    arch_params = resolve_arch_params(config_raw, total_params)
+    vram_est = estimate_vram_total(
         total_params, scenario=scenario,
         stage=stage_val, method=method_val, quant=quant_val,
         quantize_bits=quantize_bits_val,
         moe_activated_B=moe_activated,
+        max_context=max_context, concurrency=concurrency,
+        input_len=inference_input_len, output_len=inference_output_len,
+        batch_size=batch_size, seq_len=seq_len,
+        arch=arch_params,
     )
+    min_vram_total = vram_est.get("min_vram_raw", vram_est["min_vram"])
+    full_vram_total = vram_est.get("full_vram_raw", vram_est["full_vram"])
+    min_vram_formula = vram_est["min_formula"]
+    full_vram_formula = vram_est["full_formula"]
+    kv_cache_gb = vram_est.get("kv_cache_gb_raw", vram_est.get("kv_cache_gb", 0.0))
+    target_vram_total = vram_est.get("target_vram_raw", full_vram_total)
+    vram_formula = full_vram_formula
 
     if scenario == "train":
         training_tokens_val = training_tokens if training_tokens else max(0.1, min(100.0, total_params * 10.0))
@@ -289,9 +325,9 @@ def api_chip_recommend(
         training_tokens_val = 0.0
         total_flops = 0.0
 
-    model_summary = (
-        f"{model_id} | {arch_family} | {total_params}B params"
-    )
+    model_summary = f"{model_id} | {arch_family} | {total_params}B params"
+    if moe_meta.get("is_moe") and moe_activated:
+        model_summary += f" | {moe_activated}B active/token"
 
     # 4. Get candidates (v3.0: no min_maturity filtering)
     _, candidates = get_chip_recommend_candidates(
@@ -303,16 +339,17 @@ def api_chip_recommend(
         if scenario == "train" and moe_activated and moe_activated < total_params:
             raise HTTPException(
                 404,
-                f"MoE模型 {model_id} 训练需加载全部 {total_params:.0f}B 参数 (非仅激活参数 {moe_activated:.0f}B)，"
+                f"MoE模型 {model_id} 的标准常驻权重部署需加载全部 {total_params:.0f}B 参数 "
+                f"(每 token 激活 {moe_activated:.0f}B 只影响计算量)，"
                 f"VRAM 估算 ≥{min_vram_total:.0f}GB。当前数据库无单卡满足需求的芯片。\n"
                 f"建议：\n"
-                f"1. 使用推理模式 (scenario=inference) — MoE 推理仅需激活参数 {moe_activated:.0f}B\n"
-                f"2. 如坚持训练，需多卡集群（如 8×H100 80GB = 640GB、16×MI300X 192GB = 3072GB）\n"
-                f"3. 考虑蒸馏为更小的 dense 模型进行训练"
+                f"1. 推理使用 INT8/INT4 权重量化降低常驻权重显存\n"
+                f"2. 使用张量并行/专家并行将全部专家权重分片到多卡\n"
+                f"3. 只有显式启用 CPU/NVMe 专家卸载时，才可采用另一套显存模型"
             )
         raise HTTPException(404, f"没有芯片满足 {model} 的VRAM需求 (≥{min_vram_total:.0f}GB)，请尝试其他模型或放宽约束")
 
-    # 5. Get scenario-specific category weights (v4.0: 3-category system)
+    # 5. Get scenario-specific category weights (v4.4: 4-category system)
     cat_weights, scenario_label = get_category_weights(
         scenario, stage=stage_val, method=method_val, quant=quant_val,
         quantize_bits=quantize_bits_val,
@@ -320,7 +357,6 @@ def api_chip_recommend(
 
     # 6. Scoring loop
     scored: list[dict] = []
-    _card = lambda n, cap=64: min(round_up_pow2(n), cap)
 
     for chip in candidates:
         chip_dict = dict(chip)
@@ -328,33 +364,96 @@ def api_chip_recommend(
         price_wan = float(chip_dict.get("price_cny_wan", 0) or 0)
         chip_model_name = str(chip_dict.get("chip_model", "") or "")
 
-        # ── Card estimation ──
-        vram_cards_raw = max(1, int(min_vram_total / vram) + 1)
-        vram_cards = _card(vram_cards_raw)
-        compute_cards = vram_cards
-        deadline_cards = vram_cards
+        # benchmark 记录提前取，理想档「吞吐上限」锚定要用
+        bench_records = get_chip_benchmarks_for_model(
+            chip_model_name, model_id, total_params,
+        )
+
+        # ── Card estimation (inference: 最小=权重+单请求峰值KV / 目标并发) ──
+        # Exact ceiling first, then power-of-two topology rounding.  Do not add
+        # an unconditional extra card and do not silently cap large clusters.
+        min_card_calc = estimate_card_count(min_vram_total, vram)
+        full_card_calc = estimate_card_count(full_vram_total, vram)
+        vram_cards = min_card_calc["rounded_cards"]
+        full_cards = full_card_calc["rounded_cards"]
+        if full_cards < vram_cards:
+            full_cards = vram_cards
+        deployment_floor_cards = full_cards if scenario == "inference" else vram_cards
+        ideal_cards = deployment_floor_cards
         estimated_days = None
+        single_machine_conc = None  # compatibility field; shared-pool sizing no longer uses replica capacity
+        ideal_calc = {
+            "basis": "full",
+            "raw_cards": (full_card_calc if scenario == "inference" else min_card_calc)["raw_cards"],
+            "rounded_cards": deployment_floor_cards,
+            "formula": (
+                "目标并发无需增加额外实例，目标并发卡数 = 最小部署卡数"
+                if scenario == "inference"
+                else "未设置额外性能目标，理想部署卡数 = 最小部署卡数"
+            ),
+        }
 
         fp16_val = parse_fp16(chip_dict.get("precision_perf", ""))
 
         if scenario == "train" and fp16_val > 0:
+            # 训练理想部署：按训练时长 (FLOPs + MFU) 反推卡数
             bench_mfu = get_chip_benchmark_mfu(chip_model_name)
             mfu_target = (bench_mfu / 100.0) if bench_mfu else 0.30
             effective_per_card_day = fp16_val * 1e12 * mfu_target * 86400
             if effective_per_card_day > 0 and training_days:
-                raw_compute = int(total_flops / (effective_per_card_day * training_days)) + 1
-                compute_cards = _card(max(vram_cards_raw, raw_compute))
-                deadline_cards = compute_cards
+                raw_compute = max(1, math.ceil(total_flops / (effective_per_card_day * training_days)))
+                compute_cards = round_up_pow2(raw_compute)
+                ideal_cards = max(vram_cards, compute_cards)
                 estimated_days = round(
-                    total_flops / (effective_per_card_day * deadline_cards), 1
+                    total_flops / (effective_per_card_day * ideal_cards), 1
                 )
+                ideal_calc = {
+                    "basis": "training_performance",
+                    "raw_cards": raw_compute,
+                    "rounded_cards": ideal_cards,
+                    "compute_rounded_cards": compute_cards,
+                    "mfu": round(mfu_target, 4),
+                    "mfu_source": "benchmark" if bench_mfu else "default",
+                    "fp16_tflops": round(fp16_val, 2),
+                    "total_flops": total_flops,
+                    "target_days": training_days,
+                    "formula": (
+                        f"ceil({total_flops:.3e} FLOPs ÷ ({fp16_val:.2f} TFLOPS/卡 × "
+                        f"{mfu_target:.2f} MFU × 86400秒 × {training_days:g}天)) = {raw_compute} 卡"
+                        f" → 取2的幂 = {compute_cards} 卡 → 与最小部署 {vram_cards} 卡取较大值 = {ideal_cards} 卡"
+                    ),
+                }
+        elif scenario == "inference":
+            # 目标并发按统一显存池计算：常驻权重只加载一份，每个在途
+            # 请求增加一份峰值 KV。仅当用户显式填写单请求目标吞吐且有
+            # 同模型实测吞吐时，才叠加吞吐卡数约束；不使用隐藏的60秒假设。
+            ideal_calc = estimate_inference_concurrency_cards(
+                weight_vram_gb=vram_est.get("weight_vram_raw", vram_est.get("weight_vram", 0.0)),
+                per_request_kv_gb=vram_est.get("ideal_kv_gb_raw", vram_est.get("ideal_kv_gb", 0.0)),
+                concurrency=concurrency,
+                per_card_vram_gb=vram,
+                per_card_tps=_max_per_card_tps(bench_records),
+                per_request_tps=sla_tps,
+            )
+            ideal_cards = max(full_cards, ideal_calc["rounded_cards"])
+            ideal_calc["rounded_cards"] = ideal_cards
 
-        recommended_cards = deadline_cards
+        # 单调约束：推理目标并发 ≥ 最小部署；训练/量化理想部署 ≥ 最小部署。
+        deployment_floor_cards = full_cards if scenario == "inference" else vram_cards
+        if ideal_cards < deployment_floor_cards:
+            ideal_cards = deployment_floor_cards
+        if full_cards < vram_cards:
+            full_cards = vram_cards
+
+        recommended_cards = ideal_cards
 
         if min_cards:
-            min_cards_pow2 = _card(min_cards)
+            min_cards_pow2 = round_up_pow2(min_cards)
             if recommended_cards < min_cards_pow2:
-                recommended_cards = _card(min_cards_pow2)
+                recommended_cards = min_cards_pow2
+                ideal_calc["minimum_card_constraint"] = min_cards
+                ideal_calc["rounded_cards"] = recommended_cards
+                ideal_calc["formula"] += f"；用户最小卡数约束 {min_cards} → {min_cards_pow2} 卡"
 
         # Hard exclude (v3.0: no min_maturity)
         if max_cards and recommended_cards > max_cards:
@@ -389,9 +488,6 @@ def api_chip_recommend(
                 model_bandwidth_gb_s = vram_bw * 0.6
 
         # ── Benchmark data ──
-        bench_records = get_chip_benchmarks_for_model(
-            chip_model_name, model_id, total_params,
-        )
         bench_mfu_val = get_chip_benchmark_mfu(chip_model_name)
         bench_tps_val = get_chip_benchmark_tps(chip_model_name)
         compat_verified = get_chip_model_compat_count(chip_model_name)
@@ -430,10 +526,31 @@ def api_chip_recommend(
         scored.append({
             "chip": chip_dict,
             "vram_cards": vram_cards,
+            "full_cards": full_cards,
             "recommended_cards": recommended_cards,
             "estimated_training_days": estimated_days,
             "meets_sla": meets_sla,
             "price_wan": price_wan,
+            "single_machine_concurrency": single_machine_conc,
+            "card_calculation": {
+                "rounding_rule": "先向上取整，再向上取最接近的2的幂；不额外加卡，不设置静默上限",
+                "per_card_vram_gb": round(vram, 1),
+                "display_tiers": ["minimum", "ideal"],
+                "minimum": {
+                    **(full_card_calc if scenario == "inference" else min_card_calc),
+                    "label": "最小部署",
+                },
+                "full": {
+                    **full_card_calc,
+                    "label": "最小部署" if scenario == "inference" else "最小部署（兼容字段）",
+                    "visible": scenario == "inference",
+                    "deprecated": scenario != "inference",
+                },
+                "ideal": {
+                    **ideal_calc,
+                    "label": "目标并发部署" if scenario == "inference" else "理想部署",
+                },
+            },
             "score": scoring_result.total_score,
             "scoring": scoring_result_to_dict(scoring_result),
         })
@@ -455,15 +572,33 @@ def api_chip_recommend(
             "scenario_label": scenario_label,
             "vram_formula": vram_formula,
             "min_vram_gb": round(min_vram_total, 1),
+            "full_vram_gb": round(full_vram_total, 1),
+            "target_vram_gb": round(target_vram_total, 1) if scenario == "inference" else None,
+            "kv_cache_gb": round(kv_cache_gb, 3) if scenario == "inference" else None,
+            "target_kv_cache_gb": vram_est.get("target_kv_gb") if scenario == "inference" else None,
+            "kv_cache_dtype": "BF16/FP16 (2 bytes/element)" if scenario == "inference" else None,
+            "min_vram_formula": min_vram_formula,
+            "full_vram_formula": full_vram_formula,
             "training_tokens_T": round(training_tokens_val, 1) if scenario == "train" else None,
             "target_training_days": training_days if scenario == "train" else None,
             "target_tokens_per_sec": sla_tps,
+            "max_context": max_context if scenario == "inference" else None,
+            "concurrency": concurrency if scenario == "inference" else None,
+            "input_len": inference_input_len if scenario == "inference" else None,
+            "output_len": inference_output_len if scenario == "inference" else None,
+            "total_context": vram_est.get("total_context") if scenario == "inference" else None,
+            "context_basis": "input_plus_output" if scenario == "inference" else None,
+            "ideal_kv_gb": vram_est.get("ideal_kv_gb") if scenario == "inference" else None,
+            "batch_size": batch_size if scenario == "train" else None,
+            "seq_len": seq_len if scenario == "train" else None,
+            "model_calculation": moe_meta,
+            "vram_calculation": vram_est.get("calculation"),
             "max_cards": max_cards,
             "min_cards": min_cards,
             "max_price_wan": max_price,
         },
         "scoring_meta": {
-            "version": "4.2.0",
+            "version": "4.4.0",
             "scenario_label": scenario_label,
             "category_weights": cat_weights.to_dict(),
             "dimensions": DIMENSION_META,
@@ -474,17 +609,24 @@ def api_chip_recommend(
                 chip=s["chip"],
                 vram_cards=s["vram_cards"],
                 recommended_cards=s["recommended_cards"],
+                full_cards=s["full_cards"],
                 estimated_training_days=s["estimated_training_days"],
                 meets_sla=s["meets_sla"],
                 total_cost_wan=(
                     round(s["price_wan"] * s["recommended_cards"], 1)
                     if s["price_wan"] else None
                 ),
+                single_machine_concurrency=s["single_machine_concurrency"],
+                card_calculation=s["card_calculation"],
                 score=s["score"],
                 scoring=s["scoring"],
                 deployment_guide=get_deployment_guide(
                     s["chip"].get("chip_model", ""),
                     model_id,
+                    backend=classify_backend(
+                        s["chip"].get("vendor", ""),
+                        s["chip"].get("chip_type", ""),
+                    ),
                 ),
             )
             for s in top
@@ -505,6 +647,9 @@ def chip_recommend_candidate_v2(
     score: float,
     scoring: dict,
     deployment_guide: dict | None = None,
+    full_cards: int | None = None,
+    single_machine_concurrency: float | None = None,
+    card_calculation: dict | None = None,
 ) -> dict:
     """Format one scored chip for v2 recommend output (includes dimension breakdown)."""
     # Reuse base candidate shape but add scoring
@@ -516,9 +661,12 @@ def chip_recommend_candidate_v2(
         meets_sla=meets_sla,
         total_cost_wan=total_cost_wan,
         score=score,
+        full_cards=full_cards,
+        single_machine_concurrency=single_machine_concurrency,
     )
     base["scoring"] = scoring
     base["deployment_guide"] = deployment_guide
+    base["recommend"]["card_calculation"] = card_calculation or {}
     return base
 
 
@@ -526,16 +674,19 @@ def chip_recommend_candidate_v2(
 
 @app.get("/api/v1/methodology")
 def api_methodology():
-    """Return scoring methodology documentation for the UI (v4.2: 3-category system, 9 dimensions)."""
+    """Return scoring methodology documentation for the UI (v4.4: 4-category system, 8 dimensions)."""
     return {
-        "version": "4.2.0",
-        "description": "AISHPerf 芯片推荐引擎 — 3大类·9子维度 分层评分方法 (v4.2)",
+        "version": "4.4.0",
+        "description": "AISHPerf 芯片推荐引擎 — 4大类·8子维度 分层评分方法 (v4.4)",
         "card_estimation": {
-            "vram_train": "总参数量(B) × 20 × 1.25 → 按单卡显存分摊 → 取2幂次方",
-            "vram_train_lora": "总参数量(B) × 2.5 × 1.25 → 按单卡显存分摊 → 取2幂次方",
+            "vram_train": "最小: P×12×1.25(权重+优化器) + 激活值(batch×seq×hidden×layers×40B)",
+            "vram_train_lora": "LoRA: P×2.5×1.25(冻结基座) + 激活值(batch×seq×hidden×layers×40B)",
+            "vram_train_tiers": "训练仅两档：最小部署=显存下限；理想部署=max(最小部署, 按FLOPs/MFU/目标天数反推的卡数)",
             "vram_quantize": "GPTQ:3.5×P×1.25 / AWQ:3.0×P×1.25 / bitsandbytes:2.5×P×1.25 / GGUF:2.5×P×1.25",
-            "vram_inference": "总参数量(B) × 2 × 1.25 → 按单卡显存分摊 → 取2幂次方",
-            "vram_inference_quant": "INT8:1.0×P×1.25 / INT4:0.5×P×1.25",
+            "vram_inference": "最小: 总参数量P×精度字节×1.25 + 单请求峰值KV Cache(2×layers×kv_heads×head_dim×2 bytes/element×(输入+输出))",
+            "vram_inference_tiers": "推理仅两档：最小部署=权重+单请求峰值KV；目标并发部署=权重+单请求峰值KV×目标并发",
+            "ideal_inference": "目标并发: 权重显存 + 单请求峰值KV×目标并发 → 除以单卡显存 → 取2幂次方；默认统一显存池不重复加载权重；仅在显式设置单请求吞吐且有实测时叠加吞吐约束",
+            "vram_inference_quant": "INT8:1.0×P / INT4:0.5×P (权重)；KV Cache 默认仍为BF16/FP16，即2 bytes/element",
             "compute_train": "6ND FLOPs / (单卡有效算力 × 训练天数) → 取2幂次方",
             "mfu_default": 0.30,
             "mfu_prefer_benchmark": "优先使用 chip_model_benchmarks 表的实测 MFU",
@@ -544,12 +695,12 @@ def api_methodology():
         "vram_factors": {
             "title": "显存计算 — 各因子含义",
             "formula_general": "min_vram_total = 总参数量(B) × bytes_per_param × safety_factor",
-            "formula_cards": "vram_cards = max(1, ceil(min_vram_total / chip_vram_gb) + 1) → 取2幂次方",
-            "note_moe": "MoE 模型：有效参数量 = min(总参数量, 激活参数量×2)，推理时只用激活参数量",
+            "formula_cards": "raw_cards = max(1, ceil(required_vram / chip_vram_gb))；cards = 向上取最接近的2幂次方（不额外+1）",
+            "note_moe": "MoE：激活参数量决定每 token 计算量；默认常驻权重部署仍按总参数量计算显存。专家并行负责跨卡分片，只有显式专家卸载才使用另一套模型。",
             "factors": [
                 {"factor": "bytes_per_param", "label": "每参数字节数", "desc": "每个参数占用的显存字节数（含参数本身+梯度+优化器状态+激活值开销）", "values": [
-                    {"scenario": "训练·SFT全参", "value": "20 bytes/param", "breakdown": "FP16参数(2) + FP16梯度(2) + Adam m(4) + Adam v(4) + 激活值(8) ≈ 20"},
-                    {"scenario": "训练·CPT", "value": "20 bytes/param", "breakdown": "同SFT全参，包含完整优化器状态和激活值"},
+                    {"scenario": "训练·SFT全参", "value": "12 bytes/param", "breakdown": "FP16参数(2) + FP16梯度(2) + Adam m/v(8)；激活值按 batch×seq×hidden×layers 另算"},
+                    {"scenario": "训练·CPT", "value": "12 bytes/param", "breakdown": "同SFT全参；激活值单独计算并逐项展示"},
                     {"scenario": "训练·RL(PPO/GRPO)", "value": "25 bytes/param", "breakdown": "Actor(2) + Critic(2) + Ref模型(2) + 优化器(8-12) + 激活(6-8) ≈ 22-30，取25"},
                     {"scenario": "训练·LoRA", "value": "2.5 bytes/param", "breakdown": "冻结基座(2) + LoRA适配器 + 无优化器状态，大幅降低显存需求"},
                     {"scenario": "量化·GPTQ", "value": "3.5 bytes/param", "breakdown": "FP16模型(2) + Hessian矩阵缓冲区(1.5)"},
@@ -559,10 +710,14 @@ def api_methodology():
                     {"scenario": "推理·INT8", "value": "1.0 bytes/param", "breakdown": "INT8 量化权重 = 1 byte/param"},
                     {"scenario": "推理·INT4/GPTQ/AWQ/GGUF", "value": "0.5 bytes/param", "breakdown": "INT4 量化权重 = 0.5 byte/param"},
                 ]},
-                {"factor": "safety_factor", "label": "安全系数", "desc": "为 KV Cache、中间激活、碎片化预留的额外空间", "values": [
-                    {"scenario": "训练场景", "value": "×1.25", "breakdown": "预留 25% 用于 KV Cache + 中间激活峰值"},
-                    {"scenario": "推理场景", "value": "×1.25", "breakdown": "预留 25% 用于 KV Cache + batch 开销"},
+                {"factor": "safety_factor", "label": "安全系数", "desc": "对模型状态/权重预留碎片化与运行时缓冲；激活值和 KV Cache 另行计算", "values": [
+                    {"scenario": "训练场景", "value": "×1.25", "breakdown": "模型状态预留 25%；训练激活值另加"},
+                    {"scenario": "推理场景", "value": "×1.25", "breakdown": "常驻权重预留 25%；KV Cache 另加"},
                     {"scenario": "量化场景", "value": "×1.25", "breakdown": "预留 25% 用于校准数据 + 中间缓冲区"},
+                ]},
+                {"factor": "kv_cache_dtype", "label": "KV Cache 元素精度", "desc": "KV Cache 精度与权重量化是两个独立配置；平台采用多数后端的保守默认值", "values": [
+                    {"scenario": "默认", "value": "BF16/FP16 = 2 bytes/element", "breakdown": "每个K或V元素占2字节；INT8/INT4权重量化不会自动把KV也量化"},
+                    {"scenario": "可选优化", "value": "FP8 = 1 byte/element", "breakdown": "只有芯片、推理后端与模型显式支持FP8 KV Cache时才能采用，当前推荐表单暂不默认启用"},
                 ]},
                 {"factor": "card_rounding", "label": "卡数取整规则", "desc": "最终推荐卡数取 2 的幂次方（1/2/4/8/16/32…），确保 NCCL 等集合通信效率最优", "values": [
                     {"scenario": "通用", "value": "ceil → pow2", "breakdown": "先向上取整，再取最近的 ≥ 当前值 的 2 幂次方"},
@@ -573,15 +728,15 @@ def api_methodology():
                 ]},
             ],
         },
-        "total_score_formula": "总分 = 算力性能×0.50 + 性价比×0.20 + 生态成熟度×0.30 (大类权重统一 5:2:3)",
+        "total_score_formula": "总分 = 生态成熟度×0.40 + 实测验证度×0.30 + 算力性能×0.20 + 性价比×0.10 (大类权重统一 4:3:2:1)",
         "scenario_weights": {
-            "训练·SFT全参":   {"compute_power": 0.50, "cost_effectiveness": 0.20, "ecosystem_maturity": 0.30},
-            "训练·SFT·LoRA": {"compute_power": 0.50, "cost_effectiveness": 0.20, "ecosystem_maturity": 0.30},
-            "训练·CPT":       {"compute_power": 0.50, "cost_effectiveness": 0.20, "ecosystem_maturity": 0.30},
-            "训练·RL":        {"compute_power": 0.50, "cost_effectiveness": 0.20, "ecosystem_maturity": 0.30},
-            "量化":            {"compute_power": 0.50, "cost_effectiveness": 0.20, "ecosystem_maturity": 0.30},
-            "推理·FP16":      {"compute_power": 0.50, "cost_effectiveness": 0.20, "ecosystem_maturity": 0.30},
-            "推理·量化":       {"compute_power": 0.50, "cost_effectiveness": 0.20, "ecosystem_maturity": 0.30},
+            "训练·SFT全参":   {"ecosystem_maturity": 0.40, "benchmark_evidence": 0.30, "compute_power": 0.20, "cost_effectiveness": 0.10},
+            "训练·SFT·LoRA": {"ecosystem_maturity": 0.40, "benchmark_evidence": 0.30, "compute_power": 0.20, "cost_effectiveness": 0.10},
+            "训练·CPT":       {"ecosystem_maturity": 0.40, "benchmark_evidence": 0.30, "compute_power": 0.20, "cost_effectiveness": 0.10},
+            "训练·RL":        {"ecosystem_maturity": 0.40, "benchmark_evidence": 0.30, "compute_power": 0.20, "cost_effectiveness": 0.10},
+            "量化":            {"ecosystem_maturity": 0.40, "benchmark_evidence": 0.30, "compute_power": 0.20, "cost_effectiveness": 0.10},
+            "推理·FP16":      {"ecosystem_maturity": 0.40, "benchmark_evidence": 0.30, "compute_power": 0.20, "cost_effectiveness": 0.10},
+            "推理·量化":       {"ecosystem_maturity": 0.40, "benchmark_evidence": 0.30, "compute_power": 0.20, "cost_effectiveness": 0.10},
         },
         "scoring_dimensions": DIMENSION_META,
         "hard_constraints": [
@@ -773,6 +928,20 @@ def api_health():
 
 import os as _os
 _static_dir = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "..", "static")
+
+
+@app.get("/chips", include_in_schema=False)
+@app.get("/models", include_in_schema=False)
+@app.get("/recommend", include_in_schema=False)
+@app.get("/methodology", include_in_schema=False)
+@app.get("/vram-logic", include_in_schema=False)
+@app.get("/compat", include_in_schema=False)
+@app.get("/status", include_in_schema=False)
+async def spa_tab_entry():
+    """Serve the SPA shell for clean, refresh-safe tab URLs."""
+    return FileResponse(_os.path.join(_static_dir, "index.html"))
+
+
 if _os.path.isdir(_static_dir):
     app.mount("/", StaticFiles(directory=_static_dir, html=True), name="static")
 

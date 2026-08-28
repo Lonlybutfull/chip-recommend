@@ -630,6 +630,15 @@ def search_models(
     return {"count": count, "models": result_models}
 
 
+def get_model_config_json(model_id: str, db_path: str | Path | None = None) -> str | None:
+    """Fetch config_json for a model (用于架构参数解析 / KV Cache 计算)。"""
+    with get_db(db_path, readonly=True) as db:
+        row = db.execute(
+            "SELECT config_json FROM models WHERE model_id = ? LIMIT 1", (model_id,)
+        ).fetchone()
+        return row[0] if row else None
+
+
 def _resolve_model(db, identifier: str) -> dict | None:
     """Resolve a model by integer ID or fuzzy name match."""
     if identifier.isdigit():
@@ -1290,22 +1299,66 @@ def get_link_library_stats(db_path: str | Path | None = None) -> dict:
 # deployment_guides table
 # ---------------------------------------------------------------------------
 
+# ── Vendor → runtime backend mapping ──
+# 部署方案的真正区别在「运行时后端」，而非芯片型号。根据 vendor(+chip_type) 归类。
+VENDOR_BACKEND_MAP = {
+    # 英文 vendor
+    "nvidia": "cuda", "amd": "rocm", "hygon": "rocm", "intel": "xpu",
+    "huawei": "ascend", "cambricon": "mlu", "biren": "biren", "google": "tpu",
+    "iluvatar": "iluvatar", "kunlunxin": "kunlunxin", "metax": "metax",
+    "moorethreads": "moorethreads", "enflame": "enflame",
+    "jingjiamicro": "jingjia", "horizon": "horizon",
+    # 中文 vendor（vendor 字段中英文混合）
+    "华为": "ascend", "昇腾": "ascend", "海光": "rocm", "寒武纪": "mlu",
+    "壁仞": "biren", "天数智芯": "iluvatar", "昆仑芯": "kunlunxin",
+    "沐曦": "metax", "沐曦股份": "metax", "摩尔线程": "moorethreads",
+    "燧原": "enflame", "景嘉微": "jingjia", "地平线": "horizon",
+    "平头哥(阿里)": "pingtouge", "登临科技": "denglin", "算能科技": "suaneng",
+    "清微智能": "tsingwei", "中昊芯英": "zhonghao", "黑芝麻智能": "blacksesame",
+}
+
+
+def classify_backend(vendor: str, chip_type: str = "") -> str:
+    """Map a chip's vendor (+chip_type) to its deployment/runtime backend slug.
+
+    e.g. NVIDIA→cuda, AMD/Hygon→rocm, Huawei→ascend, Cambricon→mlu, ...
+    Unknown vendor → fall back on chip_type, else 'unknown' (→ 暂无部署方案).
+    """
+    v = (vendor or "").strip()
+    key = v.lower()
+    if key in VENDOR_BACKEND_MAP:
+        return VENDOR_BACKEND_MAP[key]
+    t = (chip_type or "").strip().lower()
+    if t == "npu":
+        return "ascend"
+    if t == "mlu":
+        return "mlu"
+    if t == "tpu":
+        return "tpu"
+    if "dcu" in t:
+        return "rocm"
+    return "unknown"
+
+
 def get_deployment_guide(
     chip_model: str,
     model_id: str,
+    backend: str | None = None,
     db_path: str | Path | None = None,
 ) -> dict | None:
-    """Return the best-matching deployment guide for a chip×model pair.
+    """Return the best-matching deployment guide for a chip×model pair (backend-aware).
 
     Resolution order (first match wins):
     1. Exact match on both chip_model and model_id
-    2. Match on model_id with chip_model=NULL (model-level guide)
-    3. Match on chip_model with model_id=NULL (chip-level guide)
+    2. backend + model_id (chip_model=NULL) — 后端专属的模型指南
+    3. backend only (model_id=NULL, chip_model=NULL) — 后端通用快速上手
+    4. model_id only (backend=NULL) — 跨后端通用模型指南
+    5. chip_model only (model_id=NULL) — 芯片专属指南
     """
     with get_db(db_path, readonly=True) as db:
         # 1. Exact chip+model match
         row = db.execute(
-            """SELECT url, title, source_type, notes
+            """SELECT url, title, source_type, notes, backend
                FROM deployment_guides
                WHERE chip_model = ? AND model_id = ?
                LIMIT 1""",
@@ -1314,20 +1367,49 @@ def get_deployment_guide(
         if row:
             return dict(row)
 
-        # 2. Model-level guide (any chip)
+        # 2. Backend-specific model guide
+        if backend:
+            row = db.execute(
+                """SELECT url, title, source_type, notes, backend
+                   FROM deployment_guides
+                   WHERE backend = ? AND model_id = ?
+                     AND (chip_model IS NULL OR chip_model = '')
+                   LIMIT 1""",
+                (backend, model_id),
+            ).fetchone()
+            if row:
+                return dict(row)
+
+        # 3. Backend-specific generic guide
+        if backend:
+            row = db.execute(
+                """SELECT url, title, source_type, notes, backend
+                   FROM deployment_guides
+                   WHERE backend = ?
+                     AND (model_id IS NULL OR model_id = '')
+                     AND (chip_model IS NULL OR chip_model = '')
+                   LIMIT 1""",
+                (backend,),
+            ).fetchone()
+            if row:
+                return dict(row)
+
+        # 4. Generic model guide (any backend)
         row = db.execute(
-            """SELECT url, title, source_type, notes
+            """SELECT url, title, source_type, notes, backend
                FROM deployment_guides
-               WHERE model_id = ? AND (chip_model IS NULL OR chip_model = '')
+               WHERE model_id = ?
+                 AND (backend IS NULL OR backend = '')
+                 AND (chip_model IS NULL OR chip_model = '')
                LIMIT 1""",
             (model_id,),
         ).fetchone()
         if row:
             return dict(row)
 
-        # 3. Chip-level guide (any model)
+        # 5. Chip-specific guide (any model)
         row = db.execute(
-            """SELECT url, title, source_type, notes
+            """SELECT url, title, source_type, notes, backend
                FROM deployment_guides
                WHERE chip_model = ? AND (model_id IS NULL OR model_id = '')
                LIMIT 1""",
@@ -1340,15 +1422,18 @@ def get_deployment_guide(
 
 
 def seed_deployment_guides(db_path: str | Path | None = None):
-    """Seed deployment_guides table with known Ascend vLLM guides.
+    """Seed deployment_guides with backend-aware guides (v4.3 治本).
 
-    Idempotent: skips entries whose (chip_model, model_id, url) already exists.
+    Self-migrating: adds `backend` column if missing; marks existing Ascend rows.
+    Idempotent: skips/updates entries by (backend, chip_model, model_id, url).
     """
     import datetime as _dt
 
     ts = _dt.datetime.utcnow().isoformat() + "Z"
 
-    # ── Model-level guides (chip_model=NULL) ──
+    ASCEND_BASE = "https://docs.vllm.ai/projects/ascend/zh-cn/v0.18.0"
+
+    # ── Model-level Ascend guides (backend='ascend', chip_model=NULL) ──
     model_guides = [
         ("Qwen/Qwen2.5-7B",              "Qwen2.5-7B"),
         ("Qwen/Qwen2.5-7B-Instruct",     "Qwen2.5-7B"),
@@ -1384,57 +1469,97 @@ def seed_deployment_guides(db_path: str | Path | None = None):
         ("PaddlePaddle/PaddleOCR-VL",    "PaddleOCR-VL"),
     ]
 
-    ASCEND_BASE = "https://docs.vllm.ai/projects/ascend/zh-cn/v0.18.0"
+    # ── Backend-generic quick-start guides (chip_model=NULL, model_id=NULL) ──
+    backend_guides = [
+        ("ascend", "vLLM Ascend 部署总览 (华为昇腾)", f"{ASCEND_BASE}/quick_start.html",
+         "official_doc", "适用于昇腾 NPU 系列"),
+        ("cuda",   "vLLM 标准部署指南 (NVIDIA CUDA)", "https://docs.vllm.ai/en/latest/getting_started/quickstart.html",
+         "official_doc", "适用于 NVIDIA GPU"),
+        ("rocm",   "vLLM ROCm 部署指南 (AMD / 海光 DCU)", "https://docs.vllm.ai/en/latest/getting_started/installation/gpu/",
+         "official_doc", "适用于 AMD GPU 与海光 DCU"),
+        ("xpu",    "vLLM XPU 部署指南 (Intel)", "https://docs.vllm.ai/en/latest/getting_started/installation/gpu/",
+         "official_doc", "适用于 Intel GPU / Gaudi"),
+    ]
 
     with get_db(db_path) as db:
+        # 0. Self-migrate: ensure backend column exists
+        cols = [r[1] for r in db.execute("PRAGMA table_info(deployment_guides)").fetchall()]
+        if "backend" not in cols:
+            db.execute("ALTER TABLE deployment_guides ADD COLUMN backend TEXT")
+            db.commit()
+
+        # 0b. Mark existing Ascend rows (URL 含 ascend) → backend='ascend'
+        db.execute(
+            "UPDATE deployment_guides SET backend='ascend' "
+            "WHERE (backend IS NULL OR backend='') AND url LIKE '%ascend%'"
+        )
+
+        # 1. Model-level Ascend guides
         for model_id, page in model_guides:
             url = f"{ASCEND_BASE}/tutorials/models/{page}.html"
-            title = f"vLLM Ascend 部署指南 — {page.replace('.html','')}"
-            # Skip if already exists
+            title = f"vLLM Ascend 部署指南 — {page}"
             existing = db.execute(
                 "SELECT id FROM deployment_guides WHERE chip_model IS NULL AND model_id = ? AND url = ?",
                 (model_id, url),
             ).fetchone()
             if existing:
+                db.execute("UPDATE deployment_guides SET backend='ascend' WHERE id = ?", (existing[0],))
                 continue
             db.execute(
                 """INSERT INTO deployment_guides
-                   (chip_model, model_id, url, title, source_type, notes, created_at, updated_at)
-                   VALUES (NULL, ?, ?, ?, 'official_doc', 'vLLM Ascend 部署指南', ?, ?)""",
+                   (chip_model, model_id, backend, url, title, source_type, notes, created_at, updated_at)
+                   VALUES (NULL, ?, 'ascend', ?, ?, 'official_doc', 'vLLM Ascend 部署指南', ?, ?)""",
                 (model_id, url, title, ts, ts),
             )
 
-        # ── Chip-level guide (any model) for Ascend chips ──
-        # Find all Ascend chips
+        # 2. Chip-level Ascend guides (any model)
         ascend_chips = db.execute(
             """SELECT DISTINCT chip_model FROM chips
                WHERE (vendor LIKE '%华为%' OR vendor LIKE '%昇腾%' OR vendor LIKE '%Ascend%'
                       OR vendor_display LIKE '%华为%' OR vendor_display LIKE '%昇腾%' OR vendor_display LIKE '%Ascend%')
                  AND chip_model IS NOT NULL AND chip_model != ''"""
         ).fetchall()
-
         for (chip_model,) in ascend_chips:
             existing = db.execute(
                 "SELECT id FROM deployment_guides WHERE chip_model = ? AND model_id IS NULL",
                 (chip_model,),
             ).fetchone()
             if existing:
+                db.execute("UPDATE deployment_guides SET backend='ascend' WHERE id = ?", (existing[0],))
                 continue
             db.execute(
                 """INSERT INTO deployment_guides
-                   (chip_model, model_id, url, title, source_type, notes, created_at, updated_at)
-                   VALUES (?, NULL, ?, ?, 'official_doc', 'Ascend 通用部署快速入门', ?, ?)""",
-                (
-                    chip_model,
-                    f"{ASCEND_BASE}/quick_start.html",
-                    "Ascend 部署总览",
-                    ts, ts,
-                ),
+                   (chip_model, model_id, backend, url, title, source_type, notes, created_at, updated_at)
+                   VALUES (?, NULL, 'ascend', ?, ?, 'official_doc', 'Ascend 通用部署快速入门', ?, ?)""",
+                (chip_model, f"{ASCEND_BASE}/quick_start.html", "Ascend 部署总览", ts, ts),
+            )
+
+        # 3. Backend-generic guides
+        for backend, title, url, source_type, notes in backend_guides:
+            existing = db.execute(
+                "SELECT id FROM deployment_guides WHERE backend = ? AND chip_model IS NULL AND model_id IS NULL",
+                (backend,),
+            ).fetchone()
+            if existing:
+                db.execute(
+                    "UPDATE deployment_guides SET url=?, title=?, source_type=?, notes=?, updated_at=? WHERE id=?",
+                    (url, title, source_type, notes, ts, existing[0]),
+                )
+                continue
+            db.execute(
+                """INSERT INTO deployment_guides
+                   (chip_model, model_id, backend, url, title, source_type, notes, created_at, updated_at)
+                   VALUES (NULL, NULL, ?, ?, ?, ?, ?, ?, ?)""",
+                (backend, url, title, source_type, notes, ts, ts),
             )
 
         db.commit()
 
-    return {"model_guides": len(model_guides), "chip_guides": len(ascend_chips)}
+    return {
+        "model_guides": len(model_guides),
+        "chip_guides": len(ascend_chips),
+        "backend_guides": len(backend_guides),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1544,6 +1669,8 @@ def chip_recommend_candidate(
     meets_sla: bool,
     total_cost_wan: float | None,
     score: float,
+    full_cards: int | None = None,
+    single_machine_concurrency: float | None = None,
 ) -> dict:
     """Format one scored chip for recommend output.
 
@@ -1558,7 +1685,9 @@ def chip_recommend_candidate(
         **chip_summary(chip),
         "recommend": {
             "vram_cards": vram_cards,
+            "full_cards": full_cards if full_cards is not None else recommended_cards,
             "recommended_cards": recommended_cards,
+            "single_machine_concurrency": single_machine_concurrency,
             "estimated_training_days": estimated_training_days,
             "meets_sla": str(meets_sla).lower(),
             "total_cost_wan": total_cost_wan,

@@ -4,6 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AISHPerf — 算力选型知识图谱 v0.5</title>
+<script>
+/* 芯片搜索、模型搜索、算力推荐被 iframe 嵌入时自动隐藏平台导航；?embed=1 可显式预览。 */
+(function(){
+  var path=location.pathname.length>1?location.pathname.replace(/\/+$/,''):'/';
+  var supported=['/chips','/models','/recommend'].indexOf(path)>=0;
+  var requested=new URLSearchParams(location.search).get('embed');
+  var framed=window.self!==window.top;
+  if(supported&&(framed||requested==='1'||requested==='true')){
+    document.documentElement.classList.add('embed-mode');
+  }
+})();
+</script>
 <style>
 /* ── Reset & Base ── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -264,6 +276,18 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 }
 .toggle.on::after{left:21px}
 
+/* ── Advanced filter (collapsible) ── */
+.rec-advanced{grid-column:1/-1;border:var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--bg3)}
+.rec-advanced summary{
+  cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px;
+  padding:10px 14px;font-weight:600;font-size:0.85rem;color:var(--text);user-select:none;
+}
+.rec-advanced summary::-webkit-details-marker{display:none}
+.rec-advanced summary::marker{display:none}
+.rec-advanced .rec-adv-arrow{margin-left:auto;color:var(--text2);font-size:0.7rem;transition:transform 0.2s}
+.rec-advanced[open] .rec-adv-arrow{transform:rotate(90deg)}
+.rec-advanced-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;padding:14px;border-top:var(--border)}
+
 /* ── Recommend result card ── */
 .rec-card{
   background:var(--bg2);border:var(--border);border-radius:var(--radius);
@@ -271,15 +295,75 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 }
 .rec-card:hover{border-color:var(--accent)}
 .rec-card.best{border-color:var(--accent);box-shadow:0 4px 16px rgba(45,140,240,0.15)}
-.rec-rank{font-size:0.72rem;color:var(--accent);font-weight:700;margin-bottom:3px}
+.rec-rank{font-size:.86rem;color:var(--accent);font-weight:700;margin-bottom:10px}
 .rec-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
 .rec-header h3{font-size:0.95rem}
 .rec-score{font-size:1.3rem;font-weight:700;color:var(--accent)}
 .rec-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px;margin-bottom:8px}
 .rec-stat .label{font-size:0.68rem;color:var(--text3)}
 .rec-stat .value{font-size:0.85rem;font-weight:600}
-.rec-rationale{font-size:0.75rem;color:var(--text2);font-style:italic}
-/* ── Recommend card layout (3 rows) ── */
+.rec-rationale{font-size:.82rem;color:var(--text2)}
+/* ── Recommend card overview (3 columns) ── */
+.rec-overview-grid{
+  display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1.1fr) minmax(250px,.85fr);
+  gap:12px;margin-bottom:12px;
+}
+.rec-overview-panel{
+  min-width:0;background:var(--bg3);border:1px solid var(--bg4);
+  border-radius:var(--radius-sm);padding:14px 16px;
+}
+.rec-overview-title{
+  display:flex;align-items:center;gap:7px;margin-bottom:11px;
+  color:var(--text);font-size:1.08rem;font-weight:750;line-height:1.3;
+}
+.rec-basic-primary{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rec-basic-field{
+  min-width:0;padding:8px 10px;background:var(--bg2);border:1px solid var(--bg4);
+  border-radius:6px;
+}
+.rec-basic-field.wide{grid-column:1/-1}
+.rec-basic-field .label{font-size:.73rem;color:var(--text3);margin-bottom:2px}
+.rec-basic-field .value{font-size:.92rem;color:var(--text);font-weight:700;line-height:1.45;word-break:break-word}
+.rec-basic-field .value.precision{font-size:.78rem;font-weight:600}
+.rec-basic-secondary{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.rec-basic-secondary span{
+  padding:3px 7px;border-radius:4px;background:var(--bg4);color:var(--text2);
+  font-size:.71rem;line-height:1.4;
+}
+.rec-basic-actions{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.rec-basic-actions .rec-profile-btn{margin-left:0}
+.rec-reason-list{list-style:none;display:grid;gap:9px}
+.rec-reason-list li{font-size:.83rem;color:var(--text2);line-height:1.55;padding-left:14px;position:relative}
+.rec-reason-list li::before{content:'•';position:absolute;left:0;color:var(--accent);font-weight:800}
+.rec-reason-list b{color:var(--text);font-weight:700}
+.rec-quantity-list{display:grid;gap:10px}
+.rec-quantity-tier{
+  display:grid;grid-template-columns:1fr auto;gap:3px 12px;align-items:center;
+  padding:11px 12px;background:var(--bg2);border:1px solid var(--bg4);border-radius:7px;
+}
+.rec-quantity-tier.primary{border-color:rgba(45,140,240,.35);background:rgba(45,140,240,.045)}
+.rec-quantity-tier .qt-name{font-size:.83rem;color:var(--text);font-weight:700}
+.rec-quantity-tier .qt-cards{grid-row:1/3;grid-column:2;font-size:1.35rem;color:var(--accent);font-weight:800;white-space:nowrap}
+.rec-quantity-tier .qt-cards small{font-size:.72rem;margin-left:2px;color:var(--text2)}
+.rec-quantity-tier .qt-desc{font-size:.7rem;color:var(--text3);line-height:1.45}
+.rec-quantity-note{margin-top:9px;color:var(--text3);font-size:.69rem;line-height:1.5}
+.rec-deployment-content{margin-top:12px;padding-top:11px;border-top:1px solid var(--bg4)}
+.rec-deployment-content .deployment-title{font-size:.86rem;font-weight:750;color:var(--text);margin-bottom:7px}
+.rec-deployment-content .rec-rationale{font-size:.77rem;line-height:1.5;margin-bottom:8px}
+.rec-deployment-content .rec-deploy-link,.rec-deployment-content .rec-deploy-none{margin-left:0;font-size:.74rem}
+@media(max-width:1050px){
+  .rec-overview-grid{grid-template-columns:1fr 1fr}
+  .rec-quantity-panel{grid-column:1/-1}
+  .rec-quantity-list{grid-template-columns:1fr 1fr}
+}
+@media(max-width:720px){
+  .rec-overview-grid{grid-template-columns:1fr}
+  .rec-quantity-panel{grid-column:auto}
+  .rec-quantity-list{grid-template-columns:1fr}
+  .rec-basic-primary{grid-template-columns:1fr}
+  .rec-basic-field.wide{grid-column:auto}
+}
+/* ── Legacy compact row helpers ── */
 .rec-calc-row{
   display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;
   background:var(--bg3);border-radius:var(--radius-sm);padding:10px 14px;
@@ -299,30 +383,34 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 .rec-chip-row .chip-spec{color:var(--text);font-weight:500;font-size:0.72rem;white-space:nowrap}
 .rec-chip-row .chip-spec-sep{color:var(--bg4)}
 .rec-profile-btn{
-  display:inline-block;margin-left:auto;font-size:0.68rem;color:var(--accent);
+  display:inline-block;margin-left:auto;font-size:.72rem;color:var(--accent);
   cursor:pointer;padding:4px 10px;border:1px solid var(--accent);border-radius:4px;
   transition:var(--transition);background:transparent;white-space:nowrap;flex-shrink:0;
 }
 .rec-profile-btn:hover{background:var(--accent);color:#fff}
 .rec-deploy-link{
-  display:inline-block;font-size:0.7rem;color:var(--green);cursor:pointer;
+  display:inline-block;font-size:.74rem;color:var(--green);cursor:pointer;
   padding:4px 10px;border:1px solid var(--green);border-radius:4px;
   transition:var(--transition);background:transparent;white-space:nowrap;
   text-decoration:none;flex-shrink:0;margin-left:auto;
 }
 .rec-deploy-link:hover{background:var(--green);color:#fff}
 .rec-deploy-none{
-  font-size:0.68rem;color:var(--text3);white-space:nowrap;margin-left:auto;
+  font-size:.72rem;color:var(--text3);white-space:nowrap;margin-left:auto;
 }
 /* ── Scoring detail panel (collapsible) ── */
-.rec-scoring-toggle{
-  display:inline-flex;align-items:center;gap:6px;font-size:0.78rem;font-weight:600;
-  color:var(--accent);cursor:pointer;user-select:none;padding:6px 0;
+.rec-scoring-breakdown{
+  margin:0 0 8px;border:1px solid rgba(45,140,240,.22);
+  background:rgba(45,140,240,.035);border-radius:8px;overflow:hidden;
 }
-.rec-scoring-toggle .arrow{transition:transform 0.2s;font-size:0.65rem}
+.rec-scoring-toggle{
+  display:flex;align-items:center;gap:8px;width:100%;font-size:.91rem;font-weight:700;
+  color:var(--accent);cursor:pointer;user-select:none;padding:10px 12px;
+}
+.rec-scoring-toggle .arrow{transition:transform 0.2s;font-size:.62rem}
 .rec-scoring-toggle.open .arrow{transform:rotate(90deg)}
 .rec-scoring-panel{
-  display:none;margin-top:4px;border-top:var(--border);padding-top:8px;
+  display:none;margin:0;border-top:1px solid rgba(45,140,240,.14);padding:10px 12px 4px;
 }
 .rec-scoring-panel.open{display:block}
 .rec-scoring-cat{
@@ -330,23 +418,31 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
   overflow:hidden;
 }
 .rec-scoring-cat-header{
-  padding:6px 10px;background:var(--bg4);font-size:0.74rem;font-weight:600;
+  padding:7px 10px;background:var(--bg4);font-size:.79rem;font-weight:600;
   display:flex;align-items:center;gap:8px;
 }
 .rec-scoring-cat-header .cat-score{color:var(--accent);margin-left:auto}
 .rec-scoring-dim{
-  padding:5px 10px 5px 18px;font-size:0.7rem;border-bottom:1px solid var(--bg4);
+  padding:6px 10px 6px 18px;font-size:.74rem;border-bottom:1px solid var(--bg4);
   line-height:1.5;
 }
 .rec-scoring-dim:last-child{border-bottom:none}
 .rec-scoring-dim .dim-head{
   display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;
 }
-.rec-scoring-dim .dim-name{font-weight:600;color:var(--text);font-size:0.73rem}
-.rec-scoring-dim .dim-wbar{font-size:0.62rem;color:var(--text3)}
-.rec-scoring-dim .dim-calc{font-size:0.65rem;color:var(--text2);margin-top:2px}
-.rec-scoring-dim .dim-formula{font-size:0.62rem;color:var(--text3);font-family:monospace;margin-top:1px}
-.rec-scoring-dim .dim-raw{font-size:0.6rem;color:var(--text3);margin-top:1px}
+.rec-scoring-dim .dim-name{font-weight:600;color:var(--text);font-size:.78rem}
+.rec-scoring-dim .dim-wbar{font-size:.66rem;color:var(--text3)}
+.rec-scoring-dim .dim-calc{font-size:.69rem;color:var(--text2);margin-top:2px}
+.rec-scoring-dim .dim-formula{font-size:.66rem;color:var(--text3);font-family:monospace;margin-top:1px}
+.rec-scoring-dim .dim-raw{font-size:.64rem;color:var(--text3);margin-top:1px}
+.rec-scoring-dim .dim-trace-explain{font-size:.65rem;color:var(--text2);margin:1px 0 3px 15px;line-height:1.45}
+.rec-scoring-dim .dim-explain{
+  font-size:.67rem;color:var(--text2);margin-top:4px;padding:4px 7px;
+  border-left:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 6%,transparent);
+  border-radius:0 4px 4px 0;
+}
+html.embed-mode header{display:none}
+html.embed-mode main{padding-top:12px}
 .dim-row{cursor:pointer;transition:background 0.15s;padding:3px 4px;border-radius:4px;margin:0 -4px}
 .dim-row:hover{background:rgba(255,255,255,0.04)}
 .scoring-details{margin-top:8px}
@@ -374,14 +470,21 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 .dim-row{cursor:pointer;transition:background 0.15s;padding:3px 4px;border-radius:4px;margin:0 -4px}
 .dim-row:hover{background:rgba(255,255,255,0.04)}
 
-/* Calculation Breakdown */
-.calc-breakdown{margin-top:10px;padding:10px 12px;background:var(--bg3);border-radius:8px;font-size:0.73rem}
-.calc-breakdown summary{font-weight:600;color:var(--accent);cursor:pointer;user-select:none;font-size:0.78rem}
-.calc-breakdown .calc-item{margin:6px 0;padding:4px 0;border-bottom:1px solid var(--bg4)}
-.calc-breakdown .calc-item:last-child{border-bottom:none}
-.calc-breakdown .calc-label{color:var(--text2);font-size:0.68rem}
-.calc-breakdown .calc-value{color:var(--text);font-weight:600;font-family:monospace;font-size:0.75rem}
-.calc-breakdown .calc-detail{color:var(--text3);font-size:0.66rem;margin-top:2px}
+/* VRAM + card calculation breakdown */
+.calc-breakdown{margin:0 0 8px;border:1px solid rgba(45,140,240,.22);background:rgba(45,140,240,.035);border-radius:8px;font-size:.77rem;overflow:hidden}
+.calc-breakdown summary{list-style:none;display:flex;align-items:center;gap:8px;padding:10px 12px;font-weight:700;color:var(--accent);cursor:pointer;user-select:none;font-size:.91rem}
+.calc-breakdown summary::-webkit-details-marker{display:none}.calc-breakdown summary::marker{display:none}
+.calc-breakdown summary .calc-arrow{font-size:.62rem;transition:transform .2s}.calc-breakdown[open] summary .calc-arrow{transform:rotate(90deg)}
+.calc-breakdown summary .calc-summary-text{margin-left:auto;color:var(--text2);font-weight:500;font-size:.7rem}
+.calc-body{padding:0 12px 12px;border-top:1px solid rgba(45,140,240,.14)}
+.calc-inputs{display:flex;gap:5px;flex-wrap:wrap;padding:9px 0 7px}.calc-chip{padding:2px 7px;border-radius:10px;background:var(--bg4);color:var(--text2);font-size:.68rem}
+.calc-moe-note{display:flex;gap:7px;margin:2px 0 9px;padding:7px 9px;border-radius:6px;background:rgba(245,158,11,.09);color:var(--orange);font-size:.71rem;line-height:1.45}
+.calc-section-title{font-weight:650;color:var(--text);font-size:.77rem;margin:9px 0 5px}
+.calc-component{display:grid;grid-template-columns:minmax(130px,.7fr) minmax(280px,2.3fr) auto;gap:10px;align-items:center;padding:7px 9px;margin:4px 0;background:var(--bg3);border-radius:6px}
+.calc-component .cc-name{color:var(--text2);font-size:.71rem}.calc-component .cc-formula{color:var(--text);font-family:'SF Mono','Cascadia Code',Consolas,monospace;font-size:.7rem;word-break:break-word}.calc-component .cc-result{color:var(--accent);font-weight:700;white-space:nowrap}
+.calc-tiers{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.calc-tiers.two{grid-template-columns:repeat(2,minmax(0,1fr))}.calc-tier{padding:8px 9px;background:var(--bg3);border-radius:6px}.calc-tier .ct-name{font-size:.68rem;color:var(--text3)}.calc-tier .ct-value{font-size:.88rem;font-weight:700;color:var(--text);margin:2px 0}.calc-tier .ct-formula{font-size:.66rem;color:var(--text2);line-height:1.45;word-break:break-word}
+.calc-total-line{margin:6px 0 2px;padding:7px 9px;background:rgba(45,140,240,.08);border-radius:6px;color:var(--text);font-size:.72rem}.calc-total-line b{color:var(--accent)}
+@media(max-width:800px){.calc-component{grid-template-columns:1fr}.calc-tiers,.calc-tiers.two{grid-template-columns:1fr}.calc-breakdown summary .calc-summary-text{display:none}}
 
 
 /* Agent quick-chips panel */
@@ -456,32 +559,6 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
   .recommend-form{grid-template-columns:1fr}
   .detail-panel{margin:8px 0}
 }
-/* ── Login overlay ── */
-.login-overlay{
-  position:fixed;inset:0;z-index:9999;background:var(--bg);
-  display:flex;align-items:center;justify-content:center;
-  transition:opacity .35s ease,visibility .35s ease;
-}
-.login-overlay.hidden{opacity:0;visibility:hidden;pointer-events:none}
-.login-card{
-  background:var(--bg2);border-radius:14px;padding:40px 36px 32px;
-  width:400px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,0.12);
-  text-align:center;
-}
-.login-card .login-icon{font-size:2.5rem;margin-bottom:8px}
-.login-card h2{font-size:1.25rem;font-weight:700;margin-bottom:4px}
-.login-card .login-sub{font-size:0.8rem;color:var(--text2);margin-bottom:24px}
-.login-field{text-align:left;margin-bottom:14px}
-.login-field label{display:block;font-size:0.78rem;font-weight:600;color:var(--text2);margin-bottom:4px}
-.login-field input{
-  width:100%;padding:10px 12px;border:var(--border);border-radius:var(--radius-sm);
-  font-size:0.9rem;background:var(--bg3);color:var(--text);
-  outline:none;transition:var(--transition);
-}
-.login-field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,140,240,0.12)}
-.login-error{font-size:0.75rem;color:var(--red);margin-bottom:10px;min-height:18px}
-.login-card .btn{width:100%;padding:11px;font-size:0.95rem;font-weight:600}
-
 /* ═══════════ Methodology & VRAM Tab Styling ═══════════ */
 /* ── Hero ── */
 .mg-hero{
@@ -542,7 +619,7 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 
 /* ── Category cards ── */
 .mg-cat-grid{
-  display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  display:grid; grid-template-columns:repeat(4, minmax(0,1fr));
   gap:16px; margin-bottom:24px;
 }
 .mg-cat-card{
@@ -557,6 +634,7 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 .mg-cat-card:nth-child(1) .mg-cc-top{background:linear-gradient(135deg, rgba(45,140,240,0.07), transparent)}
 .mg-cat-card:nth-child(2) .mg-cc-top{background:linear-gradient(135deg, rgba(245,158,11,0.07), transparent)}
 .mg-cat-card:nth-child(3) .mg-cc-top{background:linear-gradient(135deg, rgba(16,185,129,0.07), transparent)}
+.mg-cat-card:nth-child(4) .mg-cc-top{background:linear-gradient(135deg, rgba(139,92,246,0.07), transparent)}
 .mg-cat-card .mg-cc-icon{font-size:1.6rem; margin-bottom:4px}
 .mg-cat-card .mg-cc-title-row{
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
@@ -569,6 +647,7 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 .mg-cat-card:nth-child(1) .mg-cc-weight{background:rgba(45,140,240,0.12); color:var(--accent)}
 .mg-cat-card:nth-child(2) .mg-cc-weight{background:rgba(245,158,11,0.12); color:var(--orange)}
 .mg-cat-card:nth-child(3) .mg-cc-weight{background:rgba(16,185,129,0.12); color:var(--green)}
+.mg-cat-card:nth-child(4) .mg-cc-weight{background:rgba(139,92,246,0.12); color:var(--purple)}
 .mg-cat-card .mg-cc-desc{color:var(--text2); font-size:0.78rem; margin-top:6px}
 .mg-cat-card .mg-cc-body{padding:6px 12px 12px}
 
@@ -635,6 +714,7 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 .mg-pill.blue{background:rgba(45,140,240,0.1); color:var(--accent)}
 .mg-pill.orange{background:rgba(245,158,11,0.1); color:var(--orange)}
 .mg-pill.green{background:rgba(16,185,129,0.1); color:var(--green)}
+.mg-pill.purple{background:rgba(139,92,246,0.1); color:var(--purple)}
 
 /* ── Constraints ── */
 .mg-constraint-grid{
@@ -777,27 +857,6 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 </head>
 <body>
 
-<!-- ═══ Login Overlay ═══ -->
-<div class="login-overlay" id="login-overlay">
-  <div class="login-card">
-    <div class="login-icon">🔐</div>
-    <h2>AISHPerf 算力选型平台</h2>
-    <div class="login-sub">请输入管理员账号密码登录</div>
-    <form onsubmit="doLogin();return false">
-      <div class="login-field">
-        <label>账号</label>
-        <input type="text" id="login-user" placeholder="请输入账号" autocomplete="username">
-      </div>
-      <div class="login-field">
-        <label>密码</label>
-        <input type="password" id="login-pass" placeholder="请输入密码" autocomplete="current-password">
-      </div>
-      <div class="login-error" id="login-error"></div>
-      <button class="btn" type="submit">登 录</button>
-    </form>
-  </div>
-</div>
-
 <header>
   <div class="header-inner">
     <div class="logo">⚡ AISH<span>Perf</span> <span class="version">v0.6</span></div>
@@ -893,36 +952,13 @@ main{max-width:1440px;margin:0 auto;padding:20px 24px}
 </div>
 <!-- Last update: 2026-08-07 19:35 -->
 <script>
-/* ═══════════════════ LOGIN ═══════════════════ */
-const LOGIN_CRED = {user:'admin',pass:'lxc583158#'};
-function doLogin(){
-  const u = ($('login-user')||{}).value||'', p = ($('login-pass')||{}).value||'';
-  const err = $('login-error');
-  if(u !== LOGIN_CRED.user || p !== LOGIN_CRED.pass){
-    err.textContent = '账号或密码错误，请重试';
-    return;
-  }
-  err.textContent = '';
-  $('login-overlay').classList.add('hidden');
-  sessionStorage.setItem('aishperf_authed','1');
-}
-(function checkLogin(){
-  if(sessionStorage.getItem('aishperf_authed') === '1'){
-    var overlay = document.getElementById('login-overlay');
-    if(overlay) overlay.classList.add('hidden');
-  }
-  setTimeout(function(){
-    var el = document.getElementById('login-user');
-    if(el) el.focus();
-  }, 100);
-})();
-
 /* ═══════════════════════════════════════════════════════════
    AISHPerf v0.5 — Dynamic component-based SPA
    ═══════════════════════════════════════════════════════════ */
 
 const API = '/api/v1';
 const STATE = { vendors: [], currentTab: 'chips' };
+const EMBED_MODE = document.documentElement.classList.contains('embed-mode');
 
 function $(id){return document.getElementById(id)}
 function show(el,disp=''){el.style.display=disp}
@@ -1318,20 +1354,25 @@ const TABS = [
   {id:'status',label:'📊 系统状态',action:()=>loadStatus()},
 ];
 
+const TAB_PATHS = {
+  agent: '/',
+  chips: '/chips',
+  models: '/models',
+  recommend: '/recommend',
+  methodology: '/methodology',
+  'vram-logic': '/vram-logic',
+  compat: '/compat',
+  status: '/status',
+};
+const PATH_TABS = Object.fromEntries(Object.entries(TAB_PATHS).map(([tab,path])=>[path,tab]));
+
 (function buildNav(){
   const nav = $('main-nav');
   nav.innerHTML = '<a href="http://61.172.167.201:8787" target="_blank" class="hermes-nav-btn" title="打开 Hermes WebUI（新标签页）">🧿 Hermes</a>'
     + TABS.map((t,i)=>`<button data-tab="${t.id}" ${i===0?'class="active"':''}>${t.label}</button>`).join('');
   nav.querySelectorAll('button').forEach(btn=>{
     btn.addEventListener('click',()=>{
-      STATE.currentTab=btn.dataset.tab;
-      nav.querySelectorAll('button').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-      const panel=document.getElementById('tab-'+btn.dataset.tab);
-      if(panel)panel.classList.add('active');
-      const def=TABS.find(t=>t.id===btn.dataset.tab);
-      if(def&&def.action)def.action();
+      switchToTab(btn.dataset.tab, {updateUrl:true});
     });
   });
 })();
@@ -1846,10 +1887,20 @@ function initRecommend(){
       <div class="form-group" id="rec-quant-grp" style="display:none"><label>推理精度</label><select id="rec-quant"><option value="fp16">FP16 (全精度)</option><option value="int8">INT8</option><option value="int4_gptq">INT4 GPTQ</option><option value="int4_awq">INT4 AWQ</option><option value="gguf_q4">GGUF Q4</option><option value="gguf_q8">GGUF Q8</option></select></div>
       <div class="form-group"><label>期望训练天数</label><input type="number" id="rec-days" placeholder="3" min="0.1" step="0.5"></div>
       <div class="form-group"><label>训练数据量 (T tokens)</label><input type="number" id="rec-tokens" placeholder="自动推算" min="0.1" max="1000" step="0.5"></div>
-      <div class="form-group"><label>目标推理吞吐 (tok/s)</label><input type="number" id="rec-tps" placeholder="可选" min="0"></div>
-      <div class="form-group"><label>最大卡数</label><input type="number" id="rec-max-cards" placeholder="可选" min="1"></div>
-      <div class="form-group"><label>最小卡数</label><input type="number" id="rec-min-cards" placeholder="可选" min="1"></div>
-      <div class="form-group"><label>最高单价 (万元/片)</label><input type="number" id="rec-max-price" placeholder="可选" min="0"></div>
+      <div class="form-group" id="rec-input-len-grp" style="display:none" title="单个请求的 Prompt 长度；将与最大输出长度相加计算峰值 KV Cache"><label>输入长度 / Prompt (tokens)</label><select id="rec-input-len"><option value="512">512</option><option value="1024">1024 (1K)</option><option value="2048">2048 (2K)</option><option value="4096" selected>4096 (4K)</option><option value="8192">8192 (8K)</option><option value="16384">16384 (16K)</option><option value="32768">32768 (32K)</option><option value="65536">65536 (64K)</option><option value="131072">131072 (128K)</option><option value="262144">262144 (256K)</option><option value="524288">524288 (512K)</option><option value="1048576">1048576 (1M)</option></select></div>
+      <div class="form-group" id="rec-output-len-grp" style="display:none" title="单个请求允许生成的最大 token 数；输出 token 同样占用 KV Cache"><label>最大输出长度 (tokens)</label><select id="rec-output-len"><option value="128">128</option><option value="256">256</option><option value="512" selected>512</option><option value="1024">1024 (1K)</option><option value="2048">2048 (2K)</option><option value="4096">4096 (4K)</option><option value="8192">8192 (8K)</option><option value="16384">16384 (16K)</option><option value="32768">32768 (32K)</option><option value="65536">65536 (64K)</option><option value="131072">131072 (128K)</option><option value="262144">262144 (256K)</option></select></div>
+      <div class="form-group" id="rec-concurrency-grp" style="display:none" title="同时在途的请求数量，用于计算目标并发部署卡数"><label>目标并发请求数</label><select id="rec-concurrency"><option value="1">1</option><option value="10">10</option><option value="100">100</option><option value="500">500</option><option value="1000">1000</option><option value="5000">5000</option></select></div>
+      <div class="form-group" id="rec-batch-grp" style="display:none"><label>Batch Size</label><input type="number" id="rec-batch-size" placeholder="1" min="1"></div>
+      <div class="form-group" id="rec-seqlen-grp" style="display:none"><label>样本长度 (tokens)</label><input type="number" id="rec-seq-len" placeholder="2048" min="1"></div>
+      <details class="rec-advanced">
+        <summary>⚙️ 高级筛选 <span class="rec-adv-arrow">▸</span></summary>
+        <div class="rec-advanced-grid">
+          <div class="form-group"><label>最大卡数</label><input type="number" id="rec-max-cards" placeholder="可选" min="1"></div>
+          <div class="form-group"><label>最小卡数</label><input type="number" id="rec-min-cards" placeholder="可选" min="1"></div>
+          <div class="form-group"><label>最高单价 (万元/片)</label><input type="number" id="rec-max-price" placeholder="可选" min="0"></div>
+          <div class="form-group" id="rec-tps-grp" style="display:none"><label>目标推理吞吐（单并发 tok/s）</label><select id="rec-tps"><option value="">不限（不设目标）</option><option value="10">10 tok/s</option><option value="50">50 tok/s</option><option value="100">100 tok/s</option><option value="500">500 tok/s</option><option value="1000">1000 tok/s</option></select></div>
+        </div>
+      </details>
       <div class="form-group"><label>优先国产</label><div class="toggle-row"><div class="toggle" id="rec-domestic" onclick="this.classList.toggle('on')"></div></div></div>
       <div class="form-group"><label>优先厂商</label><select id="rec-vendor"><option value="">不限</option>${[...new Set(STATE.vendors)].map(v=>`<option>${esc(v)}</option>`).join('')}</select></div>
       <div class="form-actions"><button class="btn" onclick="runRecommend()">🎯 推荐芯片方案</button></div>
@@ -1885,22 +1936,30 @@ function updateRecForm(){
   const sc = $('rec-scenario').value;
   const stageGrp = $('rec-stage-grp'), methodGrp = $('rec-method-grp'), quantGrp = $('rec-quant-grp');
   const qMethGrp = $('rec-quantize-method-grp'), qBitsGrp = $('rec-quantize-bits-grp');
-  const daysEl = $('rec-days').parentElement, tokensEl = $('rec-tokens').parentElement, tpsEl = $('rec-tps').parentElement;
+  const daysEl = $('rec-days').parentElement, tokensEl = $('rec-tokens').parentElement;
+  const inLenGrp = $('rec-input-len-grp'), outLenGrp = $('rec-output-len-grp'), concGrp = $('rec-concurrency-grp'), tpsGrp = $('rec-tps-grp');
+  const batchGrp = $('rec-batch-grp'), seqGrp = $('rec-seqlen-grp');
   if(sc === 'train'){
     stageGrp.style.display=''; methodGrp.style.display=''; quantGrp.style.display='none';
     qMethGrp.style.display='none'; qBitsGrp.style.display='none';
-    daysEl.style.display=''; tokensEl.style.display=''; tpsEl.style.display='';
+    daysEl.style.display=''; tokensEl.style.display='';
+    inLenGrp.style.display='none'; outLenGrp.style.display='none'; concGrp.style.display='none'; tpsGrp.style.display='none';
+    batchGrp.style.display=''; seqGrp.style.display='';
     // SFT only: show method dropdown
     if($('rec-stage').value === 'sft'){ methodGrp.style.display=''; }
     else { methodGrp.style.display='none'; $('rec-method').value='full_param'; }
   } else if(sc === 'quantize'){
     stageGrp.style.display='none'; methodGrp.style.display='none'; quantGrp.style.display='none';
     qMethGrp.style.display=''; qBitsGrp.style.display='';
-    daysEl.style.display='none'; tokensEl.style.display='none'; tpsEl.style.display='none';
+    daysEl.style.display='none'; tokensEl.style.display='none';
+    inLenGrp.style.display='none'; outLenGrp.style.display='none'; concGrp.style.display='none'; tpsGrp.style.display='none';
+    batchGrp.style.display='none'; seqGrp.style.display='none';
   } else {
     stageGrp.style.display='none'; methodGrp.style.display='none'; quantGrp.style.display='';
     qMethGrp.style.display='none'; qBitsGrp.style.display='none';
-    daysEl.style.display='none'; tokensEl.style.display='none'; tpsEl.style.display='';
+    daysEl.style.display='none'; tokensEl.style.display='none';
+    inLenGrp.style.display=''; outLenGrp.style.display=''; concGrp.style.display=''; tpsGrp.style.display='';
+    batchGrp.style.display='none'; seqGrp.style.display='none';
   }
 }
 
@@ -1921,6 +1980,111 @@ function renderDeployLink(c){
   return '<span class="rec-deploy-none">暂无部署方案</span>';
 }
 
+function compactRecText(value,maxLen=150){
+  const text=String(value||'').trim();
+  return text.length>maxLen?text.slice(0,maxLen)+'…':text;
+}
+
+function renderChipBasicInfo(chip){
+  const secondary=[];
+  if(chip.vendor_display)secondary.push(`厂商 ${chip.vendor_display}`);
+  if(chip.vendor_region)secondary.push(`地区 ${chip.vendor_region==='domestic'?'国产':'海外'}`);
+  if(chip.chip_type)secondary.push(`类型 ${chip.chip_type}`);
+  if(chip.tdp_w!=null)secondary.push(`TDP ${chip.tdp_w}W`);
+  if(chip.architecture)secondary.push(`架构 ${chip.architecture}`);
+  if(chip.process_node_nm!=null)secondary.push(`制程 ${chip.process_node_nm}nm`);
+  if(chip.interconnect_tech)secondary.push(`互联 ${compactRecText(chip.interconnect_tech,45)}`);
+  if(chip.maturity_level)secondary.push(`成熟度 ${chip.maturity_level}`);
+  const precision=compactRecText(chip.precision_perf||'暂无数据',180);
+  return `<section class="rec-overview-panel rec-basic-panel">
+    <div class="rec-overview-title">🧩 芯片基本信息</div>
+    <div class="rec-basic-primary">
+      <div class="rec-basic-field wide"><div class="label">型号</div><div class="value">${esc(chip.chip_model||'—')}</div></div>
+      <div class="rec-basic-field"><div class="label">显存</div><div class="value">${chip.vram_gb!=null?`${esc(chip.vram_gb)} GB`:'暂无数据'}</div></div>
+      <div class="rec-basic-field"><div class="label">显存带宽</div><div class="value">${chip.vram_bw_gb_s!=null?`${esc(chip.vram_bw_gb_s)} GB/s`:'暂无数据'}</div></div>
+      <div class="rec-basic-field wide" title="${esc(chip.precision_perf||'')}"><div class="label">精度性能</div><div class="value precision">${esc(precision)}</div></div>
+    </div>
+    <div class="rec-basic-secondary">${secondary.map(x=>`<span>${esc(x)}</span>`).join('')}</div>
+    <div class="rec-basic-actions">
+      <button class="rec-profile-btn" onclick="openChipProfile('${esc(chip.id||chip.chip_model)}')">📋 完整画像</button>
+    </div>
+  </section>`;
+}
+
+function renderRecommendationReason(req,rec,chip,scoring,rank){
+  const cats=scoring.categories||{};
+  const categoryWeights=scoring.category_weights||{};
+  const total=scoring.total!=null?Number(scoring.total).toFixed(0):(rec.score!=null?Number(rec.score).toFixed(0):'—');
+  const isInference=req.scenario==='inference';
+  const minCards=isInference?(rec.full_cards??rec.vram_cards??rec.recommended_cards):(rec.vram_cards??rec.full_cards??rec.recommended_cards);
+  const targetCards=rec.recommended_cards??minCards;
+  const meets=String(rec.meets_sla).toLowerCase()!=='false';
+  const reasons=[
+    `<b>综合评分：</b>四大类加权总分 ${esc(total)}/100，候选排名第 ${esc(rank)}。`,
+  ];
+  const reasonCategoryOrder=[
+    ['ecosystem_maturity','生态成熟度','框架、工具链与来源真实度综合'],
+    ['benchmark_evidence','实测验证度','真实 benchmark 数量与质量'],
+    ['compute_power','算力性能',`单卡显存 ${chip.vram_gb??'—'}GB、带宽 ${chip.vram_bw_gb_s??'—'}GB/s`],
+    ['cost_effectiveness','性价比','能效与服务器节点效率综合'],
+  ];
+  reasonCategoryOrder.forEach(([id,label,note])=>{
+    const cat=cats[id];
+    if(!cat||cat.score==null)return;
+    const weight=cat.weight??categoryWeights[id]??0;
+    const weighted=cat.weighted??(Number(cat.score)*Number(weight));
+    reasons.push(`<b>${esc(label)}：</b>${Number(cat.score).toFixed(0)}/100 × ${(Number(weight)*100).toFixed(0)}% = 加权${Number(weighted).toFixed(0)}分；${esc(note)}。`);
+  });
+  reasons.push(isInference
+    ? `<b>部署适配：</b>最小部署 ${esc(minCards)} 卡，${esc(req.concurrency||1)} 并发目标建议 ${esc(targetCards)} 卡。`
+    : `<b>部署适配：</b>最小部署 ${esc(minCards)} 卡，理想部署建议 ${esc(targetCards)} 卡${rec.estimated_training_days!=null?`，预计训练 ${esc(rec.estimated_training_days)} 天`:''}。`);
+  if(!meets)reasons.push(`<b>约束提醒：</b>当前显式SLA尚未满足，建议增加资源或调整目标。`);
+  return `<section class="rec-overview-panel rec-reason-panel">
+    <div class="rec-overview-title">💡 芯片推荐理由</div>
+    <ul class="rec-reason-list">${reasons.map(x=>`<li>${x}</li>`).join('')}</ul>
+  </section>`;
+}
+
+function renderQuantityEstimate(req,rec,chip){
+  const isInference=req.scenario==='inference';
+  const minCards=isInference?(rec.full_cards??rec.vram_cards??rec.recommended_cards):(rec.vram_cards??rec.full_cards??rec.recommended_cards);
+  const targetCards=rec.recommended_cards??minCards;
+  const minVram=isInference?(req.full_vram_gb??req.min_vram_gb):(req.min_vram_gb??req.full_vram_gb);
+  const targetVram=isInference?(req.target_vram_gb??req.full_vram_gb):(req.full_vram_gb??req.min_vram_gb);
+  const targetName=isInference?'目标并发部署':'理想部署';
+  const targetDesc=isInference
+    ? `${req.concurrency||1}并发 · ${Number(targetVram||0).toFixed(1)}GB总显存需求`
+    : req.scenario==='train'
+      ? `最小显存下限 + ${req.target_training_days?`${req.target_training_days}天训练目标`:'训练性能目标'}，取较大值`
+      : `最小显存下限 ${Number(minVram||0).toFixed(1)}GB；无额外性能目标时与最小相同`;
+  return `<section class="rec-overview-panel rec-quantity-panel">
+    <div class="rec-overview-title">🧮 芯片数量估算</div>
+    <div class="rec-quantity-list">
+      <div class="rec-quantity-tier">
+        <div class="qt-name">最小部署</div>
+        <div class="qt-cards">${esc(minCards)}<small>卡</small></div>
+        <div class="qt-desc">${Number(minVram||0).toFixed(1)}GB ÷ 单卡${esc(chip.vram_gb??'—')}GB，向上取2的幂</div>
+      </div>
+      <div class="rec-quantity-tier primary">
+        <div class="qt-name">${esc(targetName)}</div>
+        <div class="qt-cards">${esc(targetCards)}<small>卡</small></div>
+        <div class="qt-desc">${esc(targetDesc)}</div>
+      </div>
+    </div>
+    <div class="rec-quantity-note">详细显存组成、卡数公式和取整过程请展开下方“显存与卡数计算明细”。</div>
+    ${renderDeploymentPanel(rec,chip)}
+  </section>`;
+}
+
+function renderDeploymentPanel(rec,chip){
+  const summary=rec.rationale||`${rec.recommended_cards||rec.vram_cards||'—'}卡 ${chip.chip_model||''}`;
+  return `<div class="rec-deployment-content">
+    <div class="deployment-title">🔗 部署方案</div>
+    <div class="rec-rationale"><b>推荐配置：</b>${esc(summary)}</div>
+    ${renderDeployLink(chip)}
+  </div>`;
+}
+
 async function runRecommend(){
   const loading=$('rec-loading'), results=$('rec-results');
   show(loading);results.innerHTML='';
@@ -1937,11 +2101,16 @@ async function runRecommend(){
     else params.set('method','full_param');
     const tokens=$('rec-tokens').value;if(tokens)params.set('training_tokens',tokens);
     const days=$('rec-days').value;if(days)params.set('training_days',days);
+    const bs=$('rec-batch-size').value;if(bs)params.set('batch_size',bs);
+    const sl=$('rec-seq-len').value;if(sl)params.set('seq_len',sl);
   } else if(sc==='quantize'){
     params.set('method',$('rec-quantize-method').value);
     params.set('quantize_bits',$('rec-quantize-bits').value);
   } else {
     params.set('quant',$('rec-quant').value);
+    const inLen=$('rec-input-len').value;if(inLen)params.set('input_len',inLen);
+    const outLen=$('rec-output-len').value;if(outLen)params.set('output_len',outLen);
+    const conc=$('rec-concurrency').value;if(conc)params.set('concurrency',conc);
     const tps=$('rec-tps').value;if(tps)params.set('sla_tps',tps);
   }
   const mc=$('rec-max-cards').value;if(mc)params.set('max_cards',mc);
@@ -1963,7 +2132,9 @@ async function runRecommend(){
     <div class="info" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <span>模型: <b>${esc(data.model||'')}</b> · 场景: <b>${req.scenario_label||(req.scenario==='train'?'训练':'推理')}</b>
       <a href="https://docs.vllm.ai/projects/ascend/zh-cn/v0.18.0/quick_start.html" target="_blank" rel="noopener" style="margin-left:8px;font-size:0.75rem;color:var(--accent);white-space:nowrap">📖 vLLM Ascend 部署指南 →</a>
-      · VRAM: <b>${req.min_vram_gb} GB</b>
+      · VRAM: <b>${req.scenario==='inference'
+        ? `${req.full_vram_gb} GB（最小） / ${req.target_vram_gb} GB（${req.concurrency}并发）`
+        : `${req.min_vram_gb} GB`}</b>
       ${req.vram_formula ? `· <span style="font-size:0.7rem;color:var(--text2)" title="${esc(req.vram_formula)}">${esc(req.vram_formula.substring(0,60))}…</span>` : ''}
       · 候选: <b>${data.candidates?.length||0}</b> · 排除: <b>${data.rejected||0}</b></span>
       <button class="btn" onclick="showMethodology()" style="font-size:0.75rem;padding:4px 12px">📖 算法说明</button>
@@ -1976,26 +2147,20 @@ async function runRecommend(){
       return `
         <div class="rec-card ${i===0?'best':''}">
           <div class="rec-rank">#${i+1} · 综合评分 ${scoring.total!=null?scoring.total.toFixed(0):rec.score} / 100 · ${esc(c.chip_model)} <span style="color:var(--text2);font-weight:400">${esc(c.vendor_display||'')}</span></div>
-          <!-- Row 1: 计算与推荐 -->
-          <div class="rec-calc-row">
-            ${renderCalcRow(req, rec, c)}
+          <div class="rec-overview-grid">
+            ${renderChipBasicInfo(c)}
+            ${renderRecommendationReason(req,rec,c,scoring,i+1)}
+            ${renderQuantityEstimate(req,rec,c)}
           </div>
-          <!-- Row 2: 芯片规格 + 部署方案 + 完整画像按钮 -->
-          <div class="rec-chip-row">
-            <span class="chip-name">${esc(c.chip_model)}</span>
-            <span class="chip-meta">${esc(c.vendor_display||'')} · ${esc(c.vendor_region||'')} · ${esc(c.chip_type||'')}</span>
-            ${renderChipSpecInline(c)}
-            ${renderDeployLink(c)}
-            <button class="rec-profile-btn" onclick="openChipProfile('${esc(c.id||c.chip_model)}')">📋 完整画像</button>
+          ${renderCalcBreakdown(req, rec, c, scoring)}
+          <div class="rec-scoring-breakdown">
+            <div class="rec-scoring-toggle" id="scoring-toggle-${i}" onclick="toggleScoringDetail(${i})">
+              <span class="arrow">▶</span> 📊 评分细则
+            </div>
+            <div class="rec-scoring-panel" id="scoring-panel-${i}">
+              ${renderScoringDetail(scoring, dimNameMap)}
+            </div>
           </div>
-          <!-- Row 3: 评分细则 toggle -->
-          <div class="rec-scoring-toggle" id="scoring-toggle-${i}" onclick="toggleScoringDetail(${i})">
-            <span class="arrow">▶</span> 📊 评分细则
-          </div>
-          <div class="rec-scoring-panel" id="scoring-panel-${i}">
-            ${renderScoringDetail(scoring, dimNameMap)}
-          </div>
-          <div class="rec-rationale">${esc(rec.rationale||'')}</div>
         </div>
       `;
     }).join('')}
@@ -2005,13 +2170,43 @@ async function runRecommend(){
 // ── Row 1: Calculation & recommendation params ──
 function renderCalcRow(req, rec, chip){
   const items = [];
-  // VRAM
+  const fmtCalcGb = v => { const n=Number(v||0); return n>0&&n<0.1?n.toFixed(3):n.toFixed(1); };
+  const isInference = req.scenario === 'inference';
+  const idealLabel = isInference ? '目标并发' : '理想';
+  // VRAM (推理: 最小档=权重+单请求峰值KV / 目标并发；训练/量化仅一个显存下限)
   if(req.min_vram_gb != null){
-    const f = req.vram_formula || '';
-    items.push({label:'显存需求', value:`${req.min_vram_gb.toFixed(1)} GB`, detail:f.length>100?f.substring(0,97)+'…':f});
+    const fullGb = req.full_vram_gb != null ? req.full_vram_gb : req.min_vram_gb;
+    const comps = req.vram_calculation?.components || [];
+    const componentText = comps.map(x=>`${x.label} ${fmtCalcGb(x.result_gb)}GB`).join(' + ');
+    if(isInference){
+      const targetGb = req.target_vram_gb != null ? req.target_vram_gb : fullGb;
+      items.push({
+        label:'显存需求 (最小/目标并发)',
+        value:`${fullGb.toFixed(1)} / ${Number(targetGb).toFixed(1)} GB`,
+        detail:`最小=权重+单请求峰值KV；目标并发=${fmtCalcGb(req.vram_calculation?.target_concurrency?.weight_gb||0)}GB权重 + ${fmtCalcGb(req.kv_cache_gb||0)}GB KV×${req.concurrency||1}`,
+      });
+    }else{
+      items.push({label:'显存需求（最小部署）', value:`${req.min_vram_gb.toFixed(1)} GB`, detail:componentText||'展开下方明细查看逐项公式'});
+    }
   }
-  // Cards
-  items.push({label:'推荐卡数', value:`${rec.recommended_cards} 卡`, detail:`单卡${chip.vram_gb||'?'}GB · 显存约束${rec.vram_cards}卡${rec.recommended_cards!==rec.vram_cards?' → 算力约束'+rec.recommended_cards+'卡':''}`});
+  // KV Cache (推理场景单独显示)
+  if(req.kv_cache_gb != null && req.kv_cache_gb > 0){
+    items.push({label:'单请求峰值 KV Cache', value:`${fmtCalcGb(req.kv_cache_gb)} GB`, detail:`输入 ${req.input_len||'?'} + 输出 ${req.output_len||'?'} = ${req.total_context||'?'} tokens · KV元素精度 ${req.kv_cache_dtype||'BF16/FP16 (2 bytes/element)'}，与权重量化独立`});
+  }
+  // Cards (推理只展示最小档 / 目标并发两档)
+  const minC = rec.vram_cards, fullC = rec.full_cards != null ? rec.full_cards : rec.recommended_cards, idealC = rec.recommended_cards;
+  const minRaw = rec.card_calculation?.minimum?.raw_cards;
+  const rawText = minRaw!=null ? ` · 最小档原始${minRaw}卡→取2幂${minC}卡` : '';
+  if(isInference){
+    const targetCalc = rec.card_calculation?.ideal || {};
+    items.push({
+      label:'卡数 (最小/目标并发)',
+      value:`${fullC} / ${idealC}`,
+      detail:`单卡${chip.vram_gb||'?'}GB · 目标并发按权重仅加载一份的统一显存池计算${targetCalc.throughput_rounded_cards?'，并叠加显式吞吐约束':''}`,
+    });
+  }else{
+    items.push({label:`卡数 (最小/${idealLabel})`, value:`${minC} / ${idealC}`, detail:`单卡${chip.vram_gb||'?'}GB${rawText} · ${idealLabel}按性能目标与最小部署取较大值`});
+  }
   // Training time
   if(rec.estimated_training_days != null){
     const parts = [];
@@ -2063,6 +2258,96 @@ function toggleScoringDetail(idx){
   panel.classList.toggle('open');
 }
 
+const SCORE_DIM_EXPLAIN_CN = {
+  compute_perf:'看单卡FP16/BF16理论算力；分数越高，单卡计算能力通常越强。',
+  bandwidth_adequacy:'看推荐卡的总显存带宽能否覆盖模型需求；余量越大，越不容易受访存瓶颈限制，也越能应对更多并发请求。',
+  power_efficiency:'看每瓦功耗可提供多少算力；分数越高，同等计算量的电力和散热成本通常越低。',
+  server_count_efficiency:'按每节点8卡估算部署规模；节点越少，互联、运维和部署复杂度通常越低。',
+  framework_compat:'看PyTorch、TensorFlow、JAX等主流框架的支持情况；支持越多，模型迁移和部署越容易。',
+  toolchain_compat:'看DeepSpeed、TensorRT、Triton等辅助工具的支持情况；支持越完整，训练和推理优化越方便。',
+  source_credibility:'看评分数据中官方资料所占比例；分数越高，评分所依据的数据通常越可信。',
+  benchmark_evidence:'看真实benchmark的数量和质量；分数越高，越能用实测结果验证理论规格。'
+};
+
+const SCORE_TRACE_EXPLAIN_CN = {
+  compute_perf:{
+    formula:'按芯片库的算力分位点分段线性评分：13T得25分、105T得50分、383T得75分、2563T得100分；落在两个节点之间时按比例插值。',
+    source:'读取芯片的精度性能字段；全库1093颗芯片中996颗有该数据，覆盖率约91%。',
+    fields:{fp16_tflops:['FP16/BF16算力','TFLOPS'],missing:['数据是否缺失','boolean']}
+  },
+  bandwidth_adequacy:{
+    formula:'总带宽=单卡显存带宽×卡数；模型需求不超过总带宽50%时得100分，超过50%后线性扣分，达到或超过100%时为0分。',
+    source:'芯片带宽取自显存带宽字段，覆盖率约88%；模型带宽需求根据当前模型和使用场景估算。',
+    fields:{vram_bw_gb_s:['单卡显存带宽','GB/s'],cards:['卡数','张'],total_bw_gb_s:['总显存带宽','GB/s'],model_bandwidth_gb_s:['模型带宽需求','GB/s'],ratio:['带宽需求占比','percent'],missing:['数据是否缺失','boolean']}
+  },
+  power_efficiency:{
+    formula:'先计算每瓦算力=FP16/BF16算力×1000÷TDP功耗，再按照数据库中的能效分位点分段换算为分数。',
+    source:'算力取自芯片精度性能字段，功耗取自TDP字段；TDP字段覆盖率约92%。',
+    fields:{gflops_per_watt:['每瓦算力','GFLOPS/W'],tdp_w:['芯片功耗TDP','W'],missing:['数据是否缺失','boolean']}
+  },
+  server_count_efficiency:{
+    formula:'按每台服务器8张卡向上取整计算节点数；1节点100分，2、3、4节点分别80、60、40分，更多节点继续扣分。',
+    source:'这是由当前推荐卡数计算出的派生指标，不直接读取芯片数据库字段。',
+    fields:{recommended_cards:['推荐卡数','张'],nodes:['服务器节点数','个']}
+  },
+  framework_compat:{
+    formula:'每检测到一个主流框架加15分，最高100分；未检测到框架数据时使用中性默认值50分。',
+    source:'读取芯片的软件栈和兼容框架字段，检查PyTorch、TensorFlow、JAX、MindSpore、PaddlePaddle、vLLM和ONNX。',
+    fields:{major_frameworks_found:['检测到的主流框架数','个'],missing:['数据是否缺失','boolean']}
+  },
+  toolchain_compat:{
+    formula:'每检测到一个辅助工具链加8分，最高80分；未检测到工具链数据时使用中性默认值50分。',
+    source:'读取芯片的软件栈和兼容框架字段，检查DeepSpeed、TensorRT、Triton、FSDP、SGLang等工具。',
+    fields:{minor_tools_found:['检测到的辅助工具数','个'],missing:['数据是否缺失','boolean']}
+  },
+  source_credibility:{
+    formula:'先计算官方来源字段数÷全部有来源记录的字段数，再按官方来源比例所在档位给分。',
+    source:'读取字段级溯源表中的来源类型和官方标记；它衡量数据可信度，不代表芯片硬件性能。',
+    fields:{official_ratio:['官方来源占比','percent'],missing:['溯源数据是否缺失','boolean']}
+  },
+  benchmark_evidence:{
+    formula:'先按实测记录数量得到50至95分的基础分，再根据MFU和吞吐量各加减最多2.5分；没有实测时使用默认值50分。',
+    source:'读取芯片×模型实测表中的benchmark记录；当前匹配覆盖率较低，因此无实测不等于芯片性能较差。',
+    fields:{benchmark_count:['实测记录数','条'],max_mfu_pct:['最高MFU','%'],max_throughput_tok_s:['最高吞吐量','tokens/s'],base_score:['记录数量基础分','分'],mfu_bonus:['MFU加减分','分'],tps_bonus:['吞吐量加减分','分'],missing:['实测数据是否缺失','boolean']}
+  }
+};
+
+function formatScoreTraceField(label, type, value){
+  if(type==='boolean'){
+    const missing = value===true || value==='true';
+    return `${label}=${missing?'是（使用默认值或统计估计）':'否（数据存在）'}`;
+  }
+  if(type==='percent') return `${label}=${(Number(value||0)*100).toFixed(1)}%`;
+  const shown = typeof value==='number' ? value.toFixed(2) : String(value);
+  return `${label}=${shown}${type?` ${type}`:''}`;
+}
+
+function getScoreTraceChinese(dimId, raw){
+  const cfg = SCORE_TRACE_EXPLAIN_CN[dimId] || {};
+  const fields = cfg.fields || {};
+  const values = Object.entries(raw||{})
+    .filter(([key])=>key!=='formula'&&key!=='source'&&key!=='note')
+    .map(([key,value])=>{
+      const field = fields[key] || [key,''];
+      return formatScoreTraceField(field[0],field[1],value);
+    });
+  return {
+    formula:cfg.formula||'该公式把当前指标值换算成0至100分。',
+    raw:values.length?`本次计算使用：${values.join('；')}。`:'本项没有额外的代入参数。',
+    source:cfg.source||'数据来自芯片数据库或由当前推荐条件计算得出。'
+  };
+}
+
+function renderScoreChineseExplain(dimId, score, raw, meta){
+  const base = meta.explain_cn || SCORE_DIM_EXPLAIN_CN[dimId] || meta.desc || '该项用于衡量芯片在这一维度的表现。';
+  const scoreText = Number.isFinite(Number(score)) ? `${Number(score).toFixed(0)}/100` : '暂无';
+  if(raw && raw.missing){
+    return `💬 总结：${base} 当前缺少有效数据，${scoreText}为默认值或统计估计，不能直接视为真实性能。`;
+  }
+  const level = score >= 80 ? '表现较强' : score >= 60 ? '表现良好' : score >= 40 ? '处于中等水平' : '相对偏弱';
+  return `💬 总结：${base} 当前得分${scoreText}，${level}。`;
+}
+
 function renderScoringDetail(scoring, dimNameMap) {
   if (!scoring) return '<div class="empty">暂无评分数据</div>';
 
@@ -2076,9 +2361,10 @@ function renderScoringDetail(scoring, dimNameMap) {
   }
 
   const catOrder = [
+    {id:'ecosystem_maturity', icon:'🌐'},
+    {id:'benchmark_evidence', icon:'🧪'},
     {id:'compute_power', icon:'⚡'},
-    {id:'cost_effectiveness', icon:'💰'},
-    {id:'ecosystem_maturity', icon:'🌐'}
+    {id:'cost_effectiveness', icon:'💰'}
   ];
 
   const sections = catOrder.map(({id, icon}) => {
@@ -2105,6 +2391,7 @@ function renderScoringDetail(scoring, dimNameMap) {
         const formula = raw.formula || '';
         const source = raw.source || raw.note || '';
         const rawStr = Object.entries(raw).filter(([rk])=>rk!=='formula'&&rk!=='source'&&rk!=='note').map(([rk,rv])=>`${rk}=${typeof rv==='number'?rv.toFixed(2):rv}`).join(', ');
+        const traceCn = getScoreTraceChinese(dimId, raw);
 
         return `<div class="rec-scoring-dim">
           <div class="dim-head">
@@ -2114,9 +2401,10 @@ function renderScoringDetail(scoring, dimNameMap) {
             <span style="color:var(--text3);font-size:0.6rem">加权 ${v.weighted.toFixed(0)}</span>
           </div>
           <div class="dim-calc">${esc(detail)}</div>
-          ${formula ? `<div class="dim-formula">📐 公式: ${esc(formula)}</div>` : ''}
-          ${rawStr ? `<div class="dim-raw">📊 代入: ${esc(rawStr)}</div>` : ''}
-          ${source ? `<div class="dim-raw">📂 ${esc(source)}</div>` : ''}
+          ${formula ? `<div class="dim-formula">📐 公式: ${esc(formula)}</div><div class="dim-trace-explain">↳ ${esc(traceCn.formula)}</div>` : ''}
+          ${rawStr ? `<div class="dim-raw">📊 代入: ${esc(rawStr)}</div><div class="dim-trace-explain">↳ ${esc(traceCn.raw)}</div>` : ''}
+          <div class="dim-raw">📂 ${esc(source||'计算派生值')}</div><div class="dim-trace-explain">↳ ${esc(traceCn.source)}</div>
+          <div class="dim-explain">${esc(renderScoreChineseExplain(dimId, v.score, raw, meta))}</div>
         </div>`;
       }).join('')}
     </div>`;
@@ -2125,13 +2413,13 @@ function renderScoringDetail(scoring, dimNameMap) {
   // Total score formula
   const total = scoring.total!=null ? scoring.total.toFixed(0) : '?';
   const cw = scoring.category_weights || {};
-  const catNames2 = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度'};
+  const catNames2 = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度', benchmark_evidence:'实测验证度'};
   const totalParts = Object.entries(cw).filter(([,v])=>v>0).map(([k,v])=>
     `${catNames2[k]||k}: ${cats[k]?.score?.toFixed(0)||'?'} × ${(v*100).toFixed(0)}% = ${cats[k]?.weighted?.toFixed(0)||'?'}`
   );
   const totalFormula = totalParts.length ? `总分 = ${totalParts.join(' + ')} = ${total}` : `总分 = ${total}`;
 
-  return `<div style="font-size:0.68rem;color:var(--text3);margin-bottom:6px">📊 评分明细 v${scoring.version||'4.2'} — 3大类·9子维度</div>
+  return `<div style="font-size:0.68rem;color:var(--text3);margin-bottom:6px">📊 评分明细 v${scoring.version||'4.4'} — 4大类·8子维度</div>
     ${sections}
     <div style="margin-top:6px;padding:6px 10px;background:var(--bg4);border-radius:4px;font-size:0.7rem;color:var(--text)">
       <b>总分计算</b>: ${esc(totalFormula)}
@@ -2151,6 +2439,7 @@ function renderFlatScoringDetail(dims, dimNameMap) {
       const formula = raw.formula || '';
       const source = raw.source || raw.note || '';
       const rawStr = Object.entries(raw).filter(([rk])=>rk!=='formula'&&rk!=='source'&&rk!=='note').map(([rk,rv])=>`${rk}=${typeof rv==='number'?rv.toFixed(2):rv}`).join(', ');
+      const traceCn = getScoreTraceChinese(dimId, raw);
       return `<div class="rec-scoring-dim">
         <div class="dim-head">
           <span class="dim-name">${esc(name)}</span>
@@ -2158,9 +2447,10 @@ function renderFlatScoringDetail(dims, dimNameMap) {
           <span style="color:var(--text3);font-size:0.6rem">×${v.weight.toFixed(2)} = ${v.weighted.toFixed(0)}</span>
         </div>
         ${detail ? `<div class="dim-calc">${esc(detail)}</div>` : ''}
-        ${formula ? `<div class="dim-formula">📐 公式: ${esc(formula)}</div>` : ''}
-        ${rawStr ? `<div class="dim-raw">📊 代入: ${esc(rawStr)}</div>` : ''}
-        ${source ? `<div class="dim-raw">📂 ${esc(source)}</div>` : ''}
+        ${formula ? `<div class="dim-formula">📐 公式: ${esc(formula)}</div><div class="dim-trace-explain">↳ ${esc(traceCn.formula)}</div>` : ''}
+        ${rawStr ? `<div class="dim-raw">📊 代入: ${esc(rawStr)}</div><div class="dim-trace-explain">↳ ${esc(traceCn.raw)}</div>` : ''}
+        <div class="dim-raw">📂 ${esc(source||'计算派生值')}</div><div class="dim-trace-explain">↳ ${esc(traceCn.source)}</div>
+        <div class="dim-explain">${esc(renderScoreChineseExplain(dimId, v.score, raw, meta))}</div>
       </div>`;
     }).join('')}`;
 }
@@ -2205,41 +2495,70 @@ function hideScoreTooltip(){
 
 // ── Calculation Breakdown (collapsible) ──
 function renderCalcBreakdown(req, rec, chip, scoring){
-  const items = [];
-  // VRAM calculation
-  if(req.vram_formula){
-    items.push({label:'显存需求计算', value:req.min_vram_gb!=null?req.min_vram_gb.toFixed(1)+' GB':'?', detail:req.vram_formula});
+  const vcalc = req.vram_calculation || {};
+  const mcalc = req.model_calculation || {};
+  const ccalc = rec.card_calculation || {};
+  const components = vcalc.components || [];
+  const fmtCalcGb = v => { const n=Number(v||0); return n>0&&n<0.1?n.toFixed(3):n.toFixed(1); };
+  const isInference = req.scenario === 'inference';
+  const idealLabel = isInference ? '目标并发部署' : '理想部署';
+  const inputs = [];
+  if(mcalc.total_params_b!=null) inputs.push(`总参数 ${mcalc.total_params_b}B`);
+  if(mcalc.is_moe && mcalc.active_params_b!=null) inputs.push(`每token激活 ${mcalc.active_params_b}B`);
+  inputs.push(`场景 ${req.scenario_label||req.scenario||'?'}`);
+  if(req.scenario==='train'){
+    inputs.push(`训练阶段 ${(req.stage||'').toUpperCase()}`);
+    inputs.push(`方式 ${req.method==='full_param'?'全参':req.method}`);
+    inputs.push(`Batch ${req.batch_size||1}`);
+    inputs.push(`样本长度 ${req.seq_len||'?'} tokens`);
+  }else if(req.scenario==='inference'){
+    inputs.push(`精度 ${(req.quant||'fp16').toUpperCase()}`);
+    inputs.push(`输入 ${req.input_len||'?'} tokens`);
+    inputs.push(`输出 ${req.output_len||'?'} tokens`);
+    inputs.push(`目标并发 ${req.concurrency||1}`);
+  }else{
+    inputs.push(`量化方式 ${req.method||'?'}`);
+    inputs.push(`目标精度 ${(req.quantize_bits||'').toUpperCase()}`);
   }
-  // Cards
-  if(rec.vram_cards != null){
-    items.push({label:'显存约束最少卡数', value:rec.vram_cards+' 卡', detail:`单卡${chip.vram_gb||'?'}GB / 需要${req.min_vram_gb!=null?req.min_vram_gb.toFixed(1):'?'}GB → 向上取2幂次方`});
-  }
-  if(rec.recommended_cards != null && rec.recommended_cards !== rec.vram_cards){
-    items.push({label:'算力约束最少卡数', value:rec.recommended_cards+' 卡', detail:'按训练FLOPs需求计算所需卡数'});
-  }
-  // Training time
-  if(rec.estimated_training_days != null && req.target_training_days != null){
-    items.push({label:'预计训练时间', value:rec.estimated_training_days.toFixed(1)+' 天', detail:`目标: ${req.target_training_days}天 · 训练量: ${req.training_tokens_T||'?'}T tokens`});
-  }
-  // Price
-  if(rec.total_cost_wan != null){
-    items.push({label:'预估总价', value:rec.total_cost_wan+' 万元', detail:`${rec.recommended_cards||rec.vram_cards}卡 × ${chip.price_cny_wan||'?'}万/卡`});
-  }
-  // Category weights (v4.2: 3-category, 100-point scale)
-  const w = rec.scenario_weights || (scoring && scoring.category_weights);
-  if (w) {
-    const catNames = {compute_power:'算力性能(2维)', cost_effectiveness:'性价比(2维)', ecosystem_maturity:'生态成熟度(5维)'};
-    const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${catNames[k]||k}:${(v*100).toFixed(0)}%`).join(' ');
-    items.push({label:'大类权重分配', value:parts, detail:`总分=Σ(大类分×大类权重), 子维度权重为固定比值`});
-  }
-  if(!items.length) return '';
+
+  const fullTier = ccalc.full || {};
+  const idealTier = ccalc.ideal || {};
+  const fullCards = rec.full_cards!=null ? rec.full_cards : rec.recommended_cards;
+  const summary = isInference
+    ? `${Number(req.full_vram_gb??req.min_vram_gb??0).toFixed(1)}GB ÷ ${chip.vram_gb||'?'}GB/卡 → ${fullCards||'?'}卡（最小）`
+    : `${req.min_vram_gb!=null?Number(req.min_vram_gb).toFixed(1):'?'}GB ÷ ${chip.vram_gb||'?'}GB/卡 → ${rec.vram_cards||'?'}卡（最小）`;
+  const componentHtml = components.length ? components.map(comp=>`
+    <div class="calc-component">
+      <div class="cc-name">${esc(comp.label||comp.id||'组成项')}</div>
+      <div class="cc-formula">${esc(comp.formula||'')}</div>
+      <div class="cc-result">${fmtCalcGb(comp.result_gb)} GB</div>
+    </div>`).join('') : `<div class="calc-component"><div class="cc-formula">${esc(req.full_vram_formula||req.vram_formula||'暂无逐项数据')}</div></div>`;
+
+  const tierRows = isInference ? [
+    {name:fullTier.label||'最小部署', value:`${fullCards} 卡`, formula:fullTier.formula||`ceil(${req.full_vram_gb}÷${chip.vram_gb}) → ${fullCards}`},
+    {name:idealTier.label||'目标并发部署', value:`${rec.recommended_cards} 卡`, formula:idealTier.formula||'权重 + 单请求KV×目标并发，再除以单卡显存并取2的幂'},
+  ] : [
+    {name:'最小部署', value:`${rec.vram_cards} 卡`, formula:(ccalc.minimum||{}).formula||`ceil(${req.min_vram_gb}÷${chip.vram_gb}) → ${rec.vram_cards}`},
+    {name:idealTier.label||idealLabel, value:`${rec.recommended_cards} 卡`, formula:idealTier.formula||`${idealLabel}卡数取最小部署与性能约束的较大值`},
+  ];
+  const tierHtml = tierRows.map(t=>`<div class="calc-tier"><div class="ct-name">${esc(t.name)}</div><div class="ct-value">${esc(t.value)}</div><div class="ct-formula">${esc(t.formula)}</div></div>`).join('');
+
   return `<details class="calc-breakdown">
-    <summary>📐 计算过程</summary>
-    ${items.map(it=>`<div class="calc-item">
-      <div class="calc-label">${esc(it.label)}</div>
-      <div class="calc-value">${esc(it.value)}</div>
-      ${it.detail ? `<div class="calc-detail">${esc(it.detail)}</div>` : ''}
-    </div>`).join('')}
+    <summary><span class="calc-arrow">▶</span> 🧮 显存与卡数计算明细 <span class="calc-summary-text">${esc(summary)}</span></summary>
+    <div class="calc-body">
+      <div class="calc-inputs">${inputs.map(x=>`<span class="calc-chip">${esc(x)}</span>`).join('')}</div>
+      ${mcalc.is_moe ? `<div class="calc-moe-note"><span>⚠️</span><span><b>MoE 口径：</b>${esc(mcalc.note||'激活参数影响计算量；常驻权重显存按总参数量计算。')}${mcalc.num_experts?` 当前配置 ${esc(mcalc.num_experts)} 个专家${mcalc.experts_per_token?`，每 token 路由 ${esc(mcalc.experts_per_token)} 个`:''}。`:''}</span></div>` : ''}
+      <div class="calc-section-title">① 显存由什么组成</div>
+      ${componentHtml}
+      <div class="calc-total-line">${isInference
+        ? `最小显存 <b>${Number(req.full_vram_gb??req.min_vram_gb??0).toFixed(1)} GB</b> = 权重 + 单请求峰值KV；目标并发显存 <b>${Number(req.target_vram_gb??req.full_vram_gb??0).toFixed(1)} GB</b> = 权重 + 单请求KV × ${req.concurrency||1}`
+        : req.scenario==='train'
+          ? `最小部署显存 <b>${Number(req.min_vram_gb||0).toFixed(1)} GB</b> = 模型状态 + 训练激活值；理想部署不新增显存档，而是按训练性能目标与最小卡数取较大值`
+          : `最小部署显存 <b>${Number(req.min_vram_gb||0).toFixed(1)} GB</b>；未设置额外性能目标时，理想部署等同最小部署`}</div>
+      <div class="calc-section-title">② 显存如何换算成卡数</div>
+      <div class="calc-tiers two">${tierHtml}</div>
+      <div class="calc-total-line">取整规则：<b>${esc(ccalc.rounding_rule||'ceil 后向上取2的幂')}</b>${rec.total_cost_wan!=null?`；按${idealLabel}估算总价 <b>${esc(rec.total_cost_wan)} 万元</b>`:''}</div>
+    </div>
   </details>`;
 }
 
@@ -2264,19 +2583,19 @@ async function showMethodology() {
         <div class="group"><div class="group-header">硬约束条件</div><div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px">
           ${(data.hard_constraints||[]).map(c=>`<div class="group-field"><span class="val">${esc(c)}</span></div>`).join('')}
         </div></div>
-        <div class="group"><div class="group-header">评分维度 (3大类 × 9子维度)</div>
+        <div class="group"><div class="group-header">评分维度 (4大类 × 8子维度)</div>
         <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:6px">
           ${dims.map(d=>`<div class="group-field" style="flex-direction:column;align-items:flex-start;gap:2px">
-            <span style="font-weight:600;color:var(--accent)">${esc(d.name_cn)} (${esc(d.name_en)}) <span style="font-size:0.6rem;color:var(--text3)">[${esc((d.category||'').replace('compute_power','算力性能').replace('cost_effectiveness','性价比').replace('ecosystem_maturity','生态成熟度'))}]</span></span>
+            <span style="font-weight:600;color:var(--accent)">${esc(d.name_cn)} (${esc(d.name_en)}) <span style="font-size:0.6rem;color:var(--text3)">[${esc((d.category||'').replace('compute_power','算力性能').replace('cost_effectiveness','性价比').replace('ecosystem_maturity','生态成熟度').replace('benchmark_evidence','实测验证度'))}]</span></span>
             <span style="color:var(--text2);font-size:0.73rem">${esc(d.desc||'')} · 单位: ${esc(d.unit||'')}</span>
             <span style="color:var(--text3);font-size:0.68rem">子权重: ${((d.sub_weight||0)*100).toFixed(0)}%</span>
           </div>`).join('')}
         </div></div>
         ${data.scenario_weights ? `
-        <div class="group"><div class="group-header">大类权重矩阵 (5:2:3 统一)</div>
+        <div class="group"><div class="group-header">大类权重矩阵 (4:3:2:1 统一)</div>
         <div class="group-body" style="display:grid;grid-template-columns:1fr;gap:4px;font-size:0.7rem">
           ${Object.entries(data.scenario_weights).map(([scenario,w])=>{
-            const catNames = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度'};
+            const catNames = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度', benchmark_evidence:'实测验证度'};
             const parts = Object.entries(w).filter(([,v])=>v>0).map(([k,v])=>`${catNames[k]||k}:${(v*100).toFixed(0)}%`).join(', ');
             return '<div class="group-field"><span class="key" style="font-weight:600">' + esc(scenario) + '</span><span class="val">' + esc(parts) + '</span></div>';
           }).join('')}
@@ -2297,7 +2616,8 @@ async function loadMethodology() {
     const catMap = {
       compute_power: {cn:'算力性能', icon:'⚡', desc:'单卡算力与带宽，决定训练/推理的根本上限'},
       cost_effectiveness: {cn:'性价比', icon:'💰', desc:'能效 + 集群经济性，影响部署总成本'},
-      ecosystem_maturity: {cn:'生态成熟度', icon:'🌐', desc:'兼容性 + 工具链 + 实测验证 + 数据可信度'}
+      ecosystem_maturity: {cn:'生态成熟度', icon:'🌐', desc:'框架 + 工具链 + 数据可信度'},
+      benchmark_evidence: {cn:'实测验证度', icon:'🧪', desc:'实测 benchmark 数据(MFU/吞吐)独立评分'}
     };
     // Group dimensions by category
     const groups = {};
@@ -2307,12 +2627,12 @@ async function loadMethodology() {
       groups[cat].push(d);
     });
 
-    const categoryOrder = ['compute_power','cost_effectiveness','ecosystem_maturity'];
+    const categoryOrder = ['ecosystem_maturity','benchmark_evidence','compute_power','cost_effectiveness'];
 
     content.innerHTML = `
       <div class="mg-hero">
         <h2>📖 推荐算法设计细则 <span class="mg-ver">v${data.version||'4.2'}</span></h2>
-        <p>AISHPerf 芯片推荐引擎 — 3大类 · 9子维度分层评分方法</p>
+        <p>AISHPerf 芯片推荐引擎 — 4大类 · 8子维度分层评分方法</p>
       </div>
 
       <!-- Section 1: Card Estimation -->
@@ -2336,7 +2656,7 @@ async function loadMethodology() {
       </div>
 
       <!-- Section 2: Category Overview Cards -->
-      <div class="mg-section-title"><span class="mg-section-icon" style="background:rgba(16,185,129,0.08);color:var(--green)">📊</span>3大类 · 9子维度评分</div>
+      <div class="mg-section-title"><span class="mg-section-icon" style="background:rgba(16,185,129,0.08);color:var(--green)">📊</span>4大类 · 8子维度评分</div>
       <div class="mg-cat-grid">
         ${categoryOrder.map(cat => {
           const meta = catMap[cat] || {cn:cat, icon:'📌', desc:''};
@@ -2357,7 +2677,8 @@ async function loadMethodology() {
             '</div>'+
             '<div class="mg-cc-body">'+
               catDims.map((d,i) => {
-                const isPrimary = i === 0;
+                const maxW = Math.max(...catDims.map(x => x.sub_weight || 0));
+                const isPrimary = (d.sub_weight || 0) === maxW;
                 return '<div class="mg-dim-item">'+
                   '<div class="mg-di-bar"></div>'+
                   '<div class="mg-di-content">'+
@@ -2375,23 +2696,25 @@ async function loadMethodology() {
 
       <!-- Section 3: Weight Matrix -->
       ${data.scenario_weights ? `
-      <div class="mg-section-title"><span class="mg-section-icon" style="background:rgba(245,158,11,0.08);color:var(--orange)">⚖️</span>大类权重矩阵<span style="font-size:0.73rem;color:var(--text3);font-weight:400;margin-left:6px">所有场景统一 5:2:3</span></div>
+      <div class="mg-section-title"><span class="mg-section-icon" style="background:rgba(245,158,11,0.08);color:var(--orange)">⚖️</span>大类权重矩阵<span style="font-size:0.73rem;color:var(--text3);font-weight:400;margin-left:6px">所有场景统一 4:3:2:1</span></div>
       <div class="mg-weight-card">
         <div class="mg-wc-body">
           <table class="mg-weight-table">
             <thead><tr>
               <th>场景</th>
-              <th>⚡ 算力性能 <small style="font-weight:400;color:var(--text3)">50%</small></th>
-              <th>💰 性价比 <small style="font-weight:400;color:var(--text3)">20%</small></th>
-              <th>🌐 生态成熟度 <small style="font-weight:400;color:var(--text3)">30%</small></th>
+              <th>🌐 生态成熟度 <small style="font-weight:400;color:var(--text3)">40%</small></th>
+              <th>🧪 实测验证度 <small style="font-weight:400;color:var(--text3)">30%</small></th>
+              <th>⚡ 算力性能 <small style="font-weight:400;color:var(--text3)">20%</small></th>
+              <th>💰 性价比 <small style="font-weight:400;color:var(--text3)">10%</small></th>
             </tr></thead>
             <tbody>${Object.entries(data.scenario_weights).map(([scenario,w]) => {
-              const vals = {compute_power:w.compute_power||0, cost_effectiveness:w.cost_effectiveness||0, ecosystem_maturity:w.ecosystem_maturity||0};
+              const vals = {ecosystem_maturity:w.ecosystem_maturity||0, benchmark_evidence:w.benchmark_evidence||0, compute_power:w.compute_power||0, cost_effectiveness:w.cost_effectiveness||0};
               return '<tr>'+
                 '<td>'+esc(scenario)+'</td>'+
+                '<td><span class="mg-pill green">'+(vals.ecosystem_maturity*100).toFixed(0)+'%</span></td>'+
+                '<td><span class="mg-pill purple">'+(vals.benchmark_evidence*100).toFixed(0)+'%</span></td>'+
                 '<td><span class="mg-pill blue">'+(vals.compute_power*100).toFixed(0)+'%</span></td>'+
                 '<td><span class="mg-pill orange">'+(vals.cost_effectiveness*100).toFixed(0)+'%</span></td>'+
-                '<td><span class="mg-pill green">'+(vals.ecosystem_maturity*100).toFixed(0)+'%</span></td>'+
               '</tr>';
             }).join('')}</tbody>
           </table>
@@ -2414,7 +2737,7 @@ async function loadMethodology() {
       <div class="mg-phil-grid">
         ${[
           {k:'每维 0-100 分', v:'原始分 0-10 → ×10 统一百分制，总分直接累加'},
-          {k:'大类 5:2:3', v:'算力占50%最重要，生态30%次之，价格20%（统一权重，不随场景变化）'},
+          {k:'大类 4:3:2:1', v:'生态成熟度40%、实测验证度30%、算力性能20%、性价比10%（统一权重，不随场景变化）'},
           {k:'缺数据中性分', v:'数据缺失时给该维度总数的50%（如大类满分100给50），不排除芯片'},
           {k:'实测优先', v:'chip_model_benchmarks 有实测 MFU/吞吐时优先使用，精度±10%'},
           {k:'理论估算', v:'无实测数据时用公式估算，精度±50%，会在置信度中标记'},
@@ -2432,17 +2755,20 @@ async function loadMethodology() {
   hide(loading);
 }
 
-// Hash routing: #methodology → switch to tab
-(function(){
-  if (location.hash === '#methodology') { switchToTab('methodology'); }
-  if (location.hash === '#vram-logic') { switchToTab('vram-logic'); }
-  window.addEventListener('hashchange', ()=>{
-    if (location.hash === '#methodology') switchToTab('methodology');
-    if (location.hash === '#vram-logic') switchToTab('vram-logic');
-  });
-})();
+function tabFromLocation() {
+  const path = location.pathname.length > 1
+    ? location.pathname.replace(/\/+$/, '')
+    : '/';
+  if (PATH_TABS[path]) return PATH_TABS[path];
+  // Keep previously shared hash links working after adopting clean URLs.
+  if (location.hash === '#methodology') return 'methodology';
+  if (location.hash === '#vram-logic') return 'vram-logic';
+  return 'agent';
+}
 
-function switchToTab(tabId) {
+function switchToTab(tabId, {updateUrl=false, replace=false}={}) {
+  if (!TABS.some(t=>t.id===tabId)) tabId = 'agent';
+  STATE.currentTab = tabId;
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   const panel = document.getElementById('tab-'+tabId);
   if (panel) panel.classList.add('active');
@@ -2451,7 +2777,21 @@ function switchToTab(tabId) {
   if (btn) btn.classList.add('active');
   const def = TABS.find(t=>t.id===tabId);
   if (def && def.action) def.action();
+  if (updateUrl) {
+    const targetPath = TAB_PATHS[tabId] || '/';
+    const target = EMBED_MODE ? `${targetPath}?embed=1` : targetPath;
+    if (`${location.pathname}${location.search}` !== target || location.hash) {
+      history[replace ? 'replaceState' : 'pushState']({tab:tabId}, '', target);
+    }
+  }
 }
+
+(function initRouting(){
+  const initialTab = tabFromLocation();
+  switchToTab(initialTab, {updateUrl:true, replace:true});
+  window.addEventListener('popstate', ()=>switchToTab(tabFromLocation()));
+  window.addEventListener('hashchange', ()=>switchToTab(tabFromLocation(), {updateUrl:true, replace:true}));
+})();
 
 
 
