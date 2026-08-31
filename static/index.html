@@ -2023,10 +2023,10 @@ function renderRecommendationReason(req,rec,chip,scoring,rank){
     `<b>综合评分：</b>四大类加权总分 ${esc(total)}/100，候选排名第 ${esc(rank)}。`,
   ];
   const reasonCategoryOrder=[
-    ['ecosystem_maturity','生态成熟度','框架、工具链与来源真实度综合'],
-    ['benchmark_evidence','实测验证度','真实 benchmark 数量与质量'],
     ['compute_power','算力性能',`单卡显存 ${chip.vram_gb??'—'}GB、带宽 ${chip.vram_bw_gb_s??'—'}GB/s`],
     ['cost_effectiveness','性价比','能效与服务器节点效率综合'],
+    ['ecosystem_maturity','生态成熟度','框架、工具链与来源真实度综合'],
+    ['benchmark_evidence','实测验证度','真实 benchmark 数量与质量'],
   ];
   reasonCategoryOrder.forEach(([id,label,note])=>{
     const cat=cats[id];
@@ -2361,10 +2361,10 @@ function renderScoringDetail(scoring, dimNameMap) {
   }
 
   const catOrder = [
-    {id:'ecosystem_maturity', icon:'🌐'},
-    {id:'benchmark_evidence', icon:'🧪'},
     {id:'compute_power', icon:'⚡'},
-    {id:'cost_effectiveness', icon:'💰'}
+    {id:'cost_effectiveness', icon:'💰'},
+    {id:'ecosystem_maturity', icon:'🌐'},
+    {id:'benchmark_evidence', icon:'🧪'}
   ];
 
   const sections = catOrder.map(({id, icon}) => {
@@ -2414,7 +2414,10 @@ function renderScoringDetail(scoring, dimNameMap) {
   const total = scoring.total!=null ? scoring.total.toFixed(0) : '?';
   const cw = scoring.category_weights || {};
   const catNames2 = {compute_power:'算力性能', cost_effectiveness:'性价比', ecosystem_maturity:'生态成熟度', benchmark_evidence:'实测验证度'};
-  const totalParts = Object.entries(cw).filter(([,v])=>v>0).map(([k,v])=>
+  const totalCategoryOrder = ['compute_power','cost_effectiveness','ecosystem_maturity','benchmark_evidence'];
+  const totalParts = totalCategoryOrder.filter(k=>(cw[k]||0)>0).map(k=>
+    [k,cw[k]]
+  ).map(([k,v])=>
     `${catNames2[k]||k}: ${cats[k]?.score?.toFixed(0)||'?'} × ${(v*100).toFixed(0)}% = ${cats[k]?.weighted?.toFixed(0)||'?'}`
   );
   const totalFormula = totalParts.length ? `总分 = ${totalParts.join(' + ')} = ${total}` : `总分 = ${total}`;
@@ -2627,7 +2630,7 @@ async function loadMethodology() {
       groups[cat].push(d);
     });
 
-    const categoryOrder = ['ecosystem_maturity','benchmark_evidence','compute_power','cost_effectiveness'];
+    const categoryOrder = ['compute_power','cost_effectiveness','ecosystem_maturity','benchmark_evidence'];
 
     content.innerHTML = `
       <div class="mg-hero">
@@ -2702,19 +2705,19 @@ async function loadMethodology() {
           <table class="mg-weight-table">
             <thead><tr>
               <th>场景</th>
-              <th>🌐 生态成熟度 <small style="font-weight:400;color:var(--text3)">40%</small></th>
-              <th>🧪 实测验证度 <small style="font-weight:400;color:var(--text3)">30%</small></th>
               <th>⚡ 算力性能 <small style="font-weight:400;color:var(--text3)">20%</small></th>
               <th>💰 性价比 <small style="font-weight:400;color:var(--text3)">10%</small></th>
+              <th>🌐 生态成熟度 <small style="font-weight:400;color:var(--text3)">40%</small></th>
+              <th>🧪 实测验证度 <small style="font-weight:400;color:var(--text3)">30%</small></th>
             </tr></thead>
             <tbody>${Object.entries(data.scenario_weights).map(([scenario,w]) => {
-              const vals = {ecosystem_maturity:w.ecosystem_maturity||0, benchmark_evidence:w.benchmark_evidence||0, compute_power:w.compute_power||0, cost_effectiveness:w.cost_effectiveness||0};
+              const vals = {compute_power:w.compute_power||0, cost_effectiveness:w.cost_effectiveness||0, ecosystem_maturity:w.ecosystem_maturity||0, benchmark_evidence:w.benchmark_evidence||0};
               return '<tr>'+
                 '<td>'+esc(scenario)+'</td>'+
-                '<td><span class="mg-pill green">'+(vals.ecosystem_maturity*100).toFixed(0)+'%</span></td>'+
-                '<td><span class="mg-pill purple">'+(vals.benchmark_evidence*100).toFixed(0)+'%</span></td>'+
                 '<td><span class="mg-pill blue">'+(vals.compute_power*100).toFixed(0)+'%</span></td>'+
                 '<td><span class="mg-pill orange">'+(vals.cost_effectiveness*100).toFixed(0)+'%</span></td>'+
+                '<td><span class="mg-pill green">'+(vals.ecosystem_maturity*100).toFixed(0)+'%</span></td>'+
+                '<td><span class="mg-pill purple">'+(vals.benchmark_evidence*100).toFixed(0)+'%</span></td>'+
               '</tr>';
             }).join('')}</tbody>
           </table>

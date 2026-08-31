@@ -210,6 +210,41 @@ def test_recommend_cards_use_three_column_information_architecture():
     assert "卡数 (最小/${fullLabel}/${idealLabel})" not in html
 
 
+def test_scoring_categories_show_compute_and_cost_first():
+    """Display order should lead with compute/cost without changing category weights."""
+    html = client.get("/recommend").text
+
+    expected_ids = [
+        "compute_power", "cost_effectiveness",
+        "ecosystem_maturity", "benchmark_evidence",
+    ]
+
+    cat_order = html.split("const catOrder = [", 1)[1].split("];", 1)[0]
+    assert [cat_order.index(f"id:'{item}'") for item in expected_ids] == sorted(
+        cat_order.index(f"id:'{item}'") for item in expected_ids
+    )
+
+    reason_order = html.split("const reasonCategoryOrder=[", 1)[1].split("];", 1)[0]
+    assert [reason_order.index(f"['{item}'") for item in expected_ids] == sorted(
+        reason_order.index(f"['{item}'") for item in expected_ids
+    )
+
+    assert (
+        "const categoryOrder = "
+        "['compute_power','cost_effectiveness','ecosystem_maturity','benchmark_evidence'];"
+    ) in html
+
+    weights = client.get(
+        "/api/v1/chips/recommend?model=Qwen2.5-7B&scenario=inference&limit=1"
+    ).json()["scoring_meta"]["category_weights"]
+    assert weights == {
+        "compute_power": 0.20,
+        "cost_effectiveness": 0.10,
+        "ecosystem_maturity": 0.40,
+        "benchmark_evidence": 0.30,
+    }
+
+
 def test_moe_recommendation_exposes_total_weight_and_card_calculation():
     """MoE active parameters must not replace resident weight parameters."""
     resp = client.get(
