@@ -16,15 +16,15 @@
 
 - SSH：`lxc@81.70.231.92`
 - 项目根目录：`/home/lxc/chip-recommend`
-- 当前发布目录：`/home/lxc/chip-recommend/releases/20260909-150900`
+- 当前发布目录：`/home/lxc/chip-recommend/releases/20260909-160234`
 - 持久化数据库：`/home/lxc/chip-recommend/data/data.db`
 - Docker 容器：`chip-recommend`
-- Docker 镜像：`chip-recommend:codex-20260909-150900`
+- Docker 镜像：`chip-recommend:codex-20260909-160234`
 - 容器端口：`0.0.0.0:5340 -> 8000/tcp`
 - 重启策略：`unless-stopped`
-- 本次数据库备份：`/home/lxc/chip-recommend/backups/20260909-150900/data.db`
+- 本次数据库备份：`/home/lxc/chip-recommend/backups/20260909-160234/data.db`
 - 调度切换备份：`/home/lxc/chip-recommend/backups/20260909-143438/crontab.before-hermes`
-- 回滚容器：`chip-recommend-previous-20260909-150900`（已停止）
+- 回滚容器：`chip-recommend-previous-20260909-160234`（已停止）
 
 ## 自动数据自检
 
