@@ -1936,6 +1936,13 @@ function renderFieldProvenance(fp) {
 /* ═══════════════════ RECOMMEND ═══════════════════ */
 let REC_SELECTED_MODELS = [];
 
+const TRAINING_TOKEN_DEFAULTS = Object.freeze({cpt:10, sft:0.2, rl:0.2});
+
+function applyTrainingTokenDefault(stage){
+  const input = $('rec-tokens');
+  if(input) input.value = TRAINING_TOKEN_DEFAULTS[stage] ?? TRAINING_TOKEN_DEFAULTS.sft;
+}
+
 function initRecommend(){
   STATE.vendors = STATE.vendors || [];
   ensureModelList();
@@ -1957,7 +1964,7 @@ function initRecommend(){
       <div class="form-group" id="rec-quantize-bits-grp" style="display:none"><label>量化比特</label><select id="rec-quantize-bits"><option value="int4">INT4</option><option value="int8">INT8</option><option value="fp8">FP8</option></select></div>
       <div class="form-group" id="rec-quant-grp" style="display:none"><label>推理精度</label><select id="rec-quant"><option value="fp16">FP16 (全精度)</option><option value="int8">INT8</option><option value="int4_gptq">INT4 GPTQ</option><option value="int4_awq">INT4 AWQ</option><option value="gguf_q4">GGUF Q4</option><option value="gguf_q8">GGUF Q8</option></select></div>
       <div class="form-group"><label>期望训练天数</label><input type="number" id="rec-days" placeholder="3" min="0.1" step="0.5"></div>
-      <div class="form-group"><label>训练数据量 (T tokens)</label><input type="number" id="rec-tokens" placeholder="自动推算" min="0.1" max="1000" step="0.5"></div>
+      <div class="form-group"><label>训练数据量 (T tokens)</label><input type="number" id="rec-tokens" value="0.2" min="0.01" max="1000" step="0.1" title="默认值：CPT 10T，SFT/RL 0.2T（200M）；可手动修改"></div>
       <div class="form-group" id="rec-input-len-grp" style="display:none" title="单个请求的 Prompt 长度；将与最大输出长度相加计算峰值 KV Cache"><label>输入长度 / Prompt (tokens)</label><select id="rec-input-len"><option value="512">512</option><option value="1024">1024 (1K)</option><option value="2048">2048 (2K)</option><option value="4096" selected>4096 (4K)</option><option value="8192">8192 (8K)</option><option value="16384">16384 (16K)</option><option value="32768">32768 (32K)</option><option value="65536">65536 (64K)</option><option value="131072">131072 (128K)</option><option value="262144">262144 (256K)</option><option value="524288">524288 (512K)</option><option value="1048576">1048576 (1M)</option></select></div>
       <div class="form-group" id="rec-output-len-grp" style="display:none" title="单个请求允许生成的最大 token 数；输出 token 同样占用 KV Cache"><label>最大输出长度 (tokens)</label><select id="rec-output-len"><option value="128">128</option><option value="256">256</option><option value="512" selected>512</option><option value="1024">1024 (1K)</option><option value="2048">2048 (2K)</option><option value="4096">4096 (4K)</option><option value="8192">8192 (8K)</option><option value="16384">16384 (16K)</option><option value="32768">32768 (32K)</option><option value="65536">65536 (64K)</option><option value="131072">131072 (128K)</option><option value="262144">262144 (256K)</option></select></div>
       <div class="form-group" id="rec-concurrency-grp" style="display:none" title="同时在途的请求数量，用于计算目标并发部署卡数"><label>目标并发请求数</label><select id="rec-concurrency"><option value="1">1</option><option value="10">10</option><option value="100">100</option><option value="500">500</option><option value="1000">1000</option><option value="5000">5000</option></select></div>
@@ -2000,6 +2007,7 @@ function initRecommend(){
     const g = $('rec-method-grp');
     if(this.value === 'sft'){ g.style.display=''; }
     else { g.style.display='none'; $('rec-method').value='full_param'; }
+    applyTrainingTokenDefault(this.value);
   });
 }
 

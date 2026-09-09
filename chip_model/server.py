@@ -83,6 +83,13 @@ from chip_model.scoring import (  # v4.2 scoring engine
     DIMENSION_META,
 )
 
+
+TRAINING_TOKENS_DEFAULT_T = {
+    "cpt": 10.0,
+    "sft": 0.2,
+    "rl": 0.2,
+}
+
 # ── Lifespan ────────────────────────────────────────────────────
 
 @asynccontextmanager
@@ -242,7 +249,11 @@ def api_chip_recommend(
     quant: Optional[str] = Query("fp16", description="[inference] fp16 | int8 | int4_gptq | int4_awq | gguf_q4 | gguf_q8"),
     quantize_bits: Optional[str] = Query("int4", description="[quantize] int8 | int4 | fp8"),
     training_days: Optional[float] = Query(None, description="Target training days"),
-    training_tokens: Optional[float] = Query(None, description="Training data volume (T tokens), auto-estimated if unset"),
+    training_tokens: Optional[float] = Query(
+        None,
+        gt=0,
+        description="Training data volume (T tokens); defaults: CPT=10T, SFT/RL=0.2T",
+    ),
     sla_tps: Optional[float] = Query(None, description="Target inference throughput (tok/s)"),
     tier: Optional[str] = Query("datacenter", description="datacenter | all"),
     max_cards: Optional[int] = Query(None, description="Hard exclude: max cards"),
@@ -265,7 +276,7 @@ def api_chip_recommend(
     Quantize: choose method (GPTQ/AWQ/bitsandbytes/GGUF) + bits (INT8/INT4/FP8).
     Inference: choose quantization (FP16/INT8/INT4-GPTQ/AWQ/GGUF).
     """
-    stage_val = stage or "sft"
+    stage_val = (stage or "sft").lower()
     method_val = method or "full_param"
     quant_val = quant or "fp16"
     quantize_bits_val = quantize_bits or "int4"
@@ -324,7 +335,11 @@ def api_chip_recommend(
     vram_formula = full_vram_formula
 
     if scenario == "train":
-        training_tokens_val = training_tokens if training_tokens else max(0.1, min(100.0, total_params * 10.0))
+        training_tokens_val = (
+            training_tokens
+            if training_tokens is not None
+            else TRAINING_TOKENS_DEFAULT_T.get(stage_val, TRAINING_TOKENS_DEFAULT_T["sft"])
+        )
         # Dense models execute all parameters per token. MoE models keep all
         # expert weights resident in VRAM, but only the routed/active parameter
         # subset contributes to per-token training compute.
@@ -698,6 +713,7 @@ def api_methodology():
         "version": "4.4.0",
         "description": "AISHPerf 芯片推荐引擎 — 4大类·8子维度 分层评分方法 (v4.4)",
         "card_estimation": {
+            "training_tokens_defaults": "训练数据量默认值：CPT=10T tokens；SFT=0.2T tokens（200M）；RL=0.2T tokens（200M）。用户输入时以输入值为准。",
             "vram_train": "最小: P×12×1.25(权重+优化器) + 激活值(batch×seq×hidden×layers×40B)",
             "vram_train_lora": "LoRA: P×2.5×1.25(冻结基座) + 激活值(batch×seq×hidden×layers×40B)",
             "vram_train_tiers": "训练仅两档：最小部署=显存下限；理想部署=max(最小部署, 按FLOPs/MFU/目标天数反推的卡数)",
