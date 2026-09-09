@@ -131,11 +131,12 @@
 按「期望训练天数」反推需要多少卡：
 
 ```
-总 FLOPs   = 6 × P × 训练数据量（tokens）
+总 FLOPs   = 6 × P_compute × 训练数据量（tokens）
 单卡每天算力 = FP16_TFLOPS × 10¹² × MFU × 86400
 理想卡数   = ceil(总FLOPs / (单卡每天算力 × 训练天数)) → 取 2 幂次方
 ```
 
+- 稠密模型的 `P_compute` 使用总参数量；MoE 使用每 token 激活参数量。MoE 常驻权重显存仍按总参数量计算，两种口径不能混用。
 - **MFU**（算力利用率）：优先用 `chip_model_benchmarks` 的实测 MFU，没有则默认 **0.30**
 - 若按性能反推的卡数 < 最小部署卡数，强制取最小部署卡数（单调约束）
 
@@ -292,7 +293,7 @@ mindmap
 │  ├─ 推荐芯片：候选筛选(≥8G+训练型+datacenter) → 8维评分 → 总分排序
 │  └─ 卡数两档
 │     ├─ 最小 = (P×12×1.25 + batch×seq×hidden×layers×40B) / 单卡 → pow2
-│     └─ 理想 = max(最小, 6×P×tokens / (TFLOPS×MFU×86400×天数)) → pow2
+│     └─ 理想 = max(最小, 6×P_compute×tokens / (TFLOPS×10¹²×MFU×86400×天数)) → pow2
 │
 ├─ 推理场景
 │  ├─ 输入：模型·精度(FP16/INT8/INT4)·输入长度·最大输出长度·目标并发

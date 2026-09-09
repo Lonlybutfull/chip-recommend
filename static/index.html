@@ -528,6 +528,63 @@ html.embed-mode main{padding-top:12px}
 }
 .stat-card .num{font-size:1.8rem;font-weight:700;color:var(--accent)}
 .stat-card .lbl{font-size:0.75rem;color:var(--text2);margin-top:3px}
+.status-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:24px 0 12px}
+.status-section-title h2{font-size:1.05rem}
+.source-update-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.source-update-pill{background:var(--bg2);border:var(--border);border-radius:999px;padding:6px 12px;font-size:0.75rem;color:var(--text2)}
+.source-run-card{background:var(--bg2);border:var(--border);border-radius:var(--radius);padding:15px 16px;margin-bottom:12px;box-shadow:var(--shadow)}
+.source-run-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:11px}
+.source-run-title{font-size:0.88rem;font-weight:700;color:var(--text)}
+.source-run-status{border-radius:999px;padding:4px 10px;font-size:0.72rem;font-weight:700;background:rgba(59,130,246,0.1);color:var(--accent)}
+.source-run-status.success{background:rgba(16,185,129,0.11);color:var(--green)}
+.source-run-status.partial{background:rgba(245,158,11,0.12);color:var(--orange)}
+.source-run-status.failed{background:rgba(239,68,68,0.1);color:var(--red)}
+.source-run-stats{display:grid;grid-template-columns:repeat(5,minmax(92px,1fr));gap:8px}
+.source-run-stat{background:var(--bg3);border-radius:var(--radius-sm);padding:9px 10px}
+.source-run-stat b{display:block;font-size:1rem;color:var(--text);margin-bottom:2px}
+.source-run-stat span{font-size:0.7rem;color:var(--text3)}
+.source-run-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:10px}
+.source-run-meta-item{background:var(--bg3);border-radius:var(--radius-sm);padding:8px 10px}
+.source-run-meta-item span{display:block;font-size:0.68rem;color:var(--text3);margin-bottom:3px}
+.source-run-meta-item b{display:block;font-size:0.75rem;color:var(--text);font-weight:600;line-height:1.45}
+.source-business-card{background:linear-gradient(135deg,rgba(59,130,246,0.06),var(--bg2));border:1px solid rgba(59,130,246,0.18);border-radius:var(--radius);padding:15px 16px;margin-bottom:12px}
+.source-business-title{font-size:0.88rem;font-weight:700;color:var(--text);margin-bottom:10px}
+.source-business-flow{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:0.72rem;color:var(--text3);margin-bottom:11px}
+.source-business-step{background:var(--bg3);border:var(--border);border-radius:999px;padding:5px 9px}
+.source-business-step.active{color:var(--accent);border-color:rgba(59,130,246,0.35);background:rgba(59,130,246,0.08)}
+.source-business-impact{font-size:0.78rem;color:var(--text2);line-height:1.65}
+.source-business-impact b{color:var(--text)}
+.source-run-details{background:var(--bg2);border:var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+.source-run-details summary{cursor:pointer;padding:12px 16px;font-size:0.8rem;font-weight:700;color:var(--text);list-style:none}
+.source-run-details summary::-webkit-details-marker{display:none}
+.source-run-details summary:before{content:'▶';display:inline-block;color:var(--accent);font-size:0.68rem;margin-right:8px;transition:transform .15s ease}
+.source-run-details[open] summary:before{transform:rotate(90deg)}
+.source-run-source-list{border-top:var(--border)}
+.source-run-source{display:grid;grid-template-columns:minmax(180px,1.6fr) minmax(120px,.8fr) 100px minmax(180px,1fr);gap:10px;align-items:center;padding:10px 16px;border-bottom:var(--border);font-size:0.73rem}
+.source-run-source:last-child{border-bottom:none}
+.source-run-source-name{font-weight:600;color:var(--text);word-break:break-word}
+.source-run-source-sub{font-size:0.68rem;color:var(--text3);margin-top:2px}
+.source-source-status{display:inline-flex;width:max-content;border-radius:999px;padding:3px 8px;font-weight:700;background:rgba(16,185,129,0.1);color:var(--green)}
+.source-source-status.failed,.source-source-status.retry_wait,.source-source-status.unsupported{background:rgba(239,68,68,0.09);color:var(--red)}
+.source-source-fields{display:flex;gap:4px;flex-wrap:wrap;color:var(--text3)}
+.source-source-field{border-radius:999px;background:rgba(139,92,246,0.08);color:var(--purple);padding:3px 7px}
+.source-update-list{display:grid;gap:10px}
+.source-update-card{background:var(--bg2);border:var(--border);border-radius:var(--radius);padding:15px 16px;box-shadow:var(--shadow)}
+.source-update-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+.source-update-title{font-size:0.9rem;font-weight:700;color:var(--text)}
+.source-update-meta{font-size:0.72rem;color:var(--text3);margin-top:3px;word-break:break-all}
+.source-update-summary-text{font-size:0.8rem;color:var(--text2);line-height:1.65;margin:10px 0}
+.source-update-fields{display:flex;gap:6px;flex-wrap:wrap}
+.source-update-field{font-size:0.7rem;color:var(--purple);background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:999px;padding:3px 9px}
+.source-diff{margin-top:12px;border:var(--border);border-radius:var(--radius-sm);overflow:auto;max-height:460px;background:#111827;color:#d1d5db;font:0.75rem/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}
+.source-diff-line{display:block;white-space:pre-wrap;padding:0 12px;min-height:1.55em}
+.source-diff-line.add{background:rgba(16,185,129,0.16);color:#a7f3d0}
+.source-diff-line.del{background:rgba(239,68,68,0.16);color:#fecaca}
+.source-diff-line.hunk{color:#93c5fd;background:rgba(59,130,246,0.12)}
+.source-update-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.source-update-actions .btn,.status-section-title .btn{background:var(--accent);color:#fff;border:1px solid var(--accent);border-radius:var(--radius-sm);padding:7px 12px;font-size:0.75rem;font-weight:600;cursor:pointer;line-height:1.2}
+.source-update-actions .btn.secondary,.status-section-title .btn.secondary{background:var(--bg2);color:var(--accent)}
+.source-update-actions .btn:hover,.status-section-title .btn:hover{filter:brightness(0.97)}
 
 /* ── Loading & Empty ── */
 .loading{text-align:center;padding:36px;color:var(--text3)}
@@ -558,6 +615,9 @@ html.embed-mode main{padding-top:12px}
   .filters input{min-width:100%}
   .recommend-form{grid-template-columns:1fr}
   .detail-panel{margin:8px 0}
+  .source-run-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .source-run-meta{grid-template-columns:1fr}
+  .source-run-source{grid-template-columns:1fr;gap:5px}
 }
 /* ═══════════ Methodology & VRAM Tab Styling ═══════════ */
 /* ── Hero ── */
@@ -941,8 +1001,19 @@ html.embed-mode main{padding-top:12px}
 
 <!-- ═══ STATUS ═══ -->
 <section id="tab-status" class="tab-panel">
+  <div class="status-section-title" style="margin-top:0"><h2>📊 系统状态</h2></div>
   <div class="status-grid" id="status-cards"></div>
-  <div id="status-loading" class="loading"></div>
+  <div id="status-loading" class="loading"><div class="spinner"></div></div>
+  <div class="status-section-title">
+    <div><h2>🔄 数据更新</h2><div style="font-size:0.74rem;color:var(--text3);margin-top:2px">来源网页变化记录，仅供人工核对，不会自动修改正式数据</div></div>
+    <button class="btn secondary" onclick="loadSourceUpdates()">刷新记录</button>
+  </div>
+  <div id="source-update-last-run"></div>
+  <div id="source-update-business-link"></div>
+  <div id="source-update-run-sources"></div>
+  <div id="source-update-summary" class="source-update-summary"></div>
+  <div id="source-updates-loading" class="loading" style="display:none"><div class="spinner"></div></div>
+  <div id="source-updates-list" class="source-update-list"></div>
 </section>
 </main>
 
@@ -1351,7 +1422,7 @@ const TABS = [
   {id:'methodology',label:'📖 算法设计细则',action:()=>loadMethodology()},
   {id:'vram-logic',label:'🧠 显存计算逻辑',action:()=>loadVramLogic()},
   {id:'compat',label:'🔗 兼容性',action:()=>searchCompatInit()},
-  {id:'status',label:'📊 系统状态',action:()=>loadStatus()},
+  {id:'status',label:'📊 系统状态 & 数据更新',action:()=>loadStatus()},
 ];
 
 const TAB_PATHS = {
@@ -2512,6 +2583,9 @@ function renderCalcBreakdown(req, rec, chip, scoring){
   if(req.scenario==='train'){
     inputs.push(`训练阶段 ${(req.stage||'').toUpperCase()}`);
     inputs.push(`方式 ${req.method==='full_param'?'全参':req.method}`);
+    if(req.training_tokens_T!=null) inputs.push(`训练数据量 ${req.training_tokens_T}T tokens`);
+    if(req.target_training_days!=null) inputs.push(`目标 ${req.target_training_days} 天`);
+    if(mcalc.compute_params_b!=null) inputs.push(`算力口径 ${mcalc.compute_params_b}B（${mcalc.compute_parameter_basis==='active'?'每token激活参数':'总参数'}）`);
     inputs.push(`Batch ${req.batch_size||1}`);
     inputs.push(`样本长度 ${req.seq_len||'?'} tokens`);
   }else if(req.scenario==='inference'){
@@ -3013,7 +3087,7 @@ async function loadStatus(){
   show(loading);
   const data = await fetchJSON(`${API}/db/status`);
   hide(loading);
-  if(data._error){cards.innerHTML=`<div class="error">${esc(data._error)}</div>`;return}
+  if(data._error){cards.innerHTML=`<div class="error">${esc(data._error)}</div>`;await loadSourceUpdates();return}
 
   const tables = data.tables||{};
   // Also get provenance stats
@@ -3042,6 +3116,172 @@ async function loadStatus(){
       ${provExtra}
     </div>
   `;
+  await loadSourceUpdates();
+}
+
+function formatUpdateTime(value){
+  if(!value)return '暂无';
+  const date=new Date(value);
+  return Number.isNaN(date.getTime())?String(value):date.toLocaleString('zh-CN',{hour12:false});
+}
+
+function formatRunDuration(value){
+  const ms=Number(value);
+  if(!Number.isFinite(ms)||ms<0)return '—';
+  if(ms<1000)return Math.round(ms)+' 毫秒';
+  if(ms<60000)return (ms/1000).toFixed(1)+' 秒';
+  return Math.floor(ms/60000)+' 分 '+Math.round((ms%60000)/1000)+' 秒';
+}
+
+function renderLatestSourceRun(run){
+  if(!run)return '<div class="source-run-card"><div class="empty" style="padding:12px">暂无执行记录</div></div>';
+  const counts=run.counts||{};
+  const selected=Number(counts.selected||0);
+  const succeeded=Number(counts.new||0)+Number(counts.changed||0)+Number(counts.unchanged||0);
+  const failed=Number(counts.failed||0)+Number(counts.retry_wait||0)+Number(counts.unsupported||0);
+  const changed=Number(counts.changed||0);
+  const labels={success:'执行成功',partial:'部分成功',failed:'执行失败',running:'执行中'};
+  const status=String(run.status||'unknown');
+  return '<div class="source-run-card">'+
+    '<div class="source-run-head"><div class="source-run-title">最近一次执行 <span style="font-weight:400;color:var(--text3)">#'+Number(run.id||0)+'</span></div>'+
+    '<span class="source-run-status '+esc(status)+'">'+esc(labels[status]||status)+'</span></div>'+
+    '<div class="source-run-stats">'+
+      '<div class="source-run-stat"><b>'+selected+'</b><span>计划检查</span></div>'+
+      '<div class="source-run-stat"><b style="color:var(--green)">'+succeeded+'</b><span>检查成功</span></div>'+
+      '<div class="source-run-stat"><b style="color:'+(failed?'var(--red)':'var(--text)')+'">'+failed+'</b><span>检查失败</span></div>'+
+      '<div class="source-run-stat"><b>'+changed+'</b><span>发现变化</span></div>'+
+      '<div class="source-run-stat"><b>'+esc(formatRunDuration(run.duration_ms))+'</b><span>运行耗时</span></div>'+
+    '</div><div class="source-run-meta">'+
+      '<div class="source-run-meta-item"><span>抓取开始时间</span><b>'+esc(formatUpdateTime(run.started_at))+'</b></div>'+
+      '<div class="source-run-meta-item"><span>抓取结束时间</span><b>'+esc(formatUpdateTime(run.finished_at))+'</b></div>'+
+      '<div class="source-run-meta-item"><span>运行模式</span><b>'+(run.mode==='apply-state'?'正式巡检并保存记录':esc(run.mode||'未知'))+'</b></div>'+
+      '<div class="source-run-meta-item"><span>当前自动调度</span><b>Hermes 心跳 · 每天北京时间 02:00</b></div>'+
+      '<div class="source-run-meta-item"><span>Hermes 状态</span><b>Gateway 与数据巡检 Skill 已启用</b></div>'+
+    '</div>'+
+    (run.error_summary?'<div class="error" style="margin:10px 0 0">'+esc(run.error_summary)+'</div>':'')+'</div>';
+}
+
+function renderSourceBusinessLink(run){
+  if(!run)return '';
+  const counts=run.counts||{};
+  const changed=Number(counts.changed||0);
+  const fresh=Number(counts.new||0);
+  const unchanged=Number(counts.unchanged||0);
+  const failed=Number(counts.failed||0)+Number(counts.retry_wait||0)+Number(counts.unsupported||0);
+  const sources=run.sources||[];
+  const vendors=[...new Set(sources.map(item=>item.vendor).filter(Boolean))];
+  const fields=[];
+  sources.forEach(item=>(item.candidate_fields||[]).forEach(field=>{
+    const label=field.label||field.field;
+    if(label&&fields.indexOf(label)<0)fields.push(label);
+  }));
+  const scope=vendors.length?vendors.slice(0,6).join('、')+(vendors.length>6?' 等 '+vendors.length+' 个厂商':''):'当前配置的官方来源';
+  let impact='本轮覆盖 <b>'+esc(scope)+'</b>。';
+  if(changed){
+    impact+='发现 <b>'+changed+' 条网页变化</b>，'+(fields.length?'可能涉及 <b>'+esc(fields.join('、'))+'</b>；':'尚未识别出明确字段；')+'目前处于人工审核阶段，尚未写入芯片或模型业务表。';
+  }else{
+    impact+='其中 <b>'+fresh+' 个建立新基线</b>、<b>'+unchanged+' 个内容未变化</b>'+(failed?'、<b>'+failed+' 个抓取失败</b>':'')+'；因此本轮没有修改芯片参数、模型数据、评分或推荐结果。';
+  }
+  return '<div class="source-business-card"><div class="source-business-title">🔗 这次检查与项目的联系</div>'+
+    '<div class="source-business-flow"><span class="source-business-step active">① 厂商官网巡检</span><span>→</span>'+
+    '<span class="source-business-step '+(changed?'active':'')+'">② 识别字段变化</span><span>→</span>'+
+    '<span class="source-business-step">③ 人工审核</span><span>→</span><span class="source-business-step">④ 写入字段溯源</span><span>→</span>'+
+    '<span class="source-business-step">⑤ 搜索与推荐使用新数据</span></div><div class="source-business-impact">'+impact+'</div></div>';
+}
+
+function renderLatestRunSources(run){
+  const sources=run&&run.sources||[];
+  if(!sources.length)return '';
+  const labels={new:'新建基线',changed:'发现变化',unchanged:'无变化',failed:'抓取失败',retry_wait:'等待重试',unsupported:'暂不支持',not_due:'未到时间'};
+  return '<details class="source-run-details"><summary>本轮来源明细（'+sources.length+'）</summary><div class="source-run-source-list">'+sources.map(item=>{
+    const name=item.description||item.vendor||('来源 #'+item.link_id);
+    const fields=(item.candidate_fields||[]).map(field=>field.label||field.field).filter(Boolean);
+    const error=item.error_message||item.error_code||'';
+    return '<div class="source-run-source"><div><div class="source-run-source-name">'+esc(name)+'</div><div class="source-run-source-sub">#'+Number(item.link_id||0)+(item.vendor?' · '+esc(item.vendor):'')+'</div><div class="source-run-source-sub">检查：'+esc(formatUpdateTime(item.checked_at))+' · 耗时 '+esc(formatRunDuration(item.duration_ms))+'</div></div>'+
+      '<div><div>'+esc(item.category||'未分类来源')+'</div><div class="source-run-source-sub">HTTP '+esc(item.http_status==null?'—':item.http_status)+'</div></div>'+
+      '<span class="source-source-status '+esc(item.outcome||'')+'">'+esc(labels[item.outcome]||item.outcome||'未知')+'</span>'+
+      '<div class="source-source-fields">'+(fields.length?fields.map(label=>'<span class="source-source-field">'+esc(label)+'</span>').join(''):(error?'<span title="'+esc(error)+'">'+esc(error)+'</span>':'<span>未发现候选字段</span>'))+'</div></div>';
+  }).join('')+'</div></details>';
+}
+
+function safeExternalUrl(value){
+  try{
+    const url=new URL(value);
+    return url.protocol==='http:'||url.protocol==='https:'?url.href:'';
+  }catch(_){return ''}
+}
+
+function renderSourceDiff(text){
+  if(!text)return '<div class="empty">该记录没有可读取的逐行差异，请根据摘要或快照进行核对。</div>';
+  return '<div class="source-diff">'+String(text).split('\n').map(line=>{
+    let cls='source-diff-line';
+    if(line.startsWith('+')&&!line.startsWith('+++'))cls+=' add';
+    else if(line.startsWith('-')&&!line.startsWith('---'))cls+=' del';
+    else if(line.startsWith('@@'))cls+=' hunk';
+    return '<span class="'+cls+'">'+esc(line||' ')+'</span>';
+  }).join('')+'</div>';
+}
+
+async function toggleSourceUpdate(updateId){
+  const box=$('source-update-detail-'+updateId);
+  if(!box)return;
+  if(box.dataset.loaded==='1'){
+    box.style.display=box.style.display==='none'?'block':'none';
+    return;
+  }
+  box.style.display='block';
+  box.innerHTML='<div class="loading" style="padding:16px"><div class="spinner"></div></div>';
+  const detail=await fetchJSON(`${API}/source-updates/${updateId}`);
+  if(detail._error){box.innerHTML='<div class="error">'+esc(detail._error)+'</div>';return}
+  box.dataset.loaded='1';
+  const sourceUrl=safeExternalUrl(detail.final_url);
+  box.innerHTML=(detail.diff_read_error?'<div class="info">'+esc(detail.diff_read_error)+'</div>':'')+
+    renderSourceDiff(detail.diff_text)+
+    '<div class="source-update-actions">'+
+      (sourceUrl?'<a class="btn secondary" href="'+esc(sourceUrl)+'" target="_blank" rel="noopener noreferrer">打开来源网页 ↗</a>':'')+
+      '<span style="font-size:0.7rem;color:var(--text3)">候选字段需人工核对后，才能进入正式数据。</span>'+
+    '</div>';
+}
+
+async function loadSourceUpdates(){
+  const loading=$('source-updates-loading'), list=$('source-updates-list'), summary=$('source-update-summary'), lastRun=$('source-update-last-run'), businessLink=$('source-update-business-link'), runSources=$('source-update-run-sources');
+  show(loading);list.innerHTML='';summary.innerHTML='';lastRun.innerHTML='';businessLink.innerHTML='';runSources.innerHTML='';
+  const data=await fetchJSON(`${API}/source-updates?limit=30`);
+  hide(loading);
+  if(data._error){list.innerHTML='<div class="error">'+esc(data._error)+'</div>';return}
+  if(!data.available){
+    lastRun.innerHTML=renderLatestSourceRun(null);
+    summary.innerHTML='<span class="source-update-pill">尚未启用来源巡检</span>';
+    list.innerHTML='<div class="empty">运行首次来源巡检后，这里会展示页面变化记录。</div>';
+    return;
+  }
+  lastRun.innerHTML=renderLatestSourceRun(data.latest_run);
+  businessLink.innerHTML=renderSourceBusinessLink(data.latest_run);
+  runSources.innerHTML=renderLatestRunSources(data.latest_run);
+  summary.innerHTML='<span class="source-update-pill"><b>'+Number(data.count||0)+'</b> 条变化记录</span>'+
+    '<span class="source-update-pill">最近变化：'+esc(formatUpdateTime(data.latest_at))+'</span>';
+  if(!data.updates||!data.updates.length){
+    list.innerHTML='<div class="empty">已经启用巡检，目前还没有检测到正文变化。</div>';
+    return;
+  }
+  list.innerHTML=data.updates.map(item=>{
+    const fields=[];
+    (item.candidate_fields||[]).forEach(field=>{
+      const label=field.label||field.field;
+      if(label&&fields.indexOf(label)<0)fields.push(label);
+    });
+    const title=item.description||item.vendor||('来源 #'+item.link_id);
+    const url=item.final_url||item.requested_url||'';
+    return '<article class="source-update-card">'+
+      '<div class="source-update-head"><div><div class="source-update-title">'+esc(title)+'</div>'+
+      '<div class="source-update-meta">#'+esc(item.link_id)+' · '+esc(formatUpdateTime(item.created_at))+(url?' · '+esc(url):'')+'</div></div>'+
+      '<div style="white-space:nowrap;font-size:0.75rem"><span style="color:var(--green)">+'+Number(item.added_lines||0)+'</span> / <span style="color:var(--red)">-'+Number(item.removed_lines||0)+'</span></div></div>'+
+      '<div class="source-update-summary-text">'+esc(item.diff_summary||'检测到正文哈希变化')+'</div>'+
+      (fields.length?'<div class="source-update-fields"><span style="font-size:0.7rem;color:var(--text3);padding:3px 0">可能涉及：</span>'+fields.map(label=>'<span class="source-update-field">'+esc(label)+'</span>').join('')+'</div>':'')+
+      '<div class="source-update-actions"><button class="btn secondary" onclick="toggleSourceUpdate('+Number(item.id)+')">查看新旧差异</button>'+
+      (item.truncated?'<span style="font-size:0.7rem;color:var(--orange)">差异较长，当前内容已截断</span>':'')+'</div>'+
+      '<div id="source-update-detail-'+Number(item.id)+'" style="display:none"></div></article>';
+  }).join('');
 }
 
 /* ═══════════════════ INIT ═══════════════════ */

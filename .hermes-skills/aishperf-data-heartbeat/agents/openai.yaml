@@ -1,0 +1,8 @@
+interface:
+  display_name: "AISHPerf 数据更新心跳"
+  short_description: "汇总官网变化、连续失败及其对芯片推荐数据的影响"
+  default_prompt: "Use $aishperf-data-heartbeat to summarize the injected source_refresh heartbeat result in Chinese."
+
+policy:
+  allow_implicit_invocation: true
+

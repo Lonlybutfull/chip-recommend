@@ -302,3 +302,104 @@ CREATE TABLE IF NOT EXISTS deployment_guides (
 CREATE INDEX IF NOT EXISTS idx_deploy_chip ON deployment_guides(chip_model);
 CREATE INDEX IF NOT EXISTS idx_deploy_model ON deployment_guides(model_id);
 CREATE INDEX IF NOT EXISTS idx_deploy_backend ON deployment_guides(backend);
+
+-- ============================================================
+-- 8. 来源增量复查控制面（不属于业务事实，不写 field_provenance）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS update_runs (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_type           TEXT,
+    mode               TEXT,
+    status             TEXT,
+    requested_link_ids TEXT,
+    started_at         TEXT,
+    finished_at        TEXT,
+    counts_json        TEXT,
+    error_summary      TEXT,
+    created_at         TEXT
+);
+
+-- 同一种任务同一时间只允许一个运行实例。
+CREATE UNIQUE INDEX IF NOT EXISTS idx_update_runs_one_running
+ON update_runs(run_type) WHERE status = 'running';
+
+CREATE INDEX IF NOT EXISTS idx_update_runs_started
+ON update_runs(started_at);
+
+CREATE TABLE IF NOT EXISTS source_monitor_state (
+    link_id              INTEGER PRIMARY KEY,
+    etag                 TEXT,
+    last_modified        TEXT,
+    raw_hash             TEXT,
+    content_hash         TEXT,
+    last_checked_at      TEXT,
+    next_check_at        TEXT,
+    failure_count        INTEGER DEFAULT 0,
+    last_http_status     INTEGER,
+    last_error_code      TEXT,
+    last_error_message   TEXT,
+    last_run_id          INTEGER,
+    updated_at           TEXT,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE CASCADE,
+    FOREIGN KEY(last_run_id) REFERENCES update_runs(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_monitor_due
+ON source_monitor_state(next_check_at);
+
+CREATE TABLE IF NOT EXISTS source_checks (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id                INTEGER,
+    link_id               INTEGER,
+    requested_url         TEXT,
+    final_url             TEXT,
+    outcome               TEXT,
+    http_status           INTEGER,
+    attempt_count         INTEGER,
+    previous_raw_hash     TEXT,
+    raw_hash              TEXT,
+    previous_content_hash TEXT,
+    content_hash          TEXT,
+    etag                  TEXT,
+    last_modified         TEXT,
+    content_type          TEXT,
+    response_bytes        INTEGER,
+    snapshot_path         TEXT,
+    error_code            TEXT,
+    error_message         TEXT,
+    checked_at            TEXT,
+    duration_ms           INTEGER,
+    FOREIGN KEY(run_id) REFERENCES update_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE CASCADE,
+    UNIQUE(run_id, link_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_checks_link_time
+ON source_checks(link_id, checked_at);
+
+CREATE INDEX IF NOT EXISTS idx_source_checks_outcome
+ON source_checks(outcome);
+
+-- 可读正文差异与候选字段仅供人工复核，不属于正式业务数据。
+CREATE TABLE IF NOT EXISTS source_diffs (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_check_id       INTEGER,
+    run_id                INTEGER,
+    link_id               INTEGER,
+    previous_content_hash TEXT,
+    content_hash          TEXT,
+    added_lines           INTEGER DEFAULT 0,
+    removed_lines         INTEGER DEFAULT 0,
+    truncated             INTEGER DEFAULT 0,
+    diff_summary          TEXT,
+    diff_path             TEXT,
+    candidate_fields_json TEXT,
+    created_at            TEXT,
+    FOREIGN KEY(source_check_id) REFERENCES source_checks(id) ON DELETE CASCADE,
+    FOREIGN KEY(run_id) REFERENCES update_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE CASCADE,
+    UNIQUE(run_id, link_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_diffs_link_time
+ON source_diffs(link_id, created_at);

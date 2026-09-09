@@ -116,6 +116,7 @@ def get_db(db_path: str | Path | None = None, readonly: bool = False):
 
     conn = sqlite3.connect(uri if readonly else path, uri=readonly)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=5000")
     if not readonly:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
