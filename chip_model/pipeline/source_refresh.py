@@ -12,6 +12,7 @@ import ipaddress
 import json
 import os
 import re
+import socket
 import sqlite3
 import tempfile
 import time
@@ -71,6 +72,16 @@ CANDIDATE_FIELD_RULES = (
     ),
     ("architecture", "芯片架构", ("architecture", "架构")),
     ("compute_units", "计算单元", ("compute unit", "cuda core", "tensor core", "计算单元")),
+    ("price_usd", "美元价格", ("price", "usd", "$", "售价", "价格")),
+    ("price_cny_wan", "人民币价格", ("人民币", "万元", "¥", "￥", "价格")),
+    ("software_stack", "软件栈", ("software stack", "sdk", "cuda", "rocm", "软件栈")),
+    ("compatible_frameworks", "兼容框架", ("pytorch", "tensorflow", "jax", "mindspore", "框架")),
+    ("total_params_b", "模型参数量", ("parameters", "params", "参数量", "active parameters")),
+    ("downloads", "模型下载量", ("downloads", "下载量")),
+    ("likes", "模型收藏量", ("likes", "收藏")),
+    ("benchmark", "实测结果", ("mlperf", "benchmark", "throughput", "latency", "mfu", "吞吐", "时延")),
+    ("compatibility", "兼容适配", ("compatible", "supported", "validated", "兼容", "适配", "验证")),
+    ("deployment", "部署信息", ("deployment", "vllm", "sglang", "tensorrt", "部署", "推理引擎")),
 )
 
 
@@ -138,6 +149,7 @@ class CheckResult:
     diff_removed_lines: int = 0
     diff_truncated: bool = False
     candidate_fields: list[dict[str, str]] = field(default_factory=list)
+    outbound_links: list[str] = field(default_factory=list)
     error_code: str | None = None
     error_message: str | None = None
     duration_ms: int = 0
@@ -189,8 +201,22 @@ def parse_link_ids(value: str | Iterable[int]) -> list[int]:
     return list(dict.fromkeys(items))
 
 
-def validate_source_url(url: str) -> None:
-    """Reject unsafe schemes and obvious local-address targets."""
+def resolve_host_addresses(host: str) -> list[str]:
+    """Resolve every A/AAAA result so fetches can reject non-public targets."""
+    try:
+        answers = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        raise ConfigurationError(f"来源域名无法解析：{host}。") from exc
+    addresses = list(dict.fromkeys(answer[4][0] for answer in answers))
+    if not addresses:
+        raise ConfigurationError(f"来源域名没有可用地址：{host}。")
+    return addresses
+
+
+def validate_source_url(
+    url: str, *, resolver: Callable[[str], Iterable[str]] | None = None
+) -> None:
+    """Reject unsafe schemes and local targets, including DNS results before fetch."""
     parsed = urlparse(url.strip())
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise ConfigurationError(
@@ -204,6 +230,19 @@ def validate_source_url(url: str) -> None:
     try:
         address = ipaddress.ip_address(host)
     except ValueError:
+        if resolver is None:
+            return
+        for raw_address in resolver(host):
+            try:
+                resolved = ipaddress.ip_address(str(raw_address).split("%", 1)[0])
+            except ValueError as exc:
+                raise ConfigurationError(
+                    f"来源域名解析结果无效：{raw_address!r}。"
+                ) from exc
+            if not resolved.is_global:
+                raise ConfigurationError(
+                    "来源域名解析到私有、回环或保留 IP，已拒绝访问。"
+                )
         return
     if not address.is_global:
         raise ConfigurationError("来源 URL 不允许指向私有、回环或保留 IP。")
@@ -261,6 +300,40 @@ def normalize_content(raw: bytes, content_type: str, encoding: str | None) -> st
     if not normalized:
         raise EmptyContent("响应正文在规范化后为空，旧哈希不会被覆盖。")
     return normalized
+
+
+def extract_outbound_links(
+    raw: bytes,
+    content_type: str,
+    encoding: str | None,
+    base_url: str,
+    *,
+    limit: int = 500,
+) -> list[str]:
+    """Extract ordered HTTPS links before HTML normalization removes hrefs."""
+    mime = content_type.split(";", 1)[0].strip().lower()
+    if mime not in {"", "text/html", "application/xhtml+xml"}:
+        return []
+    text = raw.decode(encoding or "utf-8", errors="replace")
+    soup = BeautifulSoup(text, "lxml")
+    links: list[str] = []
+    seen: set[str] = set()
+    for tag in soup.find_all("a", href=True):
+        href = str(tag.get("href") or "").strip()
+        if not href or href.startswith(("#", "mailto:", "tel:", "javascript:", "data:")):
+            continue
+        absolute = urljoin(base_url, href)
+        parsed = urlparse(absolute)
+        if parsed.scheme.lower() != "https" or not parsed.hostname:
+            continue
+        clean = parsed._replace(fragment="").geturl()
+        if clean in seen:
+            continue
+        seen.add(clean)
+        links.append(clean)
+        if len(links) >= max(1, limit):
+            break
+    return links
 
 
 def _read_response_body(response: requests.Response, max_bytes: int) -> bytes:
@@ -350,9 +423,11 @@ def identify_candidate_fields(
     The result is review metadata, not an extracted value and never a business
     table write.
     """
+    # Prefer the new page text.  Automatic publication may only use an
+    # ``added`` candidate as evidence; removed text remains useful for audit.
     evidence_lines = [
-        ("removed", line) for line in removed_lines
-    ] + [("added", line) for line in added_lines]
+        ("added", line) for line in added_lines
+    ] + [("removed", line) for line in removed_lines]
     candidates: list[dict[str, str]] = []
     for field_name, label, keywords in CANDIDATE_FIELD_RULES:
         for change_type, line in evidence_lines:
@@ -444,6 +519,7 @@ class SourceRefresher:
         stale_after_minutes: int = 360,
         sleep_fn: Callable[[float], None] = time.sleep,
         now_fn: Callable[[], datetime] = utc_now,
+        resolver: Callable[[str], Iterable[str]] = resolve_host_addresses,
     ) -> None:
         self.db_path = Path(db_path or get_db_path())
         self.snapshot_dir = Path(snapshot_dir or DEFAULT_SNAPSHOT_DIR)
@@ -458,6 +534,7 @@ class SourceRefresher:
         self.stale_after_minutes = max(1, stale_after_minutes)
         self.sleep_fn = sleep_fn
         self.now_fn = now_fn
+        self.resolver = resolver
 
     def _ensure_schema(self) -> None:
         schema = (get_project_root() / "schema.sql").read_text(encoding="utf-8")
@@ -513,6 +590,36 @@ class SourceRefresher:
             raise SourceRefreshError(
                 f"无法取得 SQLite 单写入锁：{exc}。请稍后重试。"
             ) from exc
+
+    def _record_event(
+        self,
+        run_id: int,
+        *,
+        actor: str,
+        stage: str,
+        status: str,
+        message: str,
+        link_id: int | None = None,
+        details: dict | None = None,
+    ) -> None:
+        """Append one human-readable process event without mutating business data."""
+        with get_db(self.db_path) as db:
+            db.execute(
+                "INSERT INTO update_run_events "
+                "(run_id, link_id, actor, stage, status, message, details_json, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    run_id,
+                    link_id,
+                    actor,
+                    stage,
+                    status,
+                    message,
+                    json.dumps(details or {}, ensure_ascii=False, separators=(",", ":")),
+                    iso_utc(self.now_fn()),
+                ),
+            )
+            db.commit()
 
     def _load_state(self, link_id: int) -> dict:
         with get_db(self.db_path, readonly=True) as db:
@@ -677,7 +784,7 @@ class SourceRefresher:
         current_url = url
         redirect_statuses = {301, 302, 303, 307, 308}
         for redirect_count in range(self.max_redirects + 1):
-            validate_source_url(current_url)
+            validate_source_url(current_url, resolver=self.resolver)
             response = self.session.get(
                 current_url,
                 headers=headers,
@@ -688,7 +795,9 @@ class SourceRefresher:
             )
             if int(response.status_code) not in redirect_statuses:
                 try:
-                    validate_source_url(str(response.url or current_url))
+                    validate_source_url(
+                        str(response.url or current_url), resolver=self.resolver
+                    )
                 except ConfigurationError:
                     response.close()
                     raise
@@ -705,7 +814,7 @@ class SourceRefresher:
 
             next_url = urljoin(str(response.url or current_url), location)
             try:
-                validate_source_url(next_url)
+                validate_source_url(next_url, resolver=self.resolver)
             except ConfigurationError:
                 response.close()
                 raise
@@ -811,6 +920,9 @@ class SourceRefresher:
                 raw_hash = hashlib.sha256(raw).hexdigest()
                 encoding = _detect_encoding(raw, response.encoding)
                 normalized = normalize_content(raw, content_type, encoding)
+                outbound_links = extract_outbound_links(
+                    raw, content_type, encoding, str(response.url)
+                )
                 content_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
                 previous_content_hash = state.get("content_hash")
                 if not previous_content_hash:
@@ -881,6 +993,7 @@ class SourceRefresher:
                     diff_removed_lines=diff_removed_lines,
                     diff_truncated=diff_truncated,
                     candidate_fields=candidate_fields,
+                    outbound_links=outbound_links,
                     checked_at=checked_at,
                     duration_ms=int((time.perf_counter() - started_perf) * 1000),
                 )
@@ -1180,12 +1293,50 @@ class SourceRefresher:
             )
 
         run_id = self._start_run(ids, started)
+        self._record_event(
+            run_id,
+            actor="orchestrator",
+            stage="run_started",
+            status="started",
+            message=f"来源巡检开始，共选择 {len(sources)} 个来源。",
+            details={"link_ids": ids, "selected": len(sources), "force": force},
+        )
+        self._record_event(
+            run_id,
+            actor="scheduler",
+            stage="source_selection",
+            status="success",
+            message="已完成来源选择与 URL 安全校验。",
+            details={
+                "sources": [
+                    {
+                        "link_id": int(source["id"]),
+                        "url": source["url"],
+                        "vendor": source.get("vendor") or "",
+                        "category": source.get("category") or "",
+                    }
+                    for source in sources
+                ]
+            },
+        )
         results: list[CheckResult] = []
         fatal_error = ""
         try:
             for source in sources:
                 state = self._load_state(int(source["id"]))
                 if not force and not self._is_due(state, self.now_fn()):
+                    self._record_event(
+                        run_id,
+                        link_id=int(source["id"]),
+                        actor="scheduler",
+                        stage="due_check",
+                        status="skipped",
+                        message="来源尚未到下次检查时间，本轮跳过。",
+                        details={
+                            "url": source["url"],
+                            "next_check_at": state.get("next_check_at"),
+                        },
+                    )
                     results.append(
                         CheckResult(
                             link_id=int(source["id"]),
@@ -1203,6 +1354,15 @@ class SourceRefresher:
                         )
                     )
                     continue
+                self._record_event(
+                    run_id,
+                    link_id=int(source["id"]),
+                    actor="fetcher",
+                    stage="fetch",
+                    status="started",
+                    message="开始访问来源网页。",
+                    details={"requested_url": source["url"]},
+                )
                 try:
                     result = self._check_source(source, state)
                 except Exception as exc:  # final report boundary; never silently swallow
@@ -1220,6 +1380,76 @@ class SourceRefresher:
                 result.vendor = str(source.get("vendor") or "")
                 result.category = str(source.get("category") or "")
                 self._persist_result(run_id, result, state)
+                fetch_status = (
+                    "success" if result.outcome in SUCCESS_OUTCOMES else "failed"
+                )
+                self._record_event(
+                    run_id,
+                    link_id=result.link_id,
+                    actor="fetcher",
+                    stage="fetch",
+                    status=fetch_status,
+                    message=(
+                        "来源网页访问完成。"
+                        if fetch_status == "success"
+                        else "来源网页访问未成功。"
+                    ),
+                    details={
+                        "requested_url": result.requested_url,
+                        "final_url": result.final_url,
+                        "http_status": result.http_status,
+                        "attempt_count": result.attempt_count,
+                        "response_bytes": result.response_bytes,
+                        "content_type": result.content_type,
+                        "duration_ms": result.duration_ms,
+                        "error_code": result.error_code,
+                        "error_message": result.error_message,
+                    },
+                )
+                if result.outcome in SUCCESS_OUTCOMES:
+                    self._record_event(
+                        run_id,
+                        link_id=result.link_id,
+                        actor="snapshot",
+                        stage="snapshot",
+                        status="success",
+                        message=(
+                            "已保存原始网页与规范化正文快照。"
+                            if result.snapshot_path
+                            else "正文未变化，复用已有内容快照。"
+                        ),
+                        details={
+                            "raw_hash": result.raw_hash,
+                            "content_hash": result.content_hash,
+                            "snapshot_path": result.snapshot_path,
+                            "normalized_snapshot_path": result.normalized_snapshot_path,
+                        },
+                    )
+                    candidate_fields = [
+                        field.get("label") or field.get("field")
+                        for field in result.candidate_fields
+                        if field.get("label") or field.get("field")
+                    ]
+                    self._record_event(
+                        run_id,
+                        link_id=result.link_id,
+                        actor="parser",
+                        stage="change_detection",
+                        status="success",
+                        message={
+                            "new": "首次抓取，已建立内容基线。",
+                            "unchanged": "规范化正文与已有基线一致。",
+                            "changed": f"检测到正文变化，识别出 {len(candidate_fields)} 个候选字段。",
+                        }.get(result.outcome, "正文检查完成。"),
+                        details={
+                            "outcome": result.outcome,
+                            "diff_summary": result.diff_summary,
+                            "added_lines": result.diff_added_lines,
+                            "removed_lines": result.diff_removed_lines,
+                            "candidate_fields": result.candidate_fields,
+                            "diff_path": result.diff_path,
+                        },
+                    )
                 results.append(result)
         except Exception as exc:
             fatal_error = str(exc)
@@ -1247,6 +1477,20 @@ class SourceRefresher:
             business_tables_modified=False,
         )
         self._finish_run(run_id, summary, fatal_error)
+        self._record_event(
+            run_id,
+            actor="orchestrator",
+            stage="run_finished",
+            status=status,
+            message=(
+                "来源巡检完成。" if not fatal_error else "来源巡检异常结束。"
+            ),
+            details={
+                "counts": counts,
+                "duration_ms": summary.duration_ms,
+                "error_summary": fatal_error,
+            },
+        )
         if fatal_error:
             raise SourceRefreshError(
                 f"运行 {run_id} 未完成：{fatal_error}；已完成来源保留，可在修复后重跑。"

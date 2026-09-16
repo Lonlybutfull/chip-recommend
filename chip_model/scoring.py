@@ -797,6 +797,7 @@ class RecommendContext:
     benchmark_count: int = 0
     max_benchmark_mfu: Optional[float] = None
     max_benchmark_tps: Optional[float] = None
+    measured_inference: Optional[dict] = None
     compat_verified_count: int = 0
     official_ratio: float = -1.0       # source credibility: official / total (from field_provenance)
 
@@ -1357,9 +1358,22 @@ def aggregate_score(
     )
 
     # D7: 实测验证度
-    dims["benchmark_evidence"] = score_benchmark_evidence(
-        ctx.benchmark_count, ctx.max_benchmark_mfu, ctx.max_benchmark_tps,
-    )
+    if ctx.measured_inference:
+        measured = ctx.measured_inference
+        dims["benchmark_evidence"] = DimensionResult(
+            score=measured["score"],
+            detail=(
+                f"同模型实测：单卡吞吐 {measured['throughput_per_card']:.2f} tokens/s"
+                f"，TTFT {measured['ttft_ms'] or '缺失'} ms"
+                f"，TPOT {measured['tpot_ms'] or '缺失'} ms"
+                f" → {measured['score']:.0f}/100"
+            ),
+            raw_values={**measured, "missing": False, "source": "chip_model_benchmarks"},
+        )
+    else:
+        dims["benchmark_evidence"] = score_benchmark_evidence(
+            ctx.benchmark_count, ctx.max_benchmark_mfu, ctx.max_benchmark_tps,
+        )
 
     # D8: 来源真实度
     dims["source_credibility"] = score_source_credibility(ctx.official_ratio)

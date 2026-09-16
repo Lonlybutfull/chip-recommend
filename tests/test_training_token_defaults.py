@@ -64,3 +64,22 @@ def test_recommend_form_exposes_stage_defaults():
     assert "Object.freeze({cpt:10, sft:0.2, rl:0.2})" in html
     assert 'id="rec-tokens" value="0.2"' in html
     assert "applyTrainingTokenDefault(this.value)" in html
+
+
+def test_recommend_form_keeps_advanced_training_inputs_hidden():
+    html = client.get("/recommend").text
+    init_block = html[html.index("function initRecommend(){") : html.index("function updateRecForm(){")]
+
+    assert "updateRecForm();" in init_block
+    assert 'id="rec-batch-size" value="1"' in init_block
+    assert 'id="rec-seq-len" value="2048"' in init_block
+    assert html.count("batchGrp.style.display='none'; seqGrp.style.display='none';") == 3
+
+
+def test_direct_recommend_route_refreshes_vendor_options_after_async_load():
+    html = client.get("/recommend").text
+
+    assert "厂商加载中…" in html
+    assert "function refreshRecommendVendorOptions()" in html
+    assert "STATE.vendors = [...new Set(CHIP_LIST.map(c=>c.vendor).filter(Boolean))].sort();" in html
+    assert "ensureChipList().then(refreshRecommendVendorOptions)" in html

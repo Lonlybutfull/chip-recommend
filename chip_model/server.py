@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path as FilePath
 from typing import Annotated, Optional
 
-from fastapi import FastAPI, Query, Path, Body, HTTPException, Response
+from fastapi import FastAPI, Query, Path, Body, HTTPException, Response, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -82,6 +82,19 @@ from chip_model.scoring import (  # v4.2 scoring engine
     scoring_result_to_dict,
     DIMENSION_META,
 )
+from chip_model.pipeline.data_agent import DataAgentOrchestrator, get_data_agent_status
+from chip_model.pipeline.test_workspace import latest_test_db
+from chip_model.pipeline.link_families import (
+    read_chip_families, read_family_selection, save_family_selection,
+)
+from chip_model.pipeline.manual_control import (
+    admin_token_valid, latest_manual_result, list_seed_urls,
+    queue_manual_run, save_seed_url,
+)
+from chip_model.measured_inference import (
+    get_comparable_measurements,
+    score_comparable_measurements,
+)
 
 
 TRAINING_TOKENS_DEFAULT_T = {
@@ -94,11 +107,12 @@ TRAINING_TOKENS_DEFAULT_T = {
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """On startup: set DB path if env var provided."""
+    """Set the persistent DB and apply additive operational migrations."""
     import os
     env_path = os.environ.get("DATA_DB_PATH")
     if env_path:
         set_db_path(env_path)
+    DataAgentOrchestrator(db_path=get_db_path()).ensure_schema()
     yield
 
 
@@ -360,6 +374,8 @@ def api_chip_recommend(
     _, candidates = get_chip_recommend_candidates(
         model, scenario=scenario, tier=tier or "datacenter",
         prefer_domestic=prefer_domestic,
+        measured_model_id=(model_id if scenario == "inference" and
+                           model_id.casefold().endswith("/deepseek-v4-flash") else None),
     )
 
     if not candidates:
@@ -382,6 +398,27 @@ def api_chip_recommend(
         quantize_bits=quantize_bits_val,
     )
 
+    # The workbook's Flash measurements are a model-specific inference
+    # reference.  Do not rank by same-scale/other-model fallback benchmarks.
+    is_flash_inference = (
+        scenario == "inference"
+        and model_id.casefold().endswith("/deepseek-v4-flash")
+    )
+    measured_scores = {}
+    if is_flash_inference:
+        measured_scores = score_comparable_measurements(
+            get_comparable_measurements(
+                model_id, [str(c.get("chip_model") or "") for c in candidates],
+            )
+        )
+        if measured_scores:
+            cat_weights = CategoryWeights(
+                ecosystem_maturity=0.20,
+                benchmark_evidence=0.60,
+                compute_power=0.15,
+                cost_effectiveness=0.05,
+            )
+
     # 6. Scoring loop
     scored: list[dict] = []
 
@@ -395,6 +432,11 @@ def api_chip_recommend(
         bench_records = get_chip_benchmarks_for_model(
             chip_model_name, model_id, total_params,
         )
+        if is_flash_inference:
+            # The fixed reference workload is for ranking, not a guarantee
+            # of TPS at arbitrary user-selected input/output/concurrency.
+            # In particular, never size Flash SLA cards from a fallback model.
+            bench_records = []
 
         # ── Card estimation (inference: 最小=权重+单请求峰值KV / 目标并发) ──
         # Exact ceiling first, then power-of-two topology rounding.  Do not add
@@ -524,6 +566,11 @@ def api_chip_recommend(
         # ── Benchmark data ──
         bench_mfu_val = get_chip_benchmark_mfu(chip_model_name)
         bench_tps_val = get_chip_benchmark_tps(chip_model_name)
+        if is_flash_inference:
+            # An unrelated benchmark or a bare model mention is not a Flash
+            # inference observation; every unmeasured chip gets the same 50.
+            bench_mfu_val = None
+            bench_tps_val = None
         compat_verified = get_chip_model_compat_count(chip_model_name)
         official_ratio = get_chip_source_credibility(chip_model_name)
 
@@ -549,6 +596,7 @@ def api_chip_recommend(
             benchmark_count=len(bench_records),
             max_benchmark_mfu=bench_mfu_val,
             max_benchmark_tps=bench_tps_val,
+            measured_inference=measured_scores.get(chip_model_name),
             compat_verified_count=compat_verified,
             official_ratio=official_ratio,
         )
@@ -587,12 +635,17 @@ def api_chip_recommend(
             },
             "score": scoring_result.total_score,
             "scoring": scoring_result_to_dict(scoring_result),
+            "measured_inference": measured_scores.get(chip_model_name),
         })
 
     if not scored:
         raise HTTPException(404, "所有候选芯片均被硬约束排除，请放宽最大卡数或最高单价限制")
 
-    scored.sort(key=lambda x: x["score"], reverse=True)
+    scored.sort(
+        key=lambda x: (bool(x["measured_inference"]), x["score"])
+        if measured_scores else x["score"],
+        reverse=True,
+    )
     top = scored[:limit]
 
     return {
@@ -626,6 +679,13 @@ def api_chip_recommend(
             "batch_size": batch_size if scenario == "train" else None,
             "seq_len": seq_len if scenario == "train" else None,
             "model_calculation": moe_meta,
+            "measured_ranking": {
+                "enabled": bool(measured_scores),
+                "model_specific": is_flash_inference,
+                "measured_chip_count": len(measured_scores),
+                "note": "同模型同参考输入/输出/并发实测优先；未实测芯片的实测项统一为中性50分。"
+                if is_flash_inference else None,
+            },
             "vram_calculation": vram_est.get("calculation"),
             "max_cards": max_cards,
             "min_cards": min_cards,
@@ -652,6 +712,7 @@ def api_chip_recommend(
                 ),
                 single_machine_concurrency=s["single_machine_concurrency"],
                 card_calculation=s["card_calculation"],
+                measured_inference=s["measured_inference"],
                 score=s["score"],
                 scoring=s["scoring"],
                 deployment_guide=get_deployment_guide(
@@ -684,6 +745,7 @@ def chip_recommend_candidate_v2(
     full_cards: int | None = None,
     single_machine_concurrency: float | None = None,
     card_calculation: dict | None = None,
+    measured_inference: dict | None = None,
 ) -> dict:
     """Format one scored chip for v2 recommend output (includes dimension breakdown)."""
     # Reuse base candidate shape but add scoring
@@ -701,6 +763,7 @@ def chip_recommend_candidate_v2(
     base["scoring"] = scoring
     base["deployment_guide"] = deployment_guide
     base["recommend"]["card_calculation"] = card_calculation or {}
+    base["recommend"]["measured_inference"] = measured_inference
     return base
 
 
@@ -764,6 +827,21 @@ def api_methodology():
             ],
         },
         "total_score_formula": "总分 = 生态成熟度×0.40 + 实测验证度×0.30 + 算力性能×0.20 + 性价比×0.10 (大类权重统一 4:3:2:1)",
+        "model_specific_measured_ranking": {
+            "model": "deepseek-ai/DeepSeek-V4-Flash",
+            "scenario": "inference",
+            "reference": "1024输入 + 1024输出 + 1并发",
+            "condition": "至少一款候选芯片有同模型、同参考场景、有效卡数及吞吐实测",
+            "category_weights_when_available": {
+                "benchmark_evidence": 0.60,
+                "ecosystem_maturity": 0.20,
+                "compute_power": 0.15,
+                "cost_effectiveness": 0.05,
+            },
+            "measured_formula": "单卡吞吐60% + TTFT20% + TPOT20%，各指标在同组实测芯片间归一化",
+            "missing_policy": "无同场景实测时实测项统一为中性50分；有实测芯片先于未实测芯片排序",
+            "source": "用户提供的推理测试明细数据_20260713（金山文档）；原始行逐条保留溯源",
+        },
         "scenario_weights": {
             "训练·SFT全参":   {"ecosystem_maturity": 0.40, "benchmark_evidence": 0.30, "compute_power": 0.20, "cost_effectiveness": 0.10},
             "训练·SFT·LoRA": {"ecosystem_maturity": 0.40, "benchmark_evidence": 0.30, "compute_power": 0.20, "cost_effectiveness": 0.10},
@@ -1001,14 +1079,47 @@ def _source_update_row(row) -> dict:
     return item
 
 
+def _source_auto_apply_row(row) -> dict:
+    item = dict(row)
+    for source_key, target_key, fallback in (
+        ("fields_json", "fields", {}),
+        ("old_values_json", "old_values", {}),
+        ("evidence_json", "evidence", {}),
+        ("validation_json", "validation", {}),
+    ):
+        raw = item.pop(source_key, None)
+        try:
+            decoded = json.loads(raw or "{}")
+        except (TypeError, json.JSONDecodeError):
+            decoded = fallback
+        item[target_key] = decoded if isinstance(decoded, dict) else fallback
+    return item
+
+
+def _source_run_event_row(row) -> dict:
+    item = dict(row)
+    raw = item.pop("details_json", None)
+    try:
+        details = json.loads(raw or "{}")
+    except (TypeError, json.JSONDecodeError):
+        details = {}
+    item["details"] = details if isinstance(details, dict) else {}
+    return item
+
+
 @app.get("/api/v1/source-updates")
 def api_source_updates(
     limit: int = Query(30, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    mode: str = Query("formal", pattern="^(formal|test)$"),
 ):
     """List source-page changes for the system status and review UI."""
     try:
-        with get_db(readonly=True) as db:
+        selected_db = get_db_path() if mode == "formal" else latest_test_db()
+        if selected_db is None:
+            return {"available": False, "count": 0, "latest_at": None,
+                    "latest_run": None, "updates": [], "mode": "test"}
+        with get_db(selected_db, readonly=True) as db:
             table = db.execute(
                 "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_diffs'"
             ).fetchone()
@@ -1025,14 +1136,34 @@ def api_source_updates(
                 "error_summary, "
                 "(julianday(finished_at)-julianday(started_at))*86400000 AS duration_ms "
                 "FROM update_runs WHERE run_type='source_refresh' "
+                + ("AND mode='test' " if mode == "test" else "") +
                 "ORDER BY id DESC LIMIT 1"
             ).fetchone()
             latest_run = _source_update_run_row(latest_run_row)
+            auto_apply_table = db.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_auto_applies'"
+            ).fetchone()
             if latest_run:
+                latest_run["events"] = []
+                event_table = db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' "
+                    "AND name='update_run_events'"
+                ).fetchone()
+                if event_table:
+                    event_rows = db.execute(
+                        "SELECT id, run_id, link_id, actor, stage, status, message, "
+                        "details_json, created_at FROM update_run_events "
+                        "WHERE run_id=? ORDER BY id",
+                        (latest_run["id"],),
+                    ).fetchall()
+                    latest_run["events"] = [
+                        _source_run_event_row(row) for row in event_rows
+                    ]
                 source_rows = db.execute(
                     "SELECT c.id AS check_id, c.link_id, c.requested_url, c.final_url, "
                     "c.outcome, c.http_status, c.error_code, c.error_message, c.checked_at, "
-                    "c.duration_ms, l.description, l.vendor, l.category, "
+                    "c.duration_ms, c.attempt_count, c.response_bytes, c.content_type, "
+                    "l.description, l.vendor, l.category, "
                     "d.id AS update_id, d.candidate_fields_json "
                     "FROM source_checks c "
                     "LEFT JOIN link_library l ON l.id=c.link_id "
@@ -1041,8 +1172,28 @@ def api_source_updates(
                     (latest_run["id"],),
                 ).fetchall()
                 latest_run["sources"] = [_source_check_row(row) for row in source_rows]
+                latest_run["auto_applies"] = []
+                if auto_apply_table:
+                    apply_rows = db.execute(
+                        "SELECT a.id, a.source_diff_id, a.chip_id, a.chip_model, a.status, "
+                        "a.source_url, a.fields_json, a.old_values_json, a.evidence_json, "
+                        "a.validation_json, a.backup_path, a.started_at, a.finished_at, "
+                        "a.error_summary FROM source_auto_applies a "
+                        "JOIN source_diffs d ON d.id=a.source_diff_id "
+                        "WHERE d.run_id=? ORDER BY a.id",
+                        (latest_run["id"],),
+                    ).fetchall()
+                    latest_run["auto_applies"] = [
+                        _source_auto_apply_row(row) for row in apply_rows
+                    ]
+                    latest_run["business_tables_modified"] = any(
+                        item.get("status") == "success"
+                        for item in latest_run["auto_applies"]
+                    )
             total_row = db.execute(
-                "SELECT COUNT(*) AS count, MAX(created_at) AS latest_at FROM source_diffs"
+                "SELECT COUNT(*) AS count, MAX(d.created_at) AS latest_at "
+                "FROM source_diffs d JOIN update_runs r ON r.id=d.run_id "
+                + ("WHERE r.mode='test'" if mode == "test" else "")
             ).fetchone()
             rows = db.execute(
                 "SELECT d.id, d.run_id, d.link_id, d.previous_content_hash, "
@@ -1051,33 +1202,189 @@ def api_source_updates(
                 "c.requested_url, c.final_url, c.http_status, "
                 "l.description, l.vendor, l.category "
                 "FROM source_diffs d "
+                "JOIN update_runs r ON r.id=d.run_id "
                 "JOIN source_checks c ON c.id=d.source_check_id "
                 "LEFT JOIN link_library l ON l.id=d.link_id "
+                + ("WHERE r.mode='test' " if mode == "test" else "") +
                 "ORDER BY d.created_at DESC, d.id DESC LIMIT ? OFFSET ?",
                 (limit, offset),
             ).fetchall()
+            updates = [_source_update_row(row) for row in rows]
+            apply_by_diff: dict[int, dict] = {}
+            if auto_apply_table and updates:
+                placeholders = ",".join("?" for _ in updates)
+                apply_rows = db.execute(
+                    "SELECT id, source_diff_id, chip_id, chip_model, status, source_url, "
+                    "fields_json, old_values_json, evidence_json, validation_json, "
+                    "backup_path, started_at, finished_at, error_summary "
+                    f"FROM source_auto_applies WHERE source_diff_id IN ({placeholders})",
+                    [item["id"] for item in updates],
+                ).fetchall()
+                apply_by_diff = {
+                    int(row["source_diff_id"]): _source_auto_apply_row(row)
+                    for row in apply_rows
+                }
+            for item in updates:
+                item["auto_apply"] = apply_by_diff.get(int(item["id"]))
         return {
             "available": True,
             "count": int(total_row["count"] or 0),
             "latest_at": total_row["latest_at"],
             "latest_run": latest_run,
-            "updates": [_source_update_row(row) for row in rows],
+            "updates": updates,
         }
     except sqlite3.OperationalError as exc:
         raise HTTPException(status_code=503, detail=f"数据更新记录暂不可用：{exc}") from exc
 
 
+@app.get("/api/v1/data-agent/status")
+def api_data_agent_status(
+    run_id: int | None = Query(None, ge=1),
+    limit: int = Query(100, ge=1, le=500),
+    mode: str = Query("formal", pattern="^(formal|test)$"),
+):
+    """Read the latest orchestrator cycle, worker queue and candidate facts."""
+    try:
+        selected_db = get_db_path() if mode == "formal" else latest_test_db()
+        if selected_db is None:
+            return {"available": True, "latest_cycle": None, "jobs": [],
+                    "discoveries": [], "candidates": [], "inbox": [],
+                    "publications": [], "totals": {}, "mode": "test"}
+        result = get_data_agent_status(db_path=selected_db, run_id=run_id, limit=limit)
+        result["mode"] = mode
+        return result
+    except sqlite3.OperationalError as exc:
+        raise HTTPException(status_code=503, detail=f"数据抓取智能体状态暂不可用：{exc}") from exc
+
+
+class ManualRunRequest(BaseModel):
+    mode: str
+    limit: int = 5
+
+
+class SeedUrlRequest(BaseModel):
+    mode: str
+    url: str
+    description: str
+    category: str
+    vendor: str = ""
+    enabled: bool = True
+
+
+class FamilySelectionRequest(BaseModel):
+    parent_url: str
+    child_urls: list[str]
+
+
+def _require_secure_admin_transport(request: Request) -> None:
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+    host = (request.url.hostname or "").lower()
+    if request.url.scheme == "https" or forwarded_proto == "https":
+        return
+    if host in {"localhost", "127.0.0.1", "::1", "testserver"}:
+        return
+    raise HTTPException(
+        status_code=426,
+        detail="数据更新管理接口只允许通过 HTTPS 或本机/SSH 隧道访问。",
+    )
+
+
+def _require_data_agent_admin(token: str | None, request: Request) -> None:
+    _require_secure_admin_transport(request)
+    if not admin_token_valid(token):
+        raise HTTPException(status_code=403, detail="需要数据更新管理员口令。")
+
+
+@app.get("/api/v1/data-agent/seeds")
+def api_data_agent_seeds(
+    http_request: Request,
+    mode: str = Query("formal", pattern="^(formal|test)$"),
+    admin_token: str | None = Header(None, alias="X-Data-Agent-Admin"),
+):
+    _require_data_agent_admin(admin_token, http_request)
+    return {"mode": mode, "seeds": list_seed_urls(mode)}
+
+
+@app.get("/api/v1/data-agent/families")
+def api_data_agent_families(
+    http_request: Request,
+    admin_token: str | None = Header(None, alias="X-Data-Agent-Admin"),
+):
+    _require_data_agent_admin(admin_token, http_request)
+    return {"families": read_chip_families(),
+            "selection": read_family_selection()}
+
+
+@app.post("/api/v1/data-agent/family-selection")
+def api_data_agent_family_selection(
+    request: FamilySelectionRequest,
+    http_request: Request,
+    admin_token: str | None = Header(None, alias="X-Data-Agent-Admin"),
+):
+    _require_data_agent_admin(admin_token, http_request)
+    try:
+        return save_family_selection(request.parent_url, request.child_urls)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/data-agent/seeds")
+def api_data_agent_save_seed(
+    request: SeedUrlRequest,
+    http_request: Request,
+    admin_token: str | None = Header(None, alias="X-Data-Agent-Admin"),
+):
+    _require_data_agent_admin(admin_token, http_request)
+    try:
+        return save_seed_url(
+            request.mode, request.url, request.description, request.category,
+            request.vendor, enabled=request.enabled,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/data-agent/manual-run")
+def api_data_agent_manual_run(
+    request: ManualRunRequest,
+    http_request: Request,
+    admin_token: str | None = Header(None, alias="X-Data-Agent-Admin"),
+):
+    _require_data_agent_admin(admin_token, http_request)
+    try:
+        return queue_manual_run(request.mode, request.limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/data-agent/manual-run")
+def api_data_agent_manual_run_result(
+    mode: str = Query("formal", pattern="^(formal|test)$"),
+):
+    return {"mode": mode, "latest_request": latest_manual_result(mode)}
+
+
 @app.get("/api/v1/source-updates/{update_id}")
-def api_source_update_detail(update_id: int = Path(..., ge=1)):
+def api_source_update_detail(
+    update_id: int = Path(..., ge=1),
+    mode: str = Query("formal", pattern="^(formal|test)$"),
+):
     """Return one bounded diff; only files under the project snapshot root are read."""
     try:
-        with get_db(readonly=True) as db:
+        selected_db = get_db_path() if mode == "formal" else latest_test_db()
+        if selected_db is None:
+            raise HTTPException(status_code=404, detail="尚未运行测试巡检。")
+        with get_db(selected_db, readonly=True) as db:
             row = db.execute(
                 "SELECT d.*, c.requested_url, c.final_url, c.http_status, "
                 "l.description, l.vendor, l.category "
                 "FROM source_diffs d "
+                "JOIN update_runs r ON r.id=d.run_id "
                 "JOIN source_checks c ON c.id=d.source_check_id "
-                "LEFT JOIN link_library l ON l.id=d.link_id WHERE d.id=?",
+                "LEFT JOIN link_library l ON l.id=d.link_id WHERE d.id=? "
+                + ("AND r.mode='test'" if mode == "test" else ""),
                 (update_id,),
             ).fetchone()
     except sqlite3.OperationalError as exc:
@@ -1090,7 +1397,8 @@ def api_source_update_detail(update_id: int = Path(..., ge=1)):
     diff_value = item.get("diff_path")
     if diff_value:
         diff_path = FilePath(str(diff_value)).resolve()
-        allowed_root = (get_project_root() / "data" / "source_snapshots").resolve()
+        allowed_root = ((get_project_root() / "data") if mode == "formal" else selected_db.parent) / "source_snapshots"
+        allowed_root = allowed_root.resolve()
         try:
             diff_path.relative_to(allowed_root)
         except ValueError:

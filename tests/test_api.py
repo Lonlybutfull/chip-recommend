@@ -69,11 +69,47 @@ def test_status_page_includes_source_update_review_ui():
     assert 'id="source-updates-list"' in resp.text
     assert 'id="source-update-last-run"' in resp.text
     assert 'id="source-update-business-link"' in resp.text
+    assert 'id="source-update-run-events"' in resp.text
+    assert 'id="data-agent-overview"' in resp.text
+    assert 'id="data-agent-details"' in resp.text
     assert 'id="source-update-run-sources"' in resp.text
     assert "抓取开始时间" in resp.text
-    assert "Hermes 心跳 · 每天北京时间 02:00" in resp.text
-    assert "Gateway 与数据巡检 Skill 已启用" in resp.text
+    assert "抓取结束时间" in resp.text
+    assert "抓取链接：" in resp.text
+    assert "source-run-source-link" in resp.text
+    assert "Hermes 心跳 · 每天 02:00 开新周期，未完成每 30 分钟续跑" in resp.text
+    assert "Gateway、数据巡检与自动更新 Skill 已启用" in resp.text
+    assert "Agent 自动核验" in resp.text
+    assert "运行轨迹" in resp.text
+    assert "展开后暂停自动刷新" in resp.text
+    assert "Agent 任务队列" in resp.text
+    assert "data-agent-job-detail" in resp.text
+    assert "正文快照" in resp.text
+    assert "Agent 提取说明" in resp.text
+    assert "候选事实与提取证据" in resp.text
+    assert "data-agent/status?limit=300" in resp.text
+    assert "自动更新成功" in resp.text
     assert "source-updates?limit=30" in resp.text
+
+
+def test_status_polling_keeps_open_logs_readable():
+    """Background polling must not rebuild logs while a detail panel is open."""
+    html = client.get("/status").text
+    assert "function sourceUpdatesReading()" in html
+    assert "if(sourceUpdatesReading())" in html
+    assert "loadSourceUpdates({silent:true})" in html
+    assert "if(silent && snapshot===SOURCE_UPDATE_RENDERED_SNAPSHOT)" in html
+
+
+def test_status_refresh_restores_reading_position():
+    """Manual refresh and full page reload should keep the current log in view."""
+    html = client.get("/status").text
+    assert "function captureSourceUpdateView()" in html
+    assert "function restoreSourceUpdateView(view)" in html
+    assert "if($('tab-status').classList.contains('active'))window.scrollTo(0,Number(view.scrollY)||0)" in html
+    assert "sessionStorage.setItem(SOURCE_UPDATE_VIEW_KEY" in html
+    assert "detail.open=!!view.openDetails?.[id]?.[index]" in html
+    assert "view.openJobIds" in html
 
 
 def test_source_updates_list_and_detail(tmp_path, monkeypatch):
@@ -105,6 +141,23 @@ def test_source_updates_list_and_detail(tmp_path, monkeypatch):
             (run_id,),
         ).lastrowid
         db.execute(
+            "INSERT INTO update_run_events "
+            "(run_id, link_id, actor, stage, status, message, details_json, created_at) "
+            "VALUES (?, 1, 'fetcher', 'fetch', 'success', '来源网页访问完成。', ?, ?)",
+            (
+                run_id,
+                json.dumps(
+                    {
+                        "requested_url": "https://vendor.example/spec",
+                        "http_status": 200,
+                        "response_bytes": 4096,
+                    },
+                    ensure_ascii=False,
+                ),
+                "2026-09-08T00:00:01Z",
+            ),
+        )
+        db.execute(
             "INSERT INTO source_diffs "
             "(source_check_id, run_id, link_id, added_lines, removed_lines, diff_summary, "
             "diff_path, candidate_fields_json, created_at) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -118,6 +171,22 @@ def test_source_updates_list_and_detail(tmp_path, monkeypatch):
                 str(diff_path),
                 json.dumps([{"field": "vram_gb", "label": "显存容量"}], ensure_ascii=False),
                 "2026-09-08T00:00:00Z",
+            ),
+        )
+        source_diff_id = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        db.execute(
+            "INSERT INTO chips (id, chip_model, vram_gb) VALUES (99, 'Example GPU', '64')"
+        )
+        db.execute(
+            "INSERT INTO source_auto_applies "
+            "(source_diff_id, chip_id, chip_model, status, source_url, fields_json, "
+            "old_values_json, evidence_json, validation_json, backup_path, started_at, finished_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                source_diff_id, 99, "Example GPU", "success", "https://vendor.example/spec",
+                '{"vram_gb":"96"}', '{"vram_gb":"64"}',
+                '{"vram_gb":"VRAM 96 GB"}', '{"stage_integrity_check":"passed"}',
+                "/backup/source-update.db", "2026-09-08T00:00:20Z", "2026-09-08T00:00:21Z",
             ),
         )
         db.commit()
@@ -136,15 +205,38 @@ def test_source_updates_list_and_detail(tmp_path, monkeypatch):
         assert payload["latest_run"]["counts"]["selected"] == 19
         assert payload["latest_run"]["counts"]["failed"] == 4
         assert payload["latest_run"]["duration_ms"] == 20000
-        assert payload["latest_run"]["business_tables_modified"] is False
+        assert "attempt_count" in payload["latest_run"]["sources"][0]
+        assert "response_bytes" in payload["latest_run"]["sources"][0]
+        assert payload["latest_run"]["business_tables_modified"] is True
+        assert payload["latest_run"]["events"][0]["actor"] == "fetcher"
+        assert payload["latest_run"]["events"][0]["details"]["http_status"] == 200
+        assert payload["latest_run"]["auto_applies"][0]["fields"]["vram_gb"] == "96"
         assert len(payload["latest_run"]["sources"]) == 1
         assert payload["latest_run"]["sources"][0]["description"] == "官方规格页"
         assert payload["latest_run"]["sources"][0]["candidate_fields"][0]["field"] == "vram_gb"
         assert payload["updates"][0]["candidate_fields"][0]["field"] == "vram_gb"
+        assert payload["updates"][0]["auto_apply"]["chip_model"] == "Example GPU"
 
         detail = client.get(f"/api/v1/source-updates/{payload['updates'][0]['id']}")
         assert detail.status_code == 200
         assert "+VRAM 96 GB" in detail.json()["diff_text"]
+    finally:
+        set_db_path(original_path)
+
+
+def test_data_agent_status_is_available_without_a_cycle(tmp_path):
+    db_path = tmp_path / "agent-status.db"
+    schema = (Path(__file__).parent.parent / "schema.sql").read_text(encoding="utf-8")
+    with sqlite3.connect(db_path) as db:
+        db.executescript(schema)
+        db.commit()
+    original_path = get_db_path()
+    set_db_path(db_path)
+    try:
+        response = client.get("/api/v1/data-agent/status")
+        assert response.status_code == 200
+        assert response.json()["available"] is True
+        assert response.json()["latest_cycle"] is None
     finally:
         set_db_path(original_path)
 

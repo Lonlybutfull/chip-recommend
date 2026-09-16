@@ -205,3 +205,9 @@ python scripts/run_enrich.py
 ## 项目进度
 
 9 项任务（工作.md）全部完成。详见 [[project-progress]]。
+
+## Testing
+
+- 完整测试：`python -m pytest -q`
+- 测试目录：`tests/`
+- 新增功能需覆盖正常流程、输入边界和失败路径；修复缺陷时增加回归测试。

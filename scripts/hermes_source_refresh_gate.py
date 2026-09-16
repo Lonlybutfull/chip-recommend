@@ -233,14 +233,17 @@ def decide(summary: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
     changed = []
     failures = []
     new_sources = []
+    checked_sources = []
     for result in summary.get("results", []):
+        compact = _compact_result(result)
+        checked_sources.append(compact)
         outcome = result.get("outcome")
         if outcome in ACTIONABLE_OUTCOMES:
-            changed.append(_compact_result(result))
+            changed.append(compact)
         elif outcome == "new" and config["notify_on_new"]:
-            new_sources.append(_compact_result(result))
+            new_sources.append(compact)
         elif outcome in FAILURE_OUTCOMES and int(result.get("failure_count") or 0) >= threshold:
-            failures.append(_compact_result(result))
+            failures.append(compact)
 
     if not changed and not failures and not new_sources:
         return {"wakeAgent": False}
@@ -256,6 +259,11 @@ def decide(summary: dict[str, Any], config: dict[str, Any]) -> dict[str, Any]:
                 "finished_at": summary.get("finished_at"),
                 "duration_ms": summary.get("duration_ms", 0),
                 "counts": summary.get("counts", {}),
+                # Include every checked source when the Agent is awakened so its
+                # notification can audit the complete crawl scope, not only the
+                # changed or failing subset. The gate remains silent for normal
+                # no-change runs, so this does not add model calls.
+                "checked_sources": checked_sources,
                 "changed_sources": changed,
                 "new_sources": new_sources,
                 "failing_sources": failures,

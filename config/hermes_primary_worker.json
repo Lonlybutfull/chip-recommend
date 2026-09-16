@@ -1,0 +1,12 @@
+{
+  "transport": "local_docker",
+  "container": "chip-recommend",
+  "worker_id": "hermes-heartbeat",
+  "job_limit": 5,
+  "skills": [
+    "url-discovery", "chip-catalog", "chip-basic", "chip-compute",
+    "chip-interconnect", "chip-ecosystem", "chip-price", "model-catalog",
+    "model-activity", "benchmark-ingest", "deployment-ingest",
+    "data-quality-review"
+  ]
+}

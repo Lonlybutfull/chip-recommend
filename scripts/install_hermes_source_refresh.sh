@@ -47,6 +47,6 @@ echo "Installed cron gate: $GATE_TARGET"
 echo "Installed gate config: $CONFIG_TARGET"
 echo
 echo "Create the recurring job from the Hermes conversation that should receive notifications:"
-echo "hermes cron create \"every day at 2am\" \"Use the source-refresh skill to summarize the injected source_refresh context in Chinese. Do not modify business data.\" --skill source-refresh --script hermes_source_refresh_gate.py --workdir \"$PROJECT_ROOT\" --deliver origin --name \"AISHPerf source refresh\""
+echo "hermes cron create \"every day at 2am\" \"Use the source-refresh skill to summarize the injected source_refresh context in Chinese. This legacy same-host installer remains check-only.\" --skill source-refresh --script hermes_source_refresh_gate.py --workdir \"$PROJECT_ROOT\" --deliver origin --name \"AISHPerf source refresh\""
 echo
 echo "Then verify: hermes cron run \"AISHPerf source refresh\" && hermes cron doctor"

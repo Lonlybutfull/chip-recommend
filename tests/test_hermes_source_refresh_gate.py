@@ -88,10 +88,37 @@ def test_changed_source_wakes_agent_with_compact_context():
     assert context["run_id"] == 7
     assert context["trigger"] == "hermes_ticker"
     assert context["duration_ms"] == 2000
+    assert context["checked_sources"][0]["requested_url"] == "https://vendor.example/spec"
     assert context["changed_sources"][0]["link_id"] == 20
     assert context["changed_sources"][0]["diff_path"].endswith(".diff")
     assert context["changed_sources"][0]["candidate_fields"][0]["field"] == "vram_gb"
     assert context["business_tables_modified"] is False
+
+
+def test_awakened_agent_receives_all_checked_source_links():
+    decision = gate.decide(
+        summary(
+            {
+                "link_id": 20,
+                "outcome": "changed",
+                "requested_url": "https://vendor.example/spec",
+            },
+            {
+                "link_id": 21,
+                "outcome": "unchanged",
+                "requested_url": "https://vendor.example/software",
+                "final_url": "https://docs.vendor.example/software",
+                "checked_at": "2026-09-07T00:00:01Z",
+                "duration_ms": 250,
+            },
+        ),
+        config(),
+    )
+
+    checked = decision["context"]["source_refresh"]["checked_sources"]
+    assert [item["link_id"] for item in checked] == [20, 21]
+    assert checked[1]["final_url"] == "https://docs.vendor.example/software"
+    assert checked[1]["duration_ms"] == 250
 
 
 def test_failure_only_wakes_after_threshold():

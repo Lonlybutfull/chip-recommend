@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -88,6 +89,7 @@ def make_refresher(
         snapshot_dir=tmp_path / "snapshots",
         session=session,
         sleep_fn=lambda _: None,
+        resolver=kwargs.pop("resolver", lambda _: ["93.184.216.34"]),
         **kwargs,
     )
     return refresher, session
@@ -140,6 +142,27 @@ def test_first_200_creates_new_state_snapshot_and_no_business_change(
     state = fetch_row(temp_db, "SELECT * FROM source_monitor_state WHERE link_id=1")
     assert state["etag"] == '"v1"'
     assert state["failure_count"] == 0
+    with sqlite3.connect(temp_db) as db:
+        db.row_factory = sqlite3.Row
+        events = [
+            dict(row)
+            for row in db.execute(
+                "SELECT actor, stage, status, message, details_json "
+                "FROM update_run_events ORDER BY id"
+            ).fetchall()
+        ]
+    assert [(event["actor"], event["stage"]) for event in events] == [
+        ("orchestrator", "run_started"),
+        ("scheduler", "source_selection"),
+        ("fetcher", "fetch"),
+        ("fetcher", "fetch"),
+        ("snapshot", "snapshot"),
+        ("parser", "change_detection"),
+        ("orchestrator", "run_finished"),
+    ]
+    assert json.loads(events[3]["details_json"])["http_status"] == 200
+    assert json.loads(events[4]["details_json"])["snapshot_path"]
+    assert events[-1]["status"] == "success"
     assert business_table_fingerprints(temp_db) == before
 
 
@@ -472,6 +495,7 @@ def test_snapshot_write_failure_is_not_recorded_as_success(temp_db: Path, tmp_pa
         snapshot_dir=bad_root,
         session=session,
         sleep_fn=lambda _: None,
+        resolver=lambda _: ["93.184.216.34"],
     )
 
     summary = refresher.run([1], apply_state=True)
@@ -480,6 +504,23 @@ def test_snapshot_write_failure_is_not_recorded_as_success(temp_db: Path, tmp_pa
     assert summary.results[0]["error_code"] == "snapshot_write_error"
     state = fetch_row(temp_db, "SELECT * FROM source_monitor_state WHERE link_id=1")
     assert state["content_hash"] is None
+
+
+def test_dns_private_target_is_rejected_before_request(temp_db: Path, tmp_path: Path):
+    refresher, session = make_refresher(
+        temp_db,
+        tmp_path,
+        [],
+        resolver=lambda _: ["127.0.0.1"],
+        max_attempts=1,
+    )
+
+    result = refresher.run([1], apply_state=True, force=True).results[0]
+
+    assert result["outcome"] == "failed"
+    assert result["error_code"] == "configuration_error"
+    assert "私有、回环或保留 IP" in result["error_message"]
+    assert session.calls == []
 
 
 def test_active_run_blocks_second_writer(temp_db: Path, tmp_path: Path):
