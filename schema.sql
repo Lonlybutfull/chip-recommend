@@ -283,6 +283,79 @@ CREATE TABLE IF NOT EXISTS link_library (
 CREATE INDEX IF NOT EXISTS idx_link_library_category ON link_library(category);
 CREATE INDEX IF NOT EXISTS idx_link_library_vendor ON link_library(vendor);
 
+-- 链接角色与发现链路独立于旧 link_library，避免破坏已有数据格式。
+CREATE TABLE IF NOT EXISTS source_registry (
+    link_id           INTEGER PRIMARY KEY,
+    canonical_url     TEXT NOT NULL,
+    url_role          TEXT NOT NULL DEFAULT 'seed',
+    crawl_depth       INTEGER NOT NULL DEFAULT 0,
+    parent_link_id    INTEGER,
+    discovery_job_id  INTEGER,
+    discovered_at     TEXT,
+    updated_at        TEXT,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE CASCADE,
+    FOREIGN KEY(parent_link_id) REFERENCES link_library(id) ON DELETE SET NULL
+);
+
+-- 原始评测工作簿逐行归档：保留所有非空行（包括测试说明、
+-- 能耗、适配性和对比表），并将能识别的推理条件/指标结构化。
+-- 缺失的模型、物理卡数不臆测；只有核实后的 benchmark 进入排序。
+CREATE TABLE IF NOT EXISTS benchmark_workbook_rows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_sha256 TEXT NOT NULL,
+    source_workbook TEXT NOT NULL,
+    source_url TEXT,
+    source_sheet TEXT NOT NULL,
+    source_row INTEGER NOT NULL,
+    row_kind TEXT NOT NULL,
+    chip_model TEXT,
+    model_id TEXT,
+    physical_cards TEXT,
+    nodes TEXT,
+    deployment TEXT,
+    precision TEXT,
+    input_tokens TEXT,
+    output_tokens TEXT,
+    concurrency TEXT,
+    output_throughput_tok_s TEXT,
+    ttft_ms TEXT,
+    tpot_ms TEXT,
+    metrics_json TEXT NOT NULL,
+    cells_json TEXT NOT NULL,
+    formulas_json TEXT NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(source_sha256, source_sheet, source_row)
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_registry_canonical
+ON source_registry(canonical_url);
+
+CREATE INDEX IF NOT EXISTS idx_source_registry_parent
+ON source_registry(parent_link_id);
+
+CREATE TABLE IF NOT EXISTS source_discovery_edges (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_run_id      INTEGER NOT NULL,
+    discovery_job_id  INTEGER NOT NULL,
+    parent_link_id    INTEGER,
+    child_link_id     INTEGER,
+    source_url        TEXT NOT NULL,
+    canonical_url     TEXT NOT NULL,
+    url_role          TEXT NOT NULL,
+    crawl_depth       INTEGER NOT NULL,
+    status            TEXT NOT NULL,
+    reason            TEXT,
+    created_at        TEXT NOT NULL,
+    fetched_at        TEXT,
+    FOREIGN KEY(cycle_run_id) REFERENCES update_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(parent_link_id) REFERENCES link_library(id) ON DELETE SET NULL,
+    FOREIGN KEY(child_link_id) REFERENCES link_library(id) ON DELETE SET NULL,
+    UNIQUE(cycle_run_id, canonical_url)
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_discovery_cycle
+ON source_discovery_edges(cycle_run_id, status);
+
 -- ============================================================
 -- 7. 部署方案链接表
 -- ============================================================
@@ -302,3 +375,317 @@ CREATE TABLE IF NOT EXISTS deployment_guides (
 CREATE INDEX IF NOT EXISTS idx_deploy_chip ON deployment_guides(chip_model);
 CREATE INDEX IF NOT EXISTS idx_deploy_model ON deployment_guides(model_id);
 CREATE INDEX IF NOT EXISTS idx_deploy_backend ON deployment_guides(backend);
+
+-- ============================================================
+-- 8. 来源增量复查控制面（不属于业务事实，不写 field_provenance）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS update_runs (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_type           TEXT,
+    mode               TEXT,
+    status             TEXT,
+    requested_link_ids TEXT,
+    started_at         TEXT,
+    finished_at        TEXT,
+    counts_json        TEXT,
+    error_summary      TEXT,
+    created_at         TEXT
+);
+
+-- 同一种任务同一时间只允许一个运行实例。
+CREATE UNIQUE INDEX IF NOT EXISTS idx_update_runs_one_running
+ON update_runs(run_type) WHERE status = 'running';
+
+CREATE INDEX IF NOT EXISTS idx_update_runs_started
+ON update_runs(started_at);
+
+-- Agent/Skill 共用的结构化运行轨迹。它记录过程，不保存业务事实；后续芯片、
+-- 模型、生态、价格等更新任务都可以复用同一张表。
+CREATE TABLE IF NOT EXISTS update_run_events (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id       INTEGER NOT NULL,
+    link_id      INTEGER,
+    actor        TEXT NOT NULL,
+    stage        TEXT NOT NULL,
+    status       TEXT NOT NULL,
+    message      TEXT NOT NULL,
+    details_json TEXT,
+    created_at   TEXT NOT NULL,
+    FOREIGN KEY(run_id) REFERENCES update_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_update_run_events_run_time
+ON update_run_events(run_id, created_at, id);
+
+CREATE INDEX IF NOT EXISTS idx_update_run_events_link_time
+ON update_run_events(link_id, created_at);
+
+CREATE TABLE IF NOT EXISTS source_monitor_state (
+    link_id              INTEGER PRIMARY KEY,
+    etag                 TEXT,
+    last_modified        TEXT,
+    raw_hash             TEXT,
+    content_hash         TEXT,
+    last_checked_at      TEXT,
+    next_check_at        TEXT,
+    failure_count        INTEGER DEFAULT 0,
+    last_http_status     INTEGER,
+    last_error_code      TEXT,
+    last_error_message   TEXT,
+    last_run_id          INTEGER,
+    updated_at           TEXT,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE CASCADE,
+    FOREIGN KEY(last_run_id) REFERENCES update_runs(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_monitor_due
+ON source_monitor_state(next_check_at);
+
+CREATE TABLE IF NOT EXISTS source_checks (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id                INTEGER,
+    link_id               INTEGER,
+    requested_url         TEXT,
+    final_url             TEXT,
+    outcome               TEXT,
+    http_status           INTEGER,
+    attempt_count         INTEGER,
+    previous_raw_hash     TEXT,
+    raw_hash              TEXT,
+    previous_content_hash TEXT,
+    content_hash          TEXT,
+    etag                  TEXT,
+    last_modified         TEXT,
+    content_type          TEXT,
+    response_bytes        INTEGER,
+    snapshot_path         TEXT,
+    error_code            TEXT,
+    error_message         TEXT,
+    checked_at            TEXT,
+    duration_ms           INTEGER,
+    FOREIGN KEY(run_id) REFERENCES update_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE CASCADE,
+    UNIQUE(run_id, link_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_checks_link_time
+ON source_checks(link_id, checked_at);
+
+CREATE INDEX IF NOT EXISTS idx_source_checks_outcome
+ON source_checks(outcome);
+
+-- 可读正文差异与候选字段供 Agent 校验和人类追溯，不属于正式业务数据。
+CREATE TABLE IF NOT EXISTS source_diffs (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_check_id       INTEGER,
+    run_id                INTEGER,
+    link_id               INTEGER,
+    previous_content_hash TEXT,
+    content_hash          TEXT,
+    added_lines           INTEGER DEFAULT 0,
+    removed_lines         INTEGER DEFAULT 0,
+    truncated             INTEGER DEFAULT 0,
+    diff_summary          TEXT,
+    diff_path             TEXT,
+    candidate_fields_json TEXT,
+    created_at            TEXT,
+    FOREIGN KEY(source_check_id) REFERENCES source_checks(id) ON DELETE CASCADE,
+    FOREIGN KEY(run_id) REFERENCES update_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE CASCADE,
+    UNIQUE(run_id, link_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_diffs_link_time
+ON source_diffs(link_id, created_at);
+
+-- Hermes 对来源变化完成机器校验后直接发布的审计记录。每条变化对同一芯片
+-- 最多应用一次；真正的字段历史仍由 field_provenance 逐字段记录。
+CREATE TABLE IF NOT EXISTS source_auto_applies (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_diff_id      INTEGER NOT NULL,
+    chip_id             INTEGER NOT NULL,
+    chip_model          TEXT NOT NULL,
+    status              TEXT NOT NULL,
+    source_url          TEXT NOT NULL,
+    fields_json         TEXT NOT NULL,
+    old_values_json     TEXT,
+    evidence_json       TEXT NOT NULL,
+    validation_json     TEXT NOT NULL,
+    backup_path         TEXT,
+    started_at          TEXT NOT NULL,
+    finished_at         TEXT,
+    error_summary       TEXT,
+    FOREIGN KEY(source_diff_id) REFERENCES source_diffs(id),
+    FOREIGN KEY(chip_id) REFERENCES chips(id),
+    UNIQUE(source_diff_id, chip_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_source_auto_applies_time
+ON source_auto_applies(started_at);
+
+-- ============================================================
+-- 9. 数据抓取智能体控制面
+-- ============================================================
+-- 一个 cycle 可以生成多个 Skill 任务。采集/解析任务可并行领取，正式发布仍由
+-- 单一 Publisher 串行执行。
+CREATE TABLE IF NOT EXISTS data_agent_jobs (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_run_id   INTEGER NOT NULL,
+    dedupe_key     TEXT NOT NULL UNIQUE,
+    job_type       TEXT NOT NULL,
+    skill_name     TEXT NOT NULL,
+    entity_type    TEXT,
+    entity_id      TEXT,
+    link_id        INTEGER,
+    field_group    TEXT,
+    priority       INTEGER DEFAULT 50,
+    status         TEXT NOT NULL,
+    scheduled_for  TEXT NOT NULL,
+    started_at     TEXT,
+    finished_at    TEXT,
+    attempt_count  INTEGER DEFAULT 0,
+    worker_id      TEXT,
+    lease_until    TEXT,
+    input_json     TEXT,
+    output_json    TEXT,
+    error_summary  TEXT,
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    FOREIGN KEY(cycle_run_id) REFERENCES update_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_data_agent_jobs_queue
+ON data_agent_jobs(status, scheduled_for, priority DESC, id);
+
+CREATE INDEX IF NOT EXISTS idx_data_agent_jobs_cycle
+ON data_agent_jobs(cycle_run_id, status, id);
+
+-- 同一份网页快照被哪些 Skill 解析过；parser_version 变化时可以安全重放。
+CREATE TABLE IF NOT EXISTS parse_ledger (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_check_id INTEGER,
+    run_id          INTEGER,
+    link_id         INTEGER,
+    skill_name      TEXT NOT NULL,
+    content_hash    TEXT,
+    parser_version  TEXT NOT NULL,
+    status          TEXT NOT NULL,
+    extracted_count INTEGER DEFAULT 0,
+    error_summary   TEXT,
+    started_at      TEXT NOT NULL,
+    finished_at     TEXT,
+    details_json    TEXT,
+    FOREIGN KEY(source_check_id) REFERENCES source_checks(id) ON DELETE CASCADE,
+    FOREIGN KEY(run_id) REFERENCES update_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE SET NULL,
+    UNIQUE(link_id, skill_name, content_hash, parser_version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_parse_ledger_run
+ON parse_ledger(run_id, skill_name, status);
+
+-- 解析器或 Agent 产出的候选事实。没有完成证据与实体校验前不得写正式业务表。
+CREATE TABLE IF NOT EXISTS extraction_candidates (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_run_id        INTEGER NOT NULL,
+    source_check_id     INTEGER,
+    source_diff_id      INTEGER,
+    link_id             INTEGER,
+    owner_skill         TEXT NOT NULL,
+    target_table        TEXT NOT NULL,
+    entity_type         TEXT,
+    entity_key_json     TEXT,
+    field_name          TEXT NOT NULL,
+    proposed_value      TEXT,
+    unit                TEXT,
+    evidence_text       TEXT,
+    evidence_location   TEXT,
+    source_url          TEXT,
+    source_type         TEXT,
+    confidence          TEXT,
+    status              TEXT NOT NULL,
+    rejection_reason    TEXT,
+    extractor_version   TEXT NOT NULL,
+    created_at          TEXT NOT NULL,
+    validated_at        TEXT,
+    published_at        TEXT,
+    FOREIGN KEY(cycle_run_id) REFERENCES update_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(source_check_id) REFERENCES source_checks(id) ON DELETE SET NULL,
+    FOREIGN KEY(source_diff_id) REFERENCES source_diffs(id) ON DELETE SET NULL,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE SET NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_extraction_candidates_entity_dedupe
+ON extraction_candidates(
+    cycle_run_id, COALESCE(source_diff_id, 0), owner_skill,
+    target_table, COALESCE(entity_key_json, ''), COALESCE(source_url, ''), field_name,
+    COALESCE(proposed_value, '')
+);
+
+CREATE INDEX IF NOT EXISTS idx_extraction_candidates_status
+ON extraction_candidates(status, owner_skill, created_at);
+
+-- 一个 Skill 在页面里发现另一个数据域的信息时写入 inbox，目标 Skill 复用已有
+-- 快照，不再重复访问相同 URL。
+CREATE TABLE IF NOT EXISTS skill_inbox (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_run_id     INTEGER NOT NULL,
+    from_skill       TEXT NOT NULL,
+    to_skill         TEXT NOT NULL,
+    link_id          INTEGER,
+    source_check_id  INTEGER,
+    content_hash     TEXT,
+    topic            TEXT NOT NULL,
+    payload_json     TEXT NOT NULL,
+    status           TEXT NOT NULL DEFAULT 'pending',
+    created_at       TEXT NOT NULL,
+    claimed_at       TEXT,
+    completed_at     TEXT,
+    FOREIGN KEY(cycle_run_id) REFERENCES update_runs(id) ON DELETE CASCADE,
+    FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE SET NULL,
+    FOREIGN KEY(source_check_id) REFERENCES source_checks(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_inbox_target
+ON skill_inbox(to_skill, status, created_at);
+
+-- 实体消歧共用别名，防止不同 Skill 各自维护一套名称映射。
+CREATE TABLE IF NOT EXISTS entity_aliases (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type    TEXT NOT NULL,
+    entity_id      TEXT NOT NULL,
+    canonical_name TEXT NOT NULL,
+    alias          TEXT NOT NULL,
+    normalized     TEXT NOT NULL,
+    source_url     TEXT,
+    confidence     TEXT,
+    created_at     TEXT NOT NULL,
+    updated_at     TEXT NOT NULL,
+    UNIQUE(entity_type, normalized)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_aliases_entity
+ON entity_aliases(entity_type, entity_id);
+
+CREATE TABLE IF NOT EXISTS candidate_publications (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_run_id       INTEGER NOT NULL,
+    target_table       TEXT NOT NULL,
+    target_row_id      TEXT,
+    candidate_ids_json TEXT NOT NULL,
+    status             TEXT NOT NULL,
+    old_values_json    TEXT,
+    new_values_json    TEXT NOT NULL,
+    source_url         TEXT NOT NULL,
+    backup_path        TEXT,
+    validation_json    TEXT NOT NULL,
+    started_at         TEXT NOT NULL,
+    finished_at        TEXT,
+    error_summary      TEXT,
+    FOREIGN KEY(cycle_run_id) REFERENCES update_runs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_candidate_publications_cycle
+ON candidate_publications(cycle_run_id, status, id);

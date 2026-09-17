@@ -116,6 +116,7 @@ def get_db(db_path: str | Path | None = None, readonly: bool = False):
 
     conn = sqlite3.connect(uri if readonly else path, uri=readonly)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=5000")
     if not readonly:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
@@ -469,6 +470,7 @@ def get_chip_recommend_candidates(
     tier: str = "datacenter",
     prefer_domestic: bool = False,
     db_path: str | Path | None = None,
+    measured_model_id: str | None = None,
 ) -> tuple[dict | None, list[dict]]:
     """Find model + candidate chips for recommend pipeline.
 
@@ -513,13 +515,25 @@ def get_chip_recommend_candidates(
         else:
             tier_cond = ""
 
+        measured_order = (
+            "CASE WHEN chip_model IN ("
+            "SELECT chip_model FROM chip_model_benchmarks "
+            "WHERE model_id = ? AND workload_type = 'inference' "
+            "AND input_seq_length = '1024' AND output_seq_length = '1024' "
+            "AND concurrency = '1' AND CAST(throughput_tok_s AS REAL) > 0 "
+            "AND CAST(chip_count AS REAL) > 0"
+            ") THEN 0 ELSE 1 END, "
+            if measured_model_id else ""
+        )
         sql = (
             f"SELECT * FROM chips "
             f"WHERE CAST(vram_gb AS REAL) >= ? {usage_cond} "
             f"{region_cond} {tier_cond} "
-            f"ORDER BY CAST(vram_gb AS REAL) DESC LIMIT 30"
+            f"ORDER BY {measured_order}CAST(vram_gb AS REAL) DESC LIMIT 30"
         )
         all_params = [min_vram_per_card] + usage_params + tier_params
+        if measured_model_id:
+            all_params.append(measured_model_id)
         candidates = [dict(r) for r in db.execute(sql, all_params).fetchall()]
 
     return model_data, candidates

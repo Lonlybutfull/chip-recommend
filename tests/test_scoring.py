@@ -212,3 +212,15 @@ def test_nested_text_config_resolves_moe_architecture_and_active_params():
     assert moe["is_moe"] is True
     assert moe["active_params_b"] == 3.0
     assert moe["weight_params_b"] == 36.0
+    assert moe["compute_params_b"] == 3.0
+    assert moe["compute_parameter_basis"] == "active"
+
+
+def test_dense_model_uses_total_parameters_for_training_compute():
+    dense = resolve_moe_metadata(
+        "Qwen/Qwen2.5-7B", "Dense", 7.0, {"model_type": "qwen2"},
+    )
+
+    assert dense["is_moe"] is False
+    assert dense["compute_params_b"] == 7.0
+    assert dense["compute_parameter_basis"] == "total"

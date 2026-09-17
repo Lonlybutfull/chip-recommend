@@ -12,6 +12,8 @@ metadata:
 
 For each chip, searches for specs across all 14 field groups, then writes values with `field_provenance` records using `database.update_chip_fields()`. Chips must already exist in the database (from `chip-catalog`).
 
+> 此 Skill 仅保留给人工发起的旧式批量扩充流程。收到 `data_agent` 队列任务时不要使用本 Skill，也不要直接写库；必须改用任务指定的 `chip-basic`、`chip-compute`、`chip-interconnect`、`chip-ecosystem` 或 `chip-price`，并由统一 Publisher 发布候选事实。
+
 ## Working directory
 
 ```bash

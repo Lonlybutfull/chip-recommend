@@ -160,16 +160,21 @@ def resolve_moe_metadata(
             if 0 < value < total_params_b:
                 active_params = value
 
+    compute_params = active_params if is_moe and active_params is not None else total_params_b
+    compute_basis = "active" if is_moe and active_params is not None else "total"
+
     return {
         "is_moe": is_moe,
         "total_params_b": total_params_b,
         "active_params_b": active_params,
         "weight_params_b": total_params_b,
         "parameter_basis": "total",
+        "compute_params_b": compute_params,
+        "compute_parameter_basis": compute_basis,
         "num_experts": num_experts or None,
         "experts_per_token": experts_per_token or None,
         "note": (
-            "激活参数量只表示每个 token 参与计算的专家规模；标准常驻权重部署的显存按总参数量计算。"
+            "激活参数量表示每个 token 参与计算的规模，用于训练 FLOPs；标准常驻权重部署的显存仍按总参数量计算。"
             if is_moe else None
         ),
     }
@@ -792,6 +797,7 @@ class RecommendContext:
     benchmark_count: int = 0
     max_benchmark_mfu: Optional[float] = None
     max_benchmark_tps: Optional[float] = None
+    measured_inference: Optional[dict] = None
     compat_verified_count: int = 0
     official_ratio: float = -1.0       # source credibility: official / total (from field_provenance)
 
@@ -1352,9 +1358,22 @@ def aggregate_score(
     )
 
     # D7: 实测验证度
-    dims["benchmark_evidence"] = score_benchmark_evidence(
-        ctx.benchmark_count, ctx.max_benchmark_mfu, ctx.max_benchmark_tps,
-    )
+    if ctx.measured_inference:
+        measured = ctx.measured_inference
+        dims["benchmark_evidence"] = DimensionResult(
+            score=measured["score"],
+            detail=(
+                f"同模型实测：单卡吞吐 {measured['throughput_per_card']:.2f} tokens/s"
+                f"，TTFT {measured['ttft_ms'] or '缺失'} ms"
+                f"，TPOT {measured['tpot_ms'] or '缺失'} ms"
+                f" → {measured['score']:.0f}/100"
+            ),
+            raw_values={**measured, "missing": False, "source": "chip_model_benchmarks"},
+        )
+    else:
+        dims["benchmark_evidence"] = score_benchmark_evidence(
+            ctx.benchmark_count, ctx.max_benchmark_mfu, ctx.max_benchmark_tps,
+        )
 
     # D8: 来源真实度
     dims["source_credibility"] = score_source_credibility(ctx.official_ratio)

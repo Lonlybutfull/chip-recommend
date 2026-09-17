@@ -109,7 +109,7 @@
 
 | 参数 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `training_tokens` | float | 1.0 | 训练数据量 (T tokens)，范围 0.01-1000 |
+| `training_tokens` | float | CPT 10.0；SFT/RL 0.2 | 训练数据量 (T tokens)，范围 0.01-1000；用户输入优先 |
 | `sla_tps` | float | None | 推理吞吐 SLA (tokens/s)，如 100 |
 | `min_cards` | int | None | 最小卡数（硬下限，自动取 2 幂次方） |
 | `max_cards` | int | None | 最大卡数（硬上限） |
@@ -163,13 +163,15 @@ recommended_cards = max(vram_cards, sla_cards)
 estimated_days = total_flops / (effective_per_card_day × recommended_cards)
 ```
 
-### 3.6 训练数据量典型值参考
+### 3.6 训练数据量默认值
 
-| 模型规模 | 典型训练数据量 |
+| 训练阶段 | 默认训练数据量 |
 |---|---|
-| 7B-13B (小模型) | 1-3 T tokens |
-| 34B-70B (中模型) | 3-15 T tokens |
-| 100B-400B (大模型) | 10-50 T tokens |
+| CPT（持续预训练） | 10 T tokens |
+| SFT（监督微调） | 0.2 T tokens（200M） |
+| RL（强化学习） | 0.2 T tokens（200M） |
+
+用户填写训练数据量时，以用户输入值为准。
 | MoE 大模型 | 15-30 T tokens |
 | GPT-4 级别 | 20-50 T tokens |
 | DeepSeek-V3 级别 | 14.8 T tokens |
@@ -592,7 +594,7 @@ else:
 
 | 参数 | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| `training_tokens` | float | 1.0 | 训练数据量 (T tokens) |
+| `training_tokens` | float | CPT 10.0；SFT/RL 0.2 | 训练数据量 (T tokens)，用户输入优先 |
 | `min_cards` | int | None | 最小卡数硬下限 |
 
 ---

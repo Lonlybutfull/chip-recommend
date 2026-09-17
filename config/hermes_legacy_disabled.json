@@ -1,0 +1,4 @@
+{
+  "transport": "disabled",
+  "reason": "旧来源直写通道已停用；以主要服务器本机 data-update-orchestrator 和 Candidate Publisher 为准。"
+}

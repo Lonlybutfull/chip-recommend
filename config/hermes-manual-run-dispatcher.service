@@ -1,0 +1,15 @@
+[Unit]
+Description=AISHPerf manual data-agent run dispatcher
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /root/.hermes/scripts/hermes_manual_run_dispatcher.py --data-root /root/chip-recommend/data --container chip-recommend --formal-job-id 268fc87564c3 --test-job-id 55ac90751778
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
