@@ -1030,38 +1030,8 @@ html.embed-mode main{padding-top:12px}
   <div class="status-grid" id="status-cards"></div>
   <div id="status-loading" class="loading"><div class="spinner"></div></div>
   <div class="status-section-title">
-    <div><h2>🔄 数据更新</h2><div style="font-size:0.74rem;color:var(--text3);margin-top:2px">当前仅手动运行芯片来源隔离测试；正式巡检和模型更新暂不在此执行</div></div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
-      <label for="data-agent-mode" style="font-size:.78rem">运行模式</label>
-      <select id="data-agent-mode" onchange="changeDataAgentMode()" style="width:auto;min-width:135px"><option value="test">芯片隔离测试</option></select>
-      <button class="btn secondary" onclick="toggleDataAgentSeeds()">管理数据来源</button>
-      <button class="btn primary" id="data-agent-manual-button" onclick="manualDataAgentRun()">手动执行</button>
-      <button class="btn secondary" onclick="loadSourceUpdates()">刷新记录</button>
-    </div>
-  </div>
-  <div id="data-agent-mode-note" class="info" style="margin-bottom:12px">从父URL链接库选定一个芯片URL族和少量目标页，结果只写入隔离副本。</div>
-  <div id="data-agent-manual-status" style="margin-bottom:12px"></div>
-  <div id="data-agent-seeds-panel" style="display:none;margin-bottom:16px;padding:16px;border:1px solid var(--border);border-radius:12px;background:var(--card)">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><h3 style="margin:0">数据来源配置</h3><button class="btn secondary" onclick="loadDataAgentSeeds()">加载列表</button></div>
-    <p id="data-agent-seeds-note" style="font-size:.8rem;color:var(--text3)">先从父URL链接库选定一个芯片族；手动填写的测试来源也只保存在隔离配置中。</p>
-    <div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin:12px 0">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <label for="data-agent-family-select">芯片 URL 族</label>
-        <select id="data-agent-family-select" onchange="renderChipFamilyTargets()" style="min-width:260px;max-width:100%"></select>
-        <button class="btn secondary" onclick="loadChipFamilies()">加载父URL链接库</button>
-      </div>
-      <div id="data-agent-family-targets" style="max-height:230px;overflow:auto;margin:8px 0"></div>
-      <button class="btn primary" onclick="saveChipFamilySelection()">保存本轮测试链接</button>
-      <div id="data-agent-family-status" style="font-size:.8rem;margin-top:8px"></div>
-    </div>
-    <div style="display:grid;grid-template-columns:minmax(240px,2fr) repeat(3,minmax(120px,1fr));gap:8px;margin:12px 0">
-      <input id="data-agent-seed-url" type="url" aria-label="来源链接" placeholder="来源链接（https://...）" autocomplete="off">
-      <input id="data-agent-seed-description" placeholder="来源描述" autocomplete="off">
-      <input id="data-agent-seed-category" placeholder="数据类别，如芯片官方规格" autocomplete="off">
-      <input id="data-agent-seed-vendor" placeholder="厂商（可选）" autocomplete="off">
-    </div>
-    <button class="btn primary" onclick="saveDataAgentSeed(true)">保存并启用</button>
-    <div id="data-agent-seeds-list" style="margin-top:12px;max-height:330px;overflow:auto"></div>
+    <div><h2>🔄 数据更新</h2><div style="font-size:0.74rem;color:var(--text3);margin-top:2px">查看独立运行记录、处理流程与字段变更</div></div>
+    <button class="btn secondary" onclick="loadSourceUpdates()">刷新记录</button>
   </div>
   <div id="source-update-last-run"></div>
   <div id="data-agent-overview"></div>
@@ -1079,6 +1049,8 @@ html.embed-mode main{padding-top:12px}
 <div class="detail-overlay" id="detail-overlay" onclick="if(event.target===this)closeDetail()">
   <div class="detail-panel" id="detail-panel"></div>
 </div>
+<link rel="stylesheet" href="/run-history.css">
+<script src="/run-history.js"></script>
 <!-- Last update: 2026-08-07 19:35 -->
 <script>
 /* ═══════════════════════════════════════════════════════════
@@ -1088,130 +1060,7 @@ html.embed-mode main{padding-top:12px}
 const API = '/api/v1';
 const STATE = { vendors: [], currentTab: 'chips' };
 const EMBED_MODE = document.documentElement.classList.contains('embed-mode');
-let DATA_AGENT_ADMIN_TOKEN = '';
-
-function dataAgentMode(){return $('data-agent-mode').value}
-function changeDataAgentMode(){
-  $('data-agent-mode-note').textContent='芯片隔离测试：从父URL链接库选少量芯片目标页；先复制正式数据库，结果只写入隔离副本。';
-  $('data-agent-seeds-note').textContent='测试数据来源仅用于测试副本，不会加入正式来源链接库。';
-  SOURCE_UPDATE_RENDERED_SNAPSHOT=null;
-  $('data-agent-seeds-list').innerHTML='';
-  loadSourceUpdates();
-  if($('data-agent-seeds-panel').style.display!=='none')loadDataAgentSeeds();
-}
-function dataAgentAdminHeader(){
-  if(!DATA_AGENT_ADMIN_TOKEN)DATA_AGENT_ADMIN_TOKEN=prompt('请输入数据更新管理员口令（仅保存在本次页面内存中）')||'';
-  return DATA_AGENT_ADMIN_TOKEN?{'X-Data-Agent-Admin':DATA_AGENT_ADMIN_TOKEN}:null;
-}
-async function dataAgentAdminRequest(url,options={}){
-  const localHosts=new Set(['localhost','127.0.0.1','::1']);
-  if(location.protocol!=='https:'&&!localHosts.has(location.hostname)){
-    throw new Error('数据更新管理操作不能在公网 HTTP 页面传输口令，请使用 HTTPS 或 SSH 隧道访问本机地址。');
-  }
-  const auth=dataAgentAdminHeader();
-  if(!auth)return null;
-  const response=await fetch(url,{...options,headers:{...auth,...(options.headers||{})}});
-  const payload=await response.json().catch(()=>({detail:'服务器返回格式不正确'}));
-  if(!response.ok){
-    if(response.status===403)DATA_AGENT_ADMIN_TOKEN='';
-    throw new Error(payload.detail||`请求失败 (${response.status})`);
-  }
-  return payload;
-}
-function toggleDataAgentSeeds(){
-  const panel=$('data-agent-seeds-panel');
-  panel.style.display=panel.style.display==='none'?'block':'none';
-  if(panel.style.display!=='none'){loadDataAgentSeeds();loadChipFamilies()}
-}
-async function loadChipFamilies(){
-  const status=$('data-agent-family-status');
-  try{
-    const data=await dataAgentAdminRequest(`${API}/data-agent/families`);
-    if(!data)return;
-    window.DATA_AGENT_FAMILIES=data.families||[];
-    window.DATA_AGENT_FAMILY_SELECTION=data.selection||null;
-    const select=$('data-agent-family-select');
-    select.innerHTML='<option value="">选择官网或资料父页面</option>'+window.DATA_AGENT_FAMILIES.map((item,index)=>
-      `<option value="${index}">${esc(item.parent_url)} · ${Number(item.child_count)}个芯片页</option>`).join('');
-    const selected=window.DATA_AGENT_FAMILIES.findIndex(item=>item.parent_url===data.selection?.parent_url);
-    if(selected>=0)select.value=String(selected);
-    renderChipFamilyTargets();
-    status.textContent=`可选 ${window.DATA_AGENT_FAMILIES.length} 个芯片 URL 族；只会运行勾选的页面。`;
-  }catch(error){status.innerHTML=`<span class="error">${esc(error.message)}</span>`}
-}
-function renderChipFamilyTargets(){
-  const index=Number($('data-agent-family-select').value),selected=$('data-agent-family-select').value;
-  const family=selected!==''?(window.DATA_AGENT_FAMILIES||[])[index]:null;
-  const target=$('data-agent-family-targets');
-  if(!family){target.innerHTML='';return}
-  const saved=window.DATA_AGENT_FAMILY_SELECTION?.parent_url===family.parent_url
-    ?new Set(window.DATA_AGENT_FAMILY_SELECTION.child_urls||[]):new Set();
-  target.innerHTML=`<div style="font-size:.8rem;color:var(--text3)">首轮访问父页；请选择 1–9 个库内芯片目标页。目标页也会直接访问，避免漏掉动态页面。</div>`+
-    family.children.map((item,index)=>`<label style="display:block;border-top:1px solid var(--border);padding:6px 0;overflow-wrap:anywhere">`+
-      `<input type="checkbox" data-child-index="${index}" ${saved.has(item.url)?'checked':''}> ${esc(item.url)}`+
-      `<small style="display:block;color:var(--text3);margin-left:24px">${esc(item.category)} · ${esc(item.description||'')}</small></label>`).join('');
-}
-async function saveChipFamilySelection(){
-  const selected=$('data-agent-family-select').value,family=(window.DATA_AGENT_FAMILIES||[])[Number(selected)];
-  const status=$('data-agent-family-status');
-  if(selected===''||!family){status.textContent='请先选择芯片 URL 族。';return}
-  const childUrls=[...$('data-agent-family-targets').querySelectorAll('input[type="checkbox"]:checked')]
-    .map(box=>family.children[Number(box.dataset.childIndex)].url);
-  try{
-    const result=await dataAgentAdminRequest(`${API}/data-agent/family-selection`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({parent_url:family.parent_url,child_urls:childUrls})
-    });
-    if(result){window.DATA_AGENT_FAMILY_SELECTION=result;status.textContent=`已选 ${childUrls.length} 个目标页 + 1 个父页；下一次手动执行只跑这些链接。`}
-  }catch(error){status.innerHTML=`<span class="error">${esc(error.message)}</span>`}
-}
-async function loadDataAgentSeeds(){
-  const list=$('data-agent-seeds-list');
-  try{
-    const data=await dataAgentAdminRequest(`${API}/data-agent/seeds?mode=${dataAgentMode()}`);
-    if(!data)return;
-    list.innerHTML=`<div style="font-size:.76rem;color:var(--text3);margin-bottom:8px">共 ${Number(data.seeds.length)} 条来源；测试模式只显示本次配置的来源。</div>`+
-      data.seeds.map((seed,index)=>{
-        const enabled=seed.enabled!==undefined?seed.enabled:seed.accessible!=='disabled';
-        return `<div style="padding:8px 0;border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap">`+
-          `<div><a href="${esc(seed.url)}" target="_blank" rel="noopener noreferrer">${esc(seed.url)}</a>`+
-          `<div style="font-size:.75rem;color:var(--text3)">${esc(seed.description||'')} · ${esc(seed.category||'')} · ${enabled?'启用':'停用'}</div></div>`+
-          `<button class="btn secondary" data-seed-index="${index}" onclick="toggleDataAgentSeed(this)">${enabled?'停用':'启用'}</button></div>`;
-      }).join('');
-    window.DATA_AGENT_VISIBLE_SEEDS=data.seeds;
-  }catch(error){list.innerHTML=`<div class="error">${esc(error.message)}</div>`}
-}
-async function saveDataAgentSeed(enabled,existing=null){
-  const source=existing||{url:$('data-agent-seed-url').value,description:$('data-agent-seed-description').value,
-    category:$('data-agent-seed-category').value,vendor:$('data-agent-seed-vendor').value};
-  try{
-    const result=await dataAgentAdminRequest(`${API}/data-agent/seeds`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({mode:dataAgentMode(),url:source.url,description:source.description,
-        category:source.category,vendor:source.vendor||'',enabled})
-    });
-    if(!result)return;
-    if(!existing)$('data-agent-seed-url').value='';
-    await loadDataAgentSeeds();
-  }catch(error){$('data-agent-seeds-list').innerHTML=`<div class="error">${esc(error.message)}</div>`}
-}
-function toggleDataAgentSeed(button){
-  const seed=(window.DATA_AGENT_VISIBLE_SEEDS||[])[Number(button.dataset.seedIndex)];
-  if(seed)saveDataAgentSeed(seed.enabled!==undefined?!seed.enabled:seed.accessible==='disabled',seed);
-}
-async function manualDataAgentRun(){
-  const mode=dataAgentMode(),test=true;
-  const message='现在运行一次芯片来源隔离测试？只访问选定链接，结果不写入正式数据。';
-  if(!confirm(message))return;
-  const button=$('data-agent-manual-button');button.disabled=true;
-  try{
-    const request=await dataAgentAdminRequest(`${API}/data-agent/manual-run`,{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode,limit:test?5:5})
-    });
-    if(request){$('data-agent-manual-status').innerHTML=`<div class="info">已提交${test?'开发测试':'正式巡检'}请求 #${esc(request.id)}；执行器处理后可在下方查看进度。</div>`;await loadSourceUpdates()}
-  }catch(error){$('data-agent-manual-status').innerHTML=`<div class="error">${esc(error.message)}</div>`}
-  finally{button.disabled=false}
-}
+function dataAgentMode(){return 'test'}
 
 function $(id){return document.getElementById(id)}
 function show(el,disp=''){el.style.display=disp}
@@ -3388,7 +3237,7 @@ function renderLatestSourceRun(run){
       '<div class="source-run-meta-item"><span>抓取开始时间</span><b>'+esc(formatUpdateTime(run.started_at))+'</b></div>'+
       '<div class="source-run-meta-item"><span>抓取结束时间</span><b>'+esc(formatUpdateTime(run.finished_at))+'</b></div>'+
       '<div class="source-run-meta-item"><span>运行模式</span><b>'+(run.mode==='test'?'隔离开发测试':run.mode==='apply-state'?'正式巡检并保存记录':esc(run.mode||'未知'))+'</b></div>'+
-      '<div class="source-run-meta-item"><span>当前自动调度</span><b>'+(dataAgentMode()==='test'?'隔离副本 · 手动执行':'Hermes 心跳 · 每天 02:00 开新周期，未完成每 30 分钟续跑')+'</b></div>'+
+      '<div class="source-run-meta-item"><span>当前自动调度</span><b>'+(dataAgentMode()==='test'?'隔离测试记录':'Hermes 心跳 · 每天 02:00 开新周期，未完成每 30 分钟续跑')+'</b></div>'+
       '<div class="source-run-meta-item"><span>Hermes 状态</span><b>Gateway、数据巡检与自动更新 Skill 已启用</b></div>'+
     '</div>'+
     (run.error_summary?'<div class="error" style="margin:10px 0 0">'+esc(run.error_summary)+'</div>':'')+'</div>';
@@ -3647,87 +3496,8 @@ function scheduleSourceUpdatesPoll(shouldPoll){
 
 async function loadSourceUpdates({silent=false}={}){
   if(SOURCE_UPDATE_POLL_TIMER){clearTimeout(SOURCE_UPDATE_POLL_TIMER);SOURCE_UPDATE_POLL_TIMER=null;}
-  const view=SOURCE_UPDATE_INITIAL_VIEW||captureSourceUpdateView();
-  const loading=$('source-updates-loading'), list=$('source-updates-list'), summary=$('source-update-summary'), lastRun=$('source-update-last-run'), agentOverview=$('data-agent-overview'), agentDetails=$('data-agent-details'), businessLink=$('source-update-business-link'), runEvents=$('source-update-run-events'), runSources=$('source-update-run-sources');
-  if(!silent)show(loading);
-  const mode=dataAgentMode();
-  const [data,agentData,manualData]=await Promise.all([
-    fetchJSON(`${API}/source-updates?limit=30&mode=${mode}`),
-    fetchJSON(`${API}/data-agent/status?limit=300&mode=${mode}`),
-    fetchJSON(`${API}/data-agent/manual-run?mode=${mode}`)
-  ]);
-  if(!silent)hide(loading);
-  if(data._error){
-    if(!silent)list.innerHTML='<div class="error">'+esc(data._error)+'</div>';
-    scheduleSourceUpdatesPoll(true);
-    return;
-  }
-  SOURCE_UPDATE_INITIAL_VIEW=null;
-  const manual=manualData.latest_request;
-  const shouldPoll=(data.latest_run&&data.latest_run.status==='running')||
-    (agentData.latest_cycle&&['running','awaiting_agent','awaiting_publish'].includes(agentData.latest_cycle.status))||
-    (manual&&['queued','running','dispatched'].includes(manual.status));
-  if(silent&&sourceUpdatesReading()){
-    scheduleSourceUpdatesPoll(shouldPoll);
-    return;
-  }
-  const snapshot=JSON.stringify([data,agentData,manualData]);
-  if(silent && snapshot===SOURCE_UPDATE_RENDERED_SNAPSHOT){
-    scheduleSourceUpdatesPoll(shouldPoll);
-    return;
-  }
-  SOURCE_UPDATE_RENDERED_SNAPSHOT=snapshot;
-  $('data-agent-manual-status').innerHTML=manual?`<div class="info">手动${mode==='test'?'测试':'巡检'} #${esc(manual.id)} · ${esc(manual.status)} · 提交 ${esc(formatUpdateTime(manual.created_at))}`+
-    (manual.finished_at?` · 结束 ${esc(formatUpdateTime(manual.finished_at))}`:'')+
-    (manual.message?`<br>${esc(manual.message)}`:'')+
-    (manual.error?`<br>${esc(manual.error)}`:'')+'</div>':'';
-  agentOverview.innerHTML=agentData._error?'<div class="error">'+esc(agentData._error)+'</div>':renderDataAgentOverview(agentData);
-  agentDetails.innerHTML=agentData._error?'':renderDataAgentDetails(agentData);
-  if(!data.available){
-    lastRun.innerHTML=renderLatestSourceRun(null);
-    summary.innerHTML='<span class="source-update-pill">尚未启用来源巡检</span>';
-    list.innerHTML='<div class="empty">运行首次来源巡检后，这里会展示页面变化记录。</div>';
-    await restoreSourceUpdateView(view);
-    scheduleSourceUpdatesPoll(shouldPoll);
-    return;
-  }
-  lastRun.innerHTML=renderLatestSourceRun(data.latest_run);
-  businessLink.innerHTML=renderSourceBusinessLink(data.latest_run);
-  runEvents.innerHTML=renderLatestRunEvents(data.latest_run);
-  runSources.innerHTML=renderLatestRunSources(data.latest_run);
-  summary.innerHTML='<span class="source-update-pill"><b>'+Number(data.count||0)+'</b> 条变化记录</span>'+
-    '<span class="source-update-pill">最近变化：'+esc(formatUpdateTime(data.latest_at))+'</span>';
-  if(!data.updates||!data.updates.length){
-    list.innerHTML='<div class="empty">已经启用巡检，目前还没有检测到正文变化。</div>';
-    await restoreSourceUpdateView(view);
-    scheduleSourceUpdatesPoll(shouldPoll);
-    return;
-  }
-  list.innerHTML=data.updates.map(item=>{
-    const fields=[];
-    (item.candidate_fields||[]).forEach(field=>{
-      const label=field.label||field.field;
-      if(label&&fields.indexOf(label)<0)fields.push(label);
-    });
-    const title=item.description||item.vendor||('来源 #'+item.link_id);
-    const url=item.final_url||item.requested_url||'';
-    const auto=item.auto_apply;
-    const autoFields=auto&&auto.fields||{};
-    const oldValues=auto&&auto.old_values||{};
-    const autoSummary=auto?Object.keys(autoFields).map(key=>key+': '+(oldValues[key]??'空')+' → '+autoFields[key]).join('；'):'';
-    return '<article class="source-update-card">'+
-      '<div class="source-update-head"><div><div class="source-update-title">'+esc(title)+'</div>'+
-      '<div class="source-update-meta">#'+esc(item.link_id)+' · '+esc(formatUpdateTime(item.created_at))+(url?' · '+esc(url):'')+'</div></div>'+
-      '<div style="white-space:nowrap;font-size:0.75rem"><span style="color:var(--green)">+'+Number(item.added_lines||0)+'</span> / <span style="color:var(--red)">-'+Number(item.removed_lines||0)+'</span></div></div>'+
-      '<div class="source-update-summary-text">'+esc(item.diff_summary||'检测到正文哈希变化')+'</div>'+
-      (auto?'<div class="info" style="margin:8px 0"><b>自动更新成功：</b>'+esc(auto.chip_model||'')+(autoSummary?' · '+esc(autoSummary):'')+'<br><span style="font-size:.7rem;color:var(--text3)">完成时间 '+esc(formatUpdateTime(auto.finished_at))+' · 溯源与备份已记录</span></div>':'<div class="source-update-meta" style="margin-top:7px">本条尚未产生自动写入记录：可能仍在处理，或因无法唯一确认而被自动跳过；具体原因可在 Hermes 运行记录中查看。</div>')+
-      (fields.length?'<div class="source-update-fields"><span style="font-size:0.7rem;color:var(--text3);padding:3px 0">可能涉及：</span>'+fields.map(label=>'<span class="source-update-field">'+esc(label)+'</span>').join('')+'</div>':'')+
-      '<div class="source-update-actions"><button class="btn secondary" onclick="toggleSourceUpdate('+Number(item.id)+')">查看新旧差异</button>'+
-      (item.truncated?'<span style="font-size:0.7rem;color:var(--orange)">差异较长，当前内容已截断</span>':'')+'</div>'+
-      '<div id="source-update-detail-'+Number(item.id)+'" style="display:none"></div></article>';
-  }).join('');
-  await restoreSourceUpdateView(view);
-  scheduleSourceUpdatesPoll(shouldPoll);
+  for(const id of ['source-update-last-run','data-agent-overview','data-agent-details','source-update-business-link','source-update-run-events','source-update-run-sources','source-update-summary','source-updates-list'])$(id).innerHTML='';
+  return loadRunHistory({silent});
 }
 
 /* ═══════════════════ INIT ═══════════════════ */

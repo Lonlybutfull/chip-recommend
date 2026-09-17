@@ -717,6 +717,10 @@ class DataAgentOrchestrator:
     ) -> CycleSummary:
         started = self.now_fn()
         run_id = self.start_cycle(allow_overlap=force, mode=mode)
+        self._event(run_id, 'orchestrator', 'run_parameters', 'recorded', '本轮运行参数快照。',
+                    {'limit': limit, 'force': force, 'mode': mode, 'max_attempts': max_attempts,
+                     'proxy_enabled': bool(proxy), 'max_crawl_depth': MAX_CRAWL_DEPTH,
+                     'selected_link_ids': selected_link_ids, 'parser_version': PARSER_VERSION})
         planned = self.plan(run_id, limit=limit, force=force,
                             selected_link_ids=selected_link_ids,
                             chip_only=mode == "test")
@@ -1441,6 +1445,8 @@ def finish_agent_job(
                         ),
                     )
                     candidate_ids.append(int(cursor.lastrowid))
+                from chip_model.pipeline.run_history import capture_candidate_baseline
+                capture_candidate_baseline(db, candidate_ids[-1])
                 inserted += 1
             discovered_count = 0
             raw_parent_depth = source_input.get("crawl_depth")

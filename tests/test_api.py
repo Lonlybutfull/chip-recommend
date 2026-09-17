@@ -62,54 +62,13 @@ def test_db_status():
     assert "chips" in data["tables"]
 
 
-def test_status_page_includes_source_update_review_ui():
-    resp = client.get("/status")
-    assert resp.status_code == 200
-    assert "系统状态 &amp; 数据更新" in resp.text or "系统状态 & 数据更新" in resp.text
-    assert 'id="source-updates-list"' in resp.text
-    assert 'id="source-update-last-run"' in resp.text
-    assert 'id="source-update-business-link"' in resp.text
-    assert 'id="source-update-run-events"' in resp.text
-    assert 'id="data-agent-overview"' in resp.text
-    assert 'id="data-agent-details"' in resp.text
-    assert 'id="source-update-run-sources"' in resp.text
-    assert "抓取开始时间" in resp.text
-    assert "抓取结束时间" in resp.text
-    assert "抓取链接：" in resp.text
-    assert "source-run-source-link" in resp.text
-    assert "Hermes 心跳 · 每天 02:00 开新周期，未完成每 30 分钟续跑" in resp.text
-    assert "Gateway、数据巡检与自动更新 Skill 已启用" in resp.text
-    assert "Agent 自动核验" in resp.text
-    assert "运行轨迹" in resp.text
-    assert "展开后暂停自动刷新" in resp.text
-    assert "Agent 任务队列" in resp.text
-    assert "data-agent-job-detail" in resp.text
-    assert "正文快照" in resp.text
-    assert "Agent 提取说明" in resp.text
-    assert "候选事实与提取证据" in resp.text
-    assert "data-agent/status?limit=300" in resp.text
-    assert "自动更新成功" in resp.text
-    assert "source-updates?limit=30" in resp.text
-
-
-def test_status_polling_keeps_open_logs_readable():
-    """Background polling must not rebuild logs while a detail panel is open."""
-    html = client.get("/status").text
-    assert "function sourceUpdatesReading()" in html
-    assert "if(sourceUpdatesReading())" in html
-    assert "loadSourceUpdates({silent:true})" in html
-    assert "if(silent && snapshot===SOURCE_UPDATE_RENDERED_SNAPSHOT)" in html
-
-
-def test_status_refresh_restores_reading_position():
-    """Manual refresh and full page reload should keep the current log in view."""
-    html = client.get("/status").text
-    assert "function captureSourceUpdateView()" in html
-    assert "function restoreSourceUpdateView(view)" in html
-    assert "if($('tab-status').classList.contains('active'))window.scrollTo(0,Number(view.scrollY)||0)" in html
-    assert "sessionStorage.setItem(SOURCE_UPDATE_VIEW_KEY" in html
-    assert "detail.open=!!view.openDetails?.[id]?.[index]" in html
-    assert "view.openJobIds" in html
+def test_status_page_loads_run_history_assets():
+    page = client.get("/status")
+    assert page.status_code == 200
+    assert '/run-history.js' in page.text
+    assert '/run-history.css' in page.text
+    assert client.get('/run-history.js').status_code == 200
+    assert client.get('/run-history.css').status_code == 200
 
 
 def test_source_updates_list_and_detail(tmp_path, monkeypatch):

@@ -617,6 +617,12 @@ CREATE TABLE IF NOT EXISTS extraction_candidates (
     FOREIGN KEY(link_id) REFERENCES link_library(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS candidate_baselines (
+    candidate_id INTEGER PRIMARY KEY REFERENCES extraction_candidates(id) ON DELETE CASCADE,
+    baseline_json TEXT NOT NULL,
+    captured_at TEXT NOT NULL
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_extraction_candidates_entity_dedupe
 ON extraction_candidates(
     cycle_run_id, COALESCE(source_diff_id, 0), owner_skill,

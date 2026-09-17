@@ -1,6 +1,8 @@
 # 当前线上部署
 
-更新时间：2026-09-16
+更新时间：2026-09-17
+
+2026-09-17 已部署独立运行卡片、运行历史和字段对比，详见 `docs/deploy_run_cards_20260917.md`。用户确认使用 HTTP。
 
 ## 访问入口
 
@@ -17,10 +19,10 @@
 
 - SSH：`lxc@81.70.231.92`
 - 项目根目录：`/home/lxc/chip-recommend`
-- 当前发布目录：`/home/lxc/chip-recommend/releases/20260916-150306`
+- 当前发布目录：`/home/lxc/chip-recommend/releases/20260917-025403`
 - 持久化数据库：`/home/lxc/chip-recommend/data/data.db`
 - Docker 容器：`chip-recommend`
-- Docker 镜像：`chip-recommend:codex-20260916-150306`
+- Docker 镜像：`chip-recommend:run-cards-20260917-025403`
 - 容器端口：`0.0.0.0:5340 -> 8000/tcp`
 - 重启策略：`unless-stopped`
 - Hermes：`hermes-gateway`、`hermes-webui`、`hermes-manual-run-dispatcher` 均在本机运行并开机自启

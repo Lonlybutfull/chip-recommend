@@ -1257,6 +1257,24 @@ def api_data_agent_status(
         raise HTTPException(status_code=503, detail=f"数据抓取智能体状态暂不可用：{exc}") from exc
 
 
+@app.get('/api/v1/data-agent/runs')
+def api_data_agent_runs(mode: str = Query('test', pattern='^(formal|test)$'),
+                        limit: int = Query(10, ge=1, le=50), offset: int = Query(0, ge=0)):
+    from chip_model.pipeline.run_history import list_runs
+    return list_runs(get_db_path(), mode=mode, limit=limit, offset=offset)
+
+
+@app.get('/api/v1/data-agent/runs/{session}/{run_id}')
+def api_data_agent_run_detail(session: str, run_id: int = Path(..., ge=1)):
+    from chip_model.pipeline.run_history import run_detail
+    try:
+        return run_detail(get_db_path(), session, run_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (OSError, sqlite3.Error) as exc:
+        raise HTTPException(status_code=503, detail='运行记录暂不可用') from exc
+
+
 class ManualRunRequest(BaseModel):
     mode: str
     limit: int = 5
