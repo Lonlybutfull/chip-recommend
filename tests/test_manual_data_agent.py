@@ -10,6 +10,9 @@ from chip_model.database import get_db_path, set_db_path
 from chip_model.pipeline.test_workspace import (
     create_test_workspace, latest_test_db, save_test_seed,
 )
+from chip_model.pipeline.manual_control import (
+    execute_open_web_manual_request, queue_manual_run,
+)
 from chip_model.server import app
 
 
@@ -106,5 +109,78 @@ def test_admin_token_is_rejected_over_public_http(tmp_path):
         )
         assert response.status_code == 426
         assert "HTTPS" in response.json()["detail"]
+    finally:
+        set_db_path(original)
+
+
+def test_open_web_manual_request_runs_in_api_background_worker(tmp_path, monkeypatch):
+    formal = _db(tmp_path)
+    original = get_db_path()
+    set_db_path(formal)
+    try:
+        request = queue_manual_run(
+            "test", 2, pipeline="open_web", skill="chip-benchmark",
+            chips=["TestChip X1"], target_fields=["throughput_tok_s"]
+        )
+        assert request["status"] == "running"
+        assert request["skill"] == "chip-benchmark"
+        assert request["target_fields"] == ["throughput_tok_s"]
+
+        def fake_run(**kwargs):
+            assert kwargs["source_db"] == formal
+            assert kwargs["skill_name"] == "chip-benchmark"
+            assert kwargs["target_fields"] == ["throughput_tok_s"]
+            return {
+                "session_id": "fixture-session",
+                "status": "success",
+                "db_path": str(tmp_path / "test_runs" / "fixture-session" / "data.db"),
+                "counts": {"validated": 1},
+                "formal_database_modified": False,
+            }
+
+        monkeypatch.setattr(
+            "chip_model.pipeline.open_web_test.run_open_web_test", fake_run
+        )
+        completed = execute_open_web_manual_request(request["id"])
+
+        assert completed["status"] == "completed"
+        assert completed["result"]["session_id"] == "fixture-session"
+        assert completed["result"]["formal_database_modified"] is False
+    finally:
+        set_db_path(original)
+
+
+def test_open_web_manual_request_rejects_unknown_skill(tmp_path):
+    formal = _db(tmp_path)
+    original = get_db_path()
+    set_db_path(formal)
+    try:
+        try:
+            queue_manual_run(
+                "test", 2, pipeline="open_web", skill="model-catalog",
+                chips=["TestChip X1"],
+            )
+        except ValueError as exc:
+            assert "不支持的信息类别" in str(exc)
+        else:
+            raise AssertionError("unknown skill should be rejected")
+    finally:
+        set_db_path(original)
+
+
+def test_open_web_manual_request_rejects_cross_category_field(tmp_path):
+    formal = _db(tmp_path)
+    original = get_db_path()
+    set_db_path(formal)
+    try:
+        try:
+            queue_manual_run(
+                "test", 2, pipeline="open_web", skill="chip-specs",
+                chips=["TestChip X1"], target_fields=["throughput_tok_s"],
+            )
+        except ValueError as exc:
+            assert "字段不属于基础参数" in str(exc)
+        else:
+            raise AssertionError("cross-category field should be rejected")
     finally:
         set_db_path(original)

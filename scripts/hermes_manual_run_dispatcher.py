@@ -41,8 +41,20 @@ def dispatch(path: Path, *, container: str, formal_job_id: str, test_job_id: str
     value.update(status="running", started_at=stamp())
     write_request(path, value)
     try:
-        command = [docker_bin, "exec", container, "python", "scripts/run_data_agent.py",
-                   "test" if mode == "test" else "run", "--limit", str(limit)]
+        pipeline = str(value.get("pipeline") or "known_sources")
+        if pipeline == "open_web":
+            command = [docker_bin, "exec", container, "python", "scripts/run_open_web_test.py",
+                       "--search-limit", str(limit), "--visit-limit", str(limit),
+                       "--skill", str(value.get("skill") or "chip-specs")]
+            for chip in value.get("chips") or []:
+                command.extend(("--chip", str(chip)))
+            for query in value.get("queries") or []:
+                command.extend(("--query", str(query)))
+            for field in value.get("target_fields") or []:
+                command.extend(("--field", str(field)))
+        else:
+            command = [docker_bin, "exec", container, "python", "scripts/run_data_agent.py",
+                       "test" if mode == "test" else "run", "--limit", str(limit)]
         if mode == "formal":
             command.append("--resume-stale-targets")
         result = subprocess.run(command, capture_output=True, text=True, timeout=1800, check=False)
@@ -54,6 +66,11 @@ def dispatch(path: Path, *, container: str, formal_job_id: str, test_job_id: str
         value["result"] = {key: summary.get(key) for key in (
             "run_id", "status", "planned_jobs", "awaiting_agent_jobs", "db_path", "session_id"
         ) if key in summary}
+        if pipeline == "open_web":
+            value.update(status="completed", finished_at=stamp(),
+                         message="开放互联网测试已完成；结果只保存在隔离测试区。")
+            write_request(path, value)
+            return value
         if mode == "test" and not test_job_active:
             value.update(status="partial", finished_at=stamp(),
                          message="隔离抓取已完成；测试 Hermes Agent 暂停，语义提取尚未执行。正式数据未改动。")

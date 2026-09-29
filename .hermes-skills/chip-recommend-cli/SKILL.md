@@ -1,6 +1,6 @@
 ---
 name: chip-recommend-cli
-description: AISHPerf CLI Skill — chip compute selection command-line tool for querying the chips/models/benchmarks knowledge graph.
+description: 使用 AISHPerf 命令行查询芯片、模型、实测、兼容性与来源信息，并生成可解释的芯片算力推荐。
 version: 2.0.0
 metadata:
   hermes:
@@ -8,117 +8,66 @@ metadata:
     related_skills: [chip-selector-agent]
 ---
 
-# AISHPerf CLI Skill
+# AISHPerf 命令行使用指南
 
-## Quick Reference
+## 快速入口
 
 ```bash
 cd /root/chip-recommend
-python scripts/run_cli.py <group> <command> [flags]
+python scripts/run_cli.py <命令组> <命令> [参数]
 ```
 
-## Command Groups
-
-### chip — Chip Query
+## 芯片查询与推荐
 
 ```bash
-# Search chips (fuzzy + multi-filter)
-python scripts/run_cli.py chip search [--search TEXT] [--vendor TEXT] [--region domestic|foreign]
-    [--usage train|inference|both] [--vram-min GB] [--vram-max GB] [--tdp-max W]
-    [--price-max WAN] [--interconnect-min GB/s] [--tier datacenter|consumer|all]
-    [--min-maturity 0-5] [--for-model TEXT] [--limit N] [--offset N]
+python scripts/run_cli.py chip search [--search TEXT] [--vendor TEXT] [--region domestic|foreign] \
+  [--usage train|inference|both] [--vram-min GB] [--vram-max GB] [--tdp-max W] \
+  [--price-max N] [--interconnect-min GB/s] [--tier datacenter|consumer|all] \
+  [--min-maturity 0-5] [--for-model TEXT] [--limit N] [--offset N]
 
-# Chip full profile (specs + ecosystem + benchmarks + compatibility + provenance)
 python scripts/run_cli.py chip profile <name_or_id> [<name_or_id> ...]
 
-# Recommend chips (v4.2 9-dimension scoring engine)
-python scripts/run_cli.py chip recommend --model TEXT [--scenario train|inference]
-    [--training-days N] [--training-tokens N] [--sla-tps N]
-    [--tier datacenter|all] [--max-cards N] [--min-cards N]
-    [--max-price N] [--min-maturity 0-5] [--domestic] [--prefer-vendor TEXT]
-    [--limit N]
+python scripts/run_cli.py chip recommend --model TEXT [--scenario train|inference] \
+  [--training-days N] [--training-tokens N] [--sla-tps N] \
+  [--tier datacenter|all] [--max-cards N] [--min-cards N] \
+  [--max-price N] [--min-maturity 0-5] [--domestic] [--prefer-vendor TEXT] \
+  [--limit N]
 ```
 
-### model — Model Query
+## 模型、实测与兼容性
 
 ```bash
-python scripts/run_cli.py model search [--search TEXT] [--author TEXT]
-    [--pipeline TYPE] [--architecture Dense|MoE] [--params-min B] [--params-max B]
-    [--for-chip TEXT] [--limit N]
-
+python scripts/run_cli.py model search [--search TEXT] [--author TEXT] \
+  [--pipeline TYPE] [--architecture Dense|MoE] [--params-min B] [--params-max B] \
+  [--for-chip TEXT] [--limit N]
 python scripts/run_cli.py model profile <name_or_id> [<name_or_id> ...]
+
+python scripts/run_cli.py benchmark search [--chip TEXT] [--model TEXT] \
+  [--workload inference|training] [--suite TEXT] [--limit N]
+
+python scripts/run_cli.py compat search [--chip TEXT] [--model TEXT] \
+  [--status verified|vendor_claimed|community] [--limit N]
 ```
 
-### benchmark — Benchmark Search
+## 来源与状态
 
 ```bash
-python scripts/run_cli.py benchmark search [--chip TEXT] [--model TEXT]
-    [--workload inference|training] [--suite TEXT] [--limit N]
-```
-
-### compat — Compatibility Query
-
-```bash
-python scripts/run_cli.py compat search [--chip TEXT] [--model TEXT]
-    [--status verified|vendor_claimed|community] [--limit N]
-```
-
-### provenance — Provenance Tracking
-
-```bash
-python scripts/run_cli.py provenance show --table chips|models|benchmarks|compat [--row-id N] [--field TEXT]
+python scripts/run_cli.py provenance show --table chips|models|benchmarks|compat \
+  [--row-id N] [--field TEXT]
 python scripts/run_cli.py provenance stats
-```
-
-### db — Database Management
-
-```bash
 python scripts/run_cli.py db status
 ```
 
-## Output Format
+## 使用规则
 
-All commands output JSON. Key fields:
-- `chip search`: `{count, chips: [{id, chip_model, vendor_display, vram_gb, precision_perf, ...}]}`
-- `chip recommend`: `{model, requirements, scoring_meta, candidates: [{chip, recommend, scoring}]}`
-- `chip profile`: `{chip: {identity, architecture, memory, ...}, benchmarks, compatibilities}`
-- `benchmark search`: `{count, benchmarks: [{chip_model, model_id, throughput_tok_s, mfu_pct, ...}]}`
-- `db status`: `{tables: {chips: {count}, models: {count}, ...}}`
+- 所有命令输出 JSON；必须根据本次结果回答，不得使用记忆补造。
+- 模型与场景明确时先用 `chip recommend`；硬件约束明确时用 `chip search`。
+- 查询具体芯片时使用 `chip profile`，查询真实表现时使用 `benchmark search`。
+- 推荐结果应说明前三名、显存与卡数、主要评分项、实测证据和方案取舍。
+- 评分权重以当前 CLI 返回的 `scoring_meta` 为准，不在 Skill 中硬编码旧版本。
+- 量化模型只用于推理；消费级芯片需显式指定 `--tier all`。
+- 中文输出按 UTF-8 解析。
 
-## Scoring v4.2 (9 Dimensions, 3 Categories)
+## 完成标准
 
-| Category | Weight | Dimensions |
-|----------|--------|------------|
-| Compute (50%) | | compute_perf, node_efficiency, bandwidth_ratio |
-| Cost-Efficiency (20%) | | cost_efficiency, power_efficiency |
-| Ecosystem (30%) | | ecosystem_maturity, framework_toolchain, source_authenticity, production_readiness |
-
-## Key DB Facts
-
-- 1098 chips (27 vendors, 17 domestic + 10 foreign)
-- 1370 models (LLM x53, VLM x31, Embedding x16, BERT x18, Audio x11)
-- 2103 benchmark records (2081 inference, 22 training)
-- 2720 compatibility records
-- All data traceable via field_provenance (11613 records, 65% official_datasheet)
-
-## Usage Patterns
-
-**Pattern A: User has model + workload -> recommendations**
-```
-chip recommend --model <name> --scenario train|inference
-```
-
-**Pattern B: User has hardware constraints -> filter**
-```
-chip search --vram-min 80 --tier datacenter --region domestic
-```
-
-**Pattern C: User wants to know about specific chip**
-```
-chip profile <name>
-```
-
-**Pattern D: User wants benchmark data**
-```
-benchmark search --chip X --model Y
-```
+命令成功、JSON 可解析，回答中的型号、规格、分数和卡数来自本次输出。失败时报告真实错误和可重试建议，不得以旧结果伪装成功。

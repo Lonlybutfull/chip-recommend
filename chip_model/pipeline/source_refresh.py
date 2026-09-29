@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import difflib
+import io
 import ipaddress
 import json
 import os
@@ -251,6 +252,7 @@ def validate_source_url(
 def normalize_content(raw: bytes, content_type: str, encoding: str | None) -> str:
     """Return deterministic full-body text used for semantic change hashing."""
     mime = content_type.split(";", 1)[0].strip().lower()
+    is_pdf = mime == "application/pdf" or raw.startswith(b"%PDF-")
     supported = {
         "",
         "text/html",
@@ -259,19 +261,33 @@ def normalize_content(raw: bytes, content_type: str, encoding: str | None) -> st
         "application/json",
         "text/json",
     }
-    if mime not in supported:
+    if mime not in supported and not is_pdf:
         raise UnsupportedContentType(
-            f"第一阶段仅支持静态 HTML、纯文本和 JSON；收到 {mime or 'unknown'}。"
+            f"测试抓取仅支持静态 HTML、PDF、纯文本和 JSON；收到 {mime or 'unknown'}。"
         )
 
-    text = raw.decode(encoding or "utf-8", errors="replace")
-    if mime in {"application/json", "text/json"}:
+    if is_pdf:
+        try:
+            from pypdf import PdfReader
+
+            reader = PdfReader(io.BytesIO(raw))
+            text = "\n".join(
+                f"[第 {index} 页]\n{page.extract_text() or ''}"
+                for index, page in enumerate(reader.pages, 1)
+            )
+        except ImportError as exc:
+            raise UnsupportedContentType("PDF 解析组件未安装。") from exc
+        except Exception as exc:
+            raise EmptyContent(f"PDF 文本提取失败：{exc}。") from exc
+    else:
+        text = raw.decode(encoding or "utf-8", errors="replace")
+    if mime in {"application/json", "text/json"} and not is_pdf:
         try:
             parsed = json.loads(text)
         except json.JSONDecodeError as exc:
             raise EmptyContent(f"JSON 响应无法解析：{exc.msg}。") from exc
         text = json.dumps(parsed, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    elif mime in {"", "text/html", "application/xhtml+xml"}:
+    elif mime in {"", "text/html", "application/xhtml+xml"} and not is_pdf:
         soup = BeautifulSoup(text, "lxml")
         for tag in soup(
             [
@@ -386,6 +402,8 @@ def _retry_after_seconds(value: str | None, now: datetime) -> float | None:
 
 def _snapshot_extension(content_type: str) -> str:
     mime = content_type.split(";", 1)[0].strip().lower()
+    if mime == "application/pdf":
+        return ".pdf"
     if mime in {"application/json", "text/json"}:
         return ".json"
     if mime == "text/plain":

@@ -77,3 +77,41 @@ def test_paused_test_agent_is_reported_as_partial(tmp_path, monkeypatch):
     assert final["status"] == "partial"
     assert "语义提取尚未执行" in final["message"]
     assert len(calls) == 1
+
+
+def test_open_web_request_runs_once_without_waking_hermes(tmp_path, monkeypatch):
+    request = tmp_path / "request.json"
+    request.write_text(json.dumps({
+        "id": "web", "mode": "test", "pipeline": "open_web", "limit": 4,
+        "skill": "chip-specs", "chips": ["昇腾 910B"],
+        "queries": ["官方规格"], "target_fields": ["vram_gb"],
+        "status": "queued",
+    }), encoding="utf-8")
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        class Result:
+            returncode = 0
+            stdout = '{"session_id":"web123","status":"success"}'
+            stderr = ""
+        return Result()
+
+    monkeypatch.setattr(dispatcher.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        dispatcher.subprocess, "Popen",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("open-web test must not wake Hermes")
+        ),
+    )
+    final = dispatcher.dispatch(
+        request, container="chip-recommend", formal_job_id="formal",
+        test_job_id="test", hermes_python="hermes-python",
+    )
+    assert final["status"] == "completed"
+    assert calls == [[
+        "/usr/bin/docker", "exec", "chip-recommend", "python",
+        "scripts/run_open_web_test.py", "--search-limit", "4", "--visit-limit", "4",
+        "--skill", "chip-specs", "--chip", "昇腾 910B", "--query", "官方规格",
+        "--field", "vram_gb",
+    ]]

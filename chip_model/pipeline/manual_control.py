@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -58,13 +59,47 @@ def save_seed_url(
     raise ValueError("正式来源维护已暂停；请在芯片隔离测试中配置来源。")
 
 
-def queue_manual_run(mode: str, limit: int = 5) -> dict[str, Any]:
+def queue_manual_run(
+    mode: str,
+    limit: int = 5,
+    *,
+    pipeline: str = "known_sources",
+    skill: str = "chip-specs",
+    chips: list[str] | None = None,
+    queries: list[str] | None = None,
+    target_fields: list[str] | None = None,
+) -> dict[str, Any]:
     if mode not in {"formal", "test"}:
         raise ValueError("运行模式仅支持 formal 或 test。")
     if mode == "formal":
         raise ValueError("正式巡检已暂停；目前只允许手动芯片隔离测试。")
     if not 1 <= limit <= 10:
         raise ValueError("手动执行的测试种子数必须在 1–10 之间。")
+    if pipeline not in {"known_sources", "open_web"}:
+        raise ValueError("测试类型仅支持 known_sources 或 open_web。")
+    if pipeline == "open_web":
+        from chip_model.pipeline.open_web_test import (
+            _resolve_target_fields,
+            resolve_test_skill,
+        )
+
+        skill, skill_config = resolve_test_skill(skill)
+        clean_target_fields = list(dict.fromkeys(
+            str(value).strip() for value in (target_fields or [])
+            if str(value).strip()
+        ))
+        if clean_target_fields:
+            _resolve_target_fields(skill_config, clean_target_fields)
+    else:
+        clean_target_fields = []
+    clean_chips = [str(value).strip() for value in (chips or []) if str(value).strip()]
+    clean_queries = [str(value).strip() for value in (queries or []) if str(value).strip()]
+    if pipeline == "open_web" and not clean_chips and not clean_queries:
+        raise ValueError("开放互联网测试至少填写一个芯片名称或搜索词。")
+    if len(clean_chips) > 5 or len(clean_queries) > 5:
+        raise ValueError("单次测试最多填写 5 个芯片和 5 个补充搜索词。")
+    if any(len(value) > 160 for value in clean_chips + clean_queries):
+        raise ValueError("芯片名称或搜索词过长。")
     root = control_root()
     pending = root / "requests"
     pending.mkdir(parents=True, exist_ok=True)
@@ -75,13 +110,63 @@ def queue_manual_run(mode: str, limit: int = 5) -> dict[str, Any]:
             continue
         if old.get("mode") == mode and old.get("status") in {"queued", "running"}:
             raise RuntimeError(f"已有 {mode} 手动执行请求正在排队或运行。")
+    in_process = pipeline == "open_web"
     request = {"id": uuid.uuid4().hex, "mode": mode, "limit": limit,
-               "status": "queued", "created_at": datetime.now(timezone.utc).isoformat()}
+               "pipeline": pipeline, "skill": skill,
+               "chips": clean_chips, "queries": clean_queries,
+               "target_fields": clean_target_fields,
+               "status": "running" if in_process else "queued",
+               "created_at": datetime.now(timezone.utc).isoformat()}
+    if in_process:
+        request["started_at"] = request["created_at"]
     target = pending / (request["id"] + ".json")
     temporary = pending / (request["id"] + ".tmp")
     temporary.write_text(json.dumps(request, ensure_ascii=False), encoding="utf-8")
     temporary.replace(target)
     return request
+
+
+def execute_open_web_manual_request(request_id: str) -> dict[str, Any]:
+    """Execute one claimed open-web request inside the API background worker."""
+    if not re.fullmatch(r"[0-9a-f]{32}", request_id):
+        raise ValueError("无效手动测试标识。")
+    path = control_root() / "requests" / f"{request_id}.json"
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if value.get("pipeline") != "open_web" or value.get("status") != "running":
+        return value
+    try:
+        from chip_model.pipeline.open_web_test import run_open_web_test
+
+        result = run_open_web_test(
+            source_db=get_db_path(),
+            chips=list(value.get("chips") or []),
+            skill_name=str(value.get("skill") or "chip-specs"),
+            extra_queries=list(value.get("queries") or []),
+            target_fields=list(value.get("target_fields") or []),
+            search_limit=int(value["limit"]),
+            visit_limit=int(value["limit"]),
+        )
+        value["result"] = {
+            key: result.get(key) for key in (
+                "session_id", "status", "db_path", "counts",
+                "formal_database_modified",
+            )
+        }
+        value.update(
+            status="completed",
+            finished_at=datetime.now(timezone.utc).isoformat(),
+            message="开放互联网测试已完成；结果只保存在隔离测试区。",
+        )
+    except Exception as exc:
+        value.update(
+            status="failed",
+            finished_at=datetime.now(timezone.utc).isoformat(),
+            error=str(exc)[:1500],
+        )
+    temporary = path.with_suffix(".writing")
+    temporary.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+    temporary.replace(path)
+    return value
 
 
 def latest_manual_result(mode: str) -> dict[str, Any] | None:

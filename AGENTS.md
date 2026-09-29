@@ -17,7 +17,7 @@
 ├── chip_model/                    # 主 Python 包
 │   ├── __init__.py                # 包初始化
 │   ├── database.py                # 数据库连接 + 查询 + 写入接口
-│   ├── server.py                  # FastAPI 后端（16 API 端点）
+│   ├── server.py                  # FastAPI 后端
 │   ├── cli_app.py                 # CLI 入口（Typer 框架，12 命令）
 │   ├── config.py                  # 配置管理
 │   ├── legacy.py                  # 历史批量扩充脚本
@@ -40,6 +40,7 @@
 │   ├── CLI_EXAMPLES.md            # CLI 示例
 │   ├── CLI_TEST_DOC.md            # CLI 测试文档
 │   ├── progress.md                # 项目进度
+│   ├── open_web_test_runbook.md   # 开放互联网隔离测试操作手册
 │   └── data_fixes.md              # 数据修正记录
 ├── data/                          # 数据文件
 │   ├── data.db                  # SQLite 数据库
@@ -48,7 +49,8 @@
 ├── static/
 │   └── index.html                 # 前端 SPA
 ├── tests/                         # 测试
-├── .Codex/skills/                # chip-catalog + chip-enrich 技能
+├── .agents/skills/               # Codex 芯片目录、参数、算力、兼容、实测和部署技能
+├── .hermes-skills/               # Hermes 数据更新技能
 ├── Dockerfile                     # 容器化部署
 ├── requirements.txt               # Python 依赖
 └── .gitignore
@@ -136,7 +138,7 @@ python scripts/run_server.py
 | 🔗 兼容性 | 芯片↔模型兼容关系浏览 |
 | 📊 系统状态 | 数据库全景统计 |
 
-### API 端点（16 个）
+### 核心 API 端点
 
 ```
 GET  /api/v1/chips             芯片搜索（多条件筛选）
@@ -151,6 +153,9 @@ GET  /api/v1/compat             兼容性搜索
 GET  /api/v1/provenance         来源追溯
 GET  /api/v1/provenance/stats   来源统计
 GET  /api/v1/db/status          数据库状态
+GET  /api/v1/data-agent/open-web-runs              开放互联网测试运行列表
+GET  /api/v1/data-agent/open-web-runs/{session_id} 单次测试完整结果
+POST /api/v1/data-agent/manual-run                  管理员后端手动启动测试
 GET  /api/v1/health             健康检查
 GET  /docs                      Scalar API 文档
 ```
@@ -172,6 +177,9 @@ python scripts/run_enrich.py
 ```
 
 需要代理 `http://127.0.0.1:7897`。
+
+开放互联网芯片信息隔离测试的命令、API、运行产物和安全边界见
+[`docs/open_web_test_runbook.md`](docs/open_web_test_runbook.md)。
 
 ## 关键规则
 
