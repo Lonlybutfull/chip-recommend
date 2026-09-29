@@ -67,8 +67,42 @@ def test_status_page_loads_run_history_assets():
     assert page.status_code == 200
     assert '/run-history.js' in page.text
     assert '/run-history.css' in page.text
-    assert client.get('/run-history.js').status_code == 200
-    assert client.get('/run-history.css').status_code == 200
+    assert '刷新记录' in page.text
+    assert 'id="open-web-run-button"' not in page.text
+    assert 'id="open-web-token"' not in page.text
+    assert 'id="open-web-skill"' not in page.text
+    assert 'startOpenWebTest' not in page.text
+    script = client.get('/run-history.js')
+    styles = client.get('/run-history.css')
+    assert script.status_code == 200
+    assert styles.status_code == 200
+    assert '已有链接明细' in script.text
+    assert '开放网络新增链接' in script.text
+    assert '未访问或重复链接' not in script.text
+    assert '搜索新网址明细' in script.text
+    assert 'auditSearchDetails' in script.text
+    assert '目标 Skill' in script.text
+    assert '构词策略' in script.text
+    assert '发现来源' in script.text
+    assert 'discovery_skills' in script.text
+    assert '原始排名 #' in script.text
+    assert "section('audit-issues'" not in script.text
+    assert "section('audit-skills'" not in script.text
+    assert "section('audit-categories'" not in script.text
+    assert "section('audit-timeline'" not in script.text
+    assert "auditLinkGroup('existing'" in script.text
+    assert 'data-audit-link-filter' in script.text
+    for label in ('芯片型号', '基础参数', '算力指标', '兼容信息', '实测数据', '部署资料'):
+        assert label in script.text
+    assert 'mergeAuditLinkAssets' in script.text
+    assert 'auditCategoryCell' in script.text
+    assert '已提取并校验的字段数' in script.text
+    assert '.audit-link-row' in styles.text
+    assert '.audit-link-category' in styles.text
+    assert '.audit-category-state.extracted' in styles.text
+    assert '.audit-search-query' in styles.text
+    assert '.audit-search-result' in styles.text
+    assert '.audit-skill-badge' in styles.text
 
 
 def test_source_updates_list_and_detail(tmp_path, monkeypatch):

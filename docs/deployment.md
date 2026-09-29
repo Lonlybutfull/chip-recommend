@@ -1,6 +1,76 @@
 # 当前线上部署
 
-更新时间：2026-09-17
+更新时间：2026-09-28
+
+## 2026-09-28 开放互联网分类 Skill v1.2
+
+- 当前发布目录：`/home/lxc/chip-recommend/releases/20260928-222335-skill-v1.2`
+- 当前镜像：`chip-recommend:skill-v1.2-20260928-222335`
+- 回滚容器：`chip-recommend-previous-20260928-222335`（已停止）
+- 数据库快照：`/home/lxc/chip-recommend/data/backups/20260928-222335-skill-v1.2/data.db`（`quick_check=ok`）
+- 六类开放互联网 Skill 已升级到 `1.2.0`：芯片型号、硬件规格、算力指标、兼容信息、实测数据、部署资料。
+- Skill 现已明确输入、字段范围、粗筛与正文复核、网页快照与逐字证据、输出留痕、常见错误和完成标准；同一网页可记录多个信息类别。
+- 发布仅覆盖六个 Skill 及 `open_web_test.py` 中的版本注册表，没有带入工作区其他未完成改动，也没有启动抓取任务。
+- 本地专项测试 `18 passed`、完整回归 `244 passed`；隔离 canary、运行历史 API、双 Skill 目录、线上 SQLite `quick_check` 和公网入口均通过。
+- 部署前后正式数据库 SHA-256 均为 `b77e2af7244469dcc38bf08b9effb5d473bd57796fe569521d91a8b9c542534f`，正式数据未变化。
+
+## 2026-09-23 开放互联网测试链路 v2
+
+- 当前发布目录：`/home/lxc/chip-recommend/releases/20260923-165351-open-web-v2`
+- 当前镜像：`chip-recommend:open-web-v2-20260923-165351`
+- 回滚容器：`chip-recommend-previous-20260923-165351`（已停止）
+- 数据库快照：`/home/lxc/chip-recommend/data/backups/20260923-165351/data.db`（`quick_check=ok`）
+- 六类 Skill 更新至 `1.1.0`：先确定目标字段，再按类别关键词、来源类型和目标字段生成可审计的搜索计划。
+- `url_assets.jsonl` 现在记录所有实际访问 URL；包含发现搜索词、搜索策略、提供商、排名、域名、网页形态、访问状态、网页镜像、复核结论、一个或多个信息类别及提取字段。
+- 后端脚本和受保护接口支持传入 `target_fields`，并拒绝跨类别字段；状态页仍无启动入口，只在历史详情中展示 URL 资产结果。
+- 本地完整回归 `177 passed`，六个 Skill 规范校验、服务器 canary、SQLite `quick_check`、80 端口公网健康检查和运行历史接口均通过。
+- 本次部署没有启动真实互联网抓取任务，也没有写入新的正式业务数据。
+
+## 2026-09-23 测试统一由后端启动
+
+- 当前发布目录：`/home/lxc/chip-recommend/releases/20260923-162923-status-readonly`
+- 当前镜像：`chip-recommend:status-readonly-20260923-162923`
+- 回滚容器：`chip-recommend-previous-20260923-162923`（已停止）
+- 数据库快照：`/home/lxc/chip-recommend/data/backups/20260923-162923/data.db`
+- 状态页删除信息类别、芯片、搜索词、口令和“开始测试”等启动控件，只保留运行结果、历史记录和“刷新记录”。
+- 测试脚本与后端接口继续保留；开发测试只在收到明确测试请求后从服务器后端执行，页面访问不会触发任务。
+- 本地完整回归 `173 passed`，服务器 canary、正式健康检查、运行记录接口及 80 端口公网状态页均验证通过。
+
+## 2026-09-22 开放互联网分类 Skill
+
+- 当前发布目录：`/home/lxc/chip-recommend/releases/20260922-200621-open-web-skills`
+- 当前镜像：`chip-recommend:open-web-skills-20260922-200621`
+- 回滚容器：`chip-recommend-previous-20260922-200621`（已停止）
+- 数据库快照：`/home/lxc/chip-recommend/data/backups/20260922-200621/data.db`（`quick_check=ok`）
+- 页面可以选择芯片型号、基础参数、算力指标、兼容信息、实测数据和部署资料；每类使用独立搜索词、粗筛线索、字段白名单和目标数据表。
+- 新增六个中文 Skill，并同时放入镜像内 `.agents/skills` 与 `.claude/skills`。
+- 粗筛不再因为只提到芯片名称就通过；指定芯片时还必须出现当前信息类别的线索。
+- 精确复核通过的页面写入本次运行的 `url_assets.jsonl`，记录搜索词、信息类别、芯片、内容哈希和判定原因。
+- 本地全量测试 `173 passed`；隔离 canary、公网健康检查、状态页分类选择和正式数据库 `quick_check` 均通过。
+- 线上 `chip-benchmark` 小规模测试搜索 15 条、粗筛并访问 1 条，正式数据库主体哈希未变化；模型网关仍返回 HTTP 401，因此尚未完成语义复核和字段提取。
+
+## 2026-09-22 数据更新页面精简
+
+- 发布目录：`/home/lxc/chip-recommend/releases/20260922-161708-ui`
+- 镜像：`chip-recommend:ui-compact-20260922-161708`
+- 当时的回滚容器：`chip-recommend-previous-20260922-161708`（已停止）
+- 删除页面中重复出现的测试隔离提示，不再占用首屏空间。
+- 单次运行默认只展示“字段提取与校验”和“详细记录”两个层级；运行阶段、参数、URL、网页访问、Agent 任务和时间线统一收进“详细记录”。
+- 开放互联网运行摘要由四项统计缩减为“网页访问、有效字段”两项；旧任务统一收进“历史运行”。
+- 本地全量测试 `168 passed`，服务器 canary、正式健康检查、公网状态页和 SQLite `quick_check` 均通过。
+
+## 2026-09-22 开放互联网隔离测试
+
+- 上一发布目录：`/home/lxc/chip-recommend/releases/20260922-131053`
+- 上一镜像：`chip-recommend:open-web-test-20260922-131053-final`
+- 发布前数据库快照：`/home/lxc/chip-recommend/backups/20260922-131053/data.db`（`quick_check=ok`）
+- 新增“基础参数”开放互联网测试：Bing 与 360 搜索 → 粗筛 → 安全访问 → 网页快照 → 大模型复核与字段提取。
+- 全部结果只写 `data/test_runs/<session_id>/` 与副本中的 `test_*` 表；不会调用正式候选发布器，也不会更新正式业务表。
+- 页面字段已简化为“要查的芯片、补充搜索词、开始测试、找到的信息、访问过的网页、执行记录”。
+- 手动开放互联网测试由 API 后台任务直接执行，不依赖 Hermes 心跳或旧的主机调度脚本；正式巡检仍保持关闭。
+- 线上实测会话 `20260922-053543-37cce7ca` 已完成搜索和官方 H100 页面访问，正式数据库主体哈希前后一致。
+- 当前 GLM 网关凭据调用 `glm-5.3` 返回 HTTP 401；替换服务器私密文件 `config/data-agent.env` 中的有效凭据后即可继续模型提取。密钥不写入代码、镜像和文档。
+- 当前公网仅提供 HTTP。管理接口继续要求 HTTPS 或本机/SSH 隧道，因此公网页面会禁用“开始测试”按钮，避免管理员口令明文传输。
 
 2026-09-17 已部署独立运行卡片、运行历史和字段对比，详见 `docs/deploy_run_cards_20260917.md`。用户确认使用 HTTP。
 
@@ -19,10 +89,10 @@
 
 - SSH：`lxc@81.70.231.92`
 - 项目根目录：`/home/lxc/chip-recommend`
-- 当前发布目录：`/home/lxc/chip-recommend/releases/20260917-025403`
+- 当前发布目录：`/home/lxc/chip-recommend/releases/20260928-222335-skill-v1.2`
 - 持久化数据库：`/home/lxc/chip-recommend/data/data.db`
 - Docker 容器：`chip-recommend`
-- Docker 镜像：`chip-recommend:run-cards-20260917-025403`
+- Docker 镜像：`chip-recommend:skill-v1.2-20260928-222335`
 - 容器端口：`0.0.0.0:5340 -> 8000/tcp`
 - 重启策略：`unless-stopped`
 - Hermes：`hermes-gateway`、`hermes-webui`、`hermes-manual-run-dispatcher` 均在本机运行并开机自启
@@ -31,7 +101,7 @@
 
 ## 自动数据自检
 
-- 当前模式：正式巡检与开发测试 Cron 均禁用，只允许页面手动触发隔离测试
+- 当前模式：正式巡检与开发测试 Cron 均禁用；网页不提供任务启动入口，隔离测试只从服务器后端按需执行
 - 恢复正式巡检后的计划：北京时间 `02:00` 开启当天首轮；未完成周期每 30 分钟继续检查并续跑，完成后当天静默
 - 调度方：`81.70.231.92` 上的 Hermes Gateway（开机自启）
 - Hermes 任务：`AISHPerf 数据抓取智能体`（ID `268fc87564c3`）

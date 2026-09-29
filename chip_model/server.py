@@ -13,11 +13,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path as FilePath
 from typing import Annotated, Optional
 
-from fastapi import FastAPI, Query, Path, Body, HTTPException, Response, Header, Request
+from fastapi import (
+    BackgroundTasks, FastAPI, Query, Path, Body, HTTPException, Response, Header, Request,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from scalar_fastapi import get_scalar_api_reference, Theme
 
 from chip_model.database import (
@@ -84,12 +86,16 @@ from chip_model.scoring import (  # v4.2 scoring engine
 )
 from chip_model.pipeline.data_agent import DataAgentOrchestrator, get_data_agent_status
 from chip_model.pipeline.test_workspace import latest_test_db
+from chip_model.pipeline.open_web_test import (
+    list_open_web_test_runs,
+    read_open_web_test_run,
+)
 from chip_model.pipeline.link_families import (
     read_chip_families, read_family_selection, save_family_selection,
 )
 from chip_model.pipeline.manual_control import (
     admin_token_valid, latest_manual_result, list_seed_urls,
-    queue_manual_run, save_seed_url,
+    execute_open_web_manual_request, queue_manual_run, save_seed_url,
 )
 from chip_model.measured_inference import (
     get_comparable_measurements,
@@ -1275,9 +1281,32 @@ def api_data_agent_run_detail(session: str, run_id: int = Path(..., ge=1)):
         raise HTTPException(status_code=503, detail='运行记录暂不可用') from exc
 
 
+@app.get('/api/v1/data-agent/open-web-runs')
+def api_open_web_test_runs(final_only: bool = False):
+    """List isolated open-web test runs; never reads candidate data from the formal DB."""
+    return {
+        "runs": list_open_web_test_runs(get_db_path(), final_only=final_only)
+    }
+
+
+@app.get('/api/v1/data-agent/open-web-runs/{session_id}')
+def api_open_web_test_run_detail(session_id: str):
+    try:
+        return read_open_web_test_run(get_db_path(), session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (OSError, sqlite3.Error) as exc:
+        raise HTTPException(status_code=503, detail='开放互联网测试记录暂不可用') from exc
+
+
 class ManualRunRequest(BaseModel):
     mode: str
     limit: int = 5
+    pipeline: str = "known_sources"
+    skill: str = "chip-specs"
+    chips: list[str] = Field(default_factory=list)
+    queries: list[str] = Field(default_factory=list)
+    target_fields: list[str] = Field(default_factory=list)
 
 
 class SeedUrlRequest(BaseModel):
@@ -1366,11 +1395,23 @@ def api_data_agent_save_seed(
 def api_data_agent_manual_run(
     request: ManualRunRequest,
     http_request: Request,
+    background_tasks: BackgroundTasks,
     admin_token: str | None = Header(None, alias="X-Data-Agent-Admin"),
 ):
     _require_data_agent_admin(admin_token, http_request)
     try:
-        return queue_manual_run(request.mode, request.limit)
+        queued = queue_manual_run(
+            request.mode,
+            request.limit,
+            pipeline=request.pipeline,
+            skill=request.skill,
+            chips=request.chips,
+            queries=request.queries,
+            target_fields=request.target_fields,
+        )
+        if request.pipeline == "open_web":
+            background_tasks.add_task(execute_open_web_manual_request, queued["id"])
+        return queued
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:

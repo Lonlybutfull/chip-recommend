@@ -19,7 +19,7 @@ DATA_DIR=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/app/data"}
 test -n "$DATA_DIR"
 test -f "$DATA_DIR/data.db"
 
-mkdir -p "$BACKUP_DIR" "$HERMES_ROOT/scripts" "$HERMES_ROOT/skills/data-update-orchestrator"
+mkdir -p "$BACKUP_DIR" "$HERMES_ROOT/scripts" "$HERMES_ROOT/skills"
 for target in \
   "$HERMES_ROOT/scripts/data_agent_gate.json" \
   "$HERMES_ROOT/scripts/data_agent_gate_61.json" \
@@ -40,8 +40,23 @@ cp "$PROJECT_ROOT/config/hermes_primary_worker.json" "$HERMES_ROOT/scripts/local
 cp "$PROJECT_ROOT/config/hermes_legacy_disabled.json" "$HERMES_ROOT/scripts/source_refresh_gate.json"
 cp "$PROJECT_ROOT/scripts/hermes_data_agent_gate.py" "$HERMES_ROOT/scripts/hermes_data_agent_gate.py"
 cp "$PROJECT_ROOT/scripts/hermes_data_agent_worker.py" "$HERMES_ROOT/scripts/hermes_data_agent_worker.py"
-cp "$PROJECT_ROOT/.hermes-skills/data-update-orchestrator/SKILL.md" \
-  "$HERMES_ROOT/skills/data-update-orchestrator/SKILL.md"
+for skill_dir in \
+  "$PROJECT_ROOT"/.hermes-skills/url-* \
+  "$PROJECT_ROOT"/.hermes-skills/data-* \
+  "$PROJECT_ROOT"/.hermes-skills/chip-* \
+  "$PROJECT_ROOT"/.hermes-skills/model-* \
+  "$PROJECT_ROOT"/.hermes-skills/benchmark-* \
+  "$PROJECT_ROOT"/.hermes-skills/deployment-*; do
+  [[ -d "$skill_dir" ]] || continue
+  skill_name=$(basename "$skill_dir")
+  target="$HERMES_ROOT/skills/$skill_name"
+  if [[ -d "$target" ]]; then
+    mkdir -p "$BACKUP_DIR/skills/$skill_name"
+    cp -a "$target/." "$BACKUP_DIR/skills/$skill_name/"
+  fi
+  mkdir -p "$target"
+  cp -R "$skill_dir/." "$target/"
+done
 chmod 600 "$HERMES_ROOT/scripts/"{data_agent_gate.json,data_agent_gate_61.json,local_docker_worker.json,source_refresh_gate.json}
 chmod 700 "$HERMES_ROOT/scripts/"{hermes_data_agent_gate.py,hermes_data_agent_worker.py}
 

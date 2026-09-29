@@ -17,6 +17,8 @@ COPY static/ ./static/
 
 # Copy skills so the chat agent can enumerate project capabilities
 COPY .claude/skills/ .claude/skills/
+COPY .agents/skills/ .agents/skills/
+COPY .agents/skills/ .claude/skills/
 
 # Copy data files
 COPY data/ ./data/

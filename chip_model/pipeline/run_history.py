@@ -200,15 +200,16 @@ def run_detail(base, session, run_id):
                for skill in sorted({j['skill_name'] for j in jobs if j['job_type'] == 'agent_extract'})]
     stages = []
     for label, types, explanation in [
-        ('首轮访问', ['source_refresh'], '访问本次选定来源，保存网页快照。'),
-        ('URL 发现', ['agent_url_discovery', 'agent_discovery'], '从父页真实链接中筛选目标，完成去重和安全校验。'),
-        ('第二轮访问', ['source_target_refresh'], '抓取发现的详情页，保留重定向与响应信息。'),
-        ('字段提取与校验', ['agent_extract'], '按领域提取候选，并核对字段格式及原文证据。')]:
+        ('检查已有来源', ['source_refresh'], '访问本次选定来源并保存网页内容。'),
+        ('查找新资料', ['agent_url_discovery', 'agent_discovery'], '从网页中寻找可能有用的新链接。'),
+        ('访问候选网页', ['source_target_refresh'], '访问新发现的详情页并保存结果。'),
+        ('提取信息', ['agent_extract'], '提取候选信息，并核对格式与原文依据。')]:
         subset = [j for j in jobs if j['job_type'] in types]
         counts = {s: sum(j['status'] == s for j in subset) for s in {j['status'] for j in subset}}
         status = 'not_run' if not subset else 'running' if any(counts.get(s) for s in ('queued', 'running', 'awaiting_agent')) else 'failed' if counts.get('failed') == len(subset) else 'partial' if counts.get('failed') else 'success'
         stages.append({'label': label, 'status': status, 'counts': counts, 'description': explanation})
-    stages.append({'label': '审核与发布', 'status': 'success' if changes and all(c['published'] for c in changes) else 'awaiting_publish' if changes else 'not_run', 'counts': {}, 'description': '候选待审核不等于已更新；只有发布记录代表实际写入。'})
+    stages.append({'label': '保存测试结果', 'status': 'success' if changes else 'not_run',
+                   'counts': {}, 'description': '结果只保存在本次隔离测试区，不会修改正式数据库。'})
     events.sort(key=lambda e: (e.get('created_at') or '', e.get('id', 0)))
     return {**data, **summary, 'run': summary, 'parameters': parameters, 'planned_fields': planned,
             'sources': sources, 'timeline': events, 'field_changes': changes, 'stages': stages, 'runtime': runtime}
