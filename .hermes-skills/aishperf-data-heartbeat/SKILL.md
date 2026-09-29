@@ -1,6 +1,6 @@
 ---
 name: aishperf-data-heartbeat
-description: Process structured AISHPerf source-monitor results, automatically publish unambiguous official chip-field changes with provenance and validation, and report the result in Chinese.
+description: 处理结构化的 AISHPerf 来源巡检结果，对明确的官方芯片字段变化完成溯源、校验和发布，并用中文报告结果。
 metadata:
   hermes:
     tags: [aishperf, heartbeat, data-quality, monitoring]

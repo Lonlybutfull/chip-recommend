@@ -1,7 +1,7 @@
 ---
 name: chip-catalog
 version: 2.0.0
-description: Extract AI accelerator chips from source CSVs and web search, deduplicate, insert into chips table with field_provenance tracking.
+description: 从来源表、网页和行业资料中识别 AI 加速芯片，规范化并去重后写入芯片目录，同时保留字段级来源记录。
 allowed-tools:
   - Bash
   - Read
@@ -12,209 +12,83 @@ allowed-tools:
   - WebSearch
   - WebFetch
 triggers:
-  - chip catalog
-  - extract chip list
-  - build chip list
-  - seed chip names
-  - populate chips table
+  - 芯片目录
+  - 提取芯片清单
+  - 构建芯片清单
+  - 播种芯片名称
+  - 写入芯片表
 ---
 
-## When to invoke
+# 芯片目录构建
 
-Extracts AI accelerator chip identities from source materials (CSV files, web search, industry reports). Normalizes and deduplicates into a canonical catalog, then inserts each chip with identity fields + `field_provenance` records using `database.insert_chip()`. This is **Step 1** — hardware specs come next (/chip-enrich).
+## 何时使用
 
-## Working directory
+需要从 CSV、网页或行业报告中整理“有哪些芯片”时使用。本 Skill 只建立芯片身份与生命周期信息；显存、算力、功耗等规格交给 `chip-enrich`。已有芯片不得重复插入。
 
-All commands run from the `芯片+模型/` directory:
+## 工作目录与依赖
 
-```bash
-cd 芯片+模型
-```
-
-## Files this skill depends on
-
-| File | Purpose |
-|------|---------|
-| `信息来源链接库_final.csv` | Source CSV (474 rows of chip/model/test/price references) |
-| `schema.sql` | DDL reference for the 78 chip columns |
-| `database.py` | Contains `insert_chip()`, `get_db()` — **use these, never raw SQL** |
-| `data.db` | SQLite database |
-
-If any required file is missing, tell the user and stop.
-
-## What "identity fields" means
-
-This skill writes ONLY these fields. Hardware specs are left NULL for `/chip-data-enrich`.
-
-| # | Field | Source |
-|---|-------|--------|
-| 1 | `vendor` | Normalized from CSV "涉及厂商" column |
-| 2 | `vendor_display` | Chinese display name for the vendor |
-| 3 | `vendor_region` | `domestic` or `foreign` |
-| 4 | `chip_series` | Canonical series name |
-| 5 | `chip_model` | Canonical model name (include VRAM suffix when known) |
-| 6 | `chip_type` | `GPU` / `NPU` / `DCU` / `TPU` / `LPU` / `ASIC` / `IPU` |
-| 7 | `usage` | `训推一体` / `训练` / `推理` |
-| 8 | `tier` | `datacenter` / `consumer` / `edge` |
-| 9 | `production_status` | `已量产` / `已发布` / `待发布` / `EOL` |
-| 10 | `is_released` | `"1"` or `"0"` |
-| 11 | `expected_release_date` | Only for pre-release chips (is_released="0") |
-| 12 | `created_at` | ISO timestamp |
-| 13 | `updated_at` | ISO timestamp |
-
-## Exclusion rules
-
-These categories appear in the CSV but are **NOT chips** — skip them:
-
-| Category | Keywords / patterns | Why |
-|----------|---------------------|-----|
-| Servers / enclosures | Atlas 800, Atlas 900, SuperPoD, REX, CloudMatrix, 服务器, 集群, Pod, 机柜 | These are server products, not chips |
-| CPU-only | 鲲鹏, 飞腾, 龙芯, Kunpeng, Phytium, Loongson, C86-4G, C86-5G, ARM CPU, 服务器CPU | Not AI accelerators |
-| Edge/auto SoC | 征程, Journey, 华山, SG2380, 黑芝麻, 地平线, 智能座舱 | Edge/automotive SoCs, not datacenter AI |
-| IP licensing | 芯原, VIP, NPU IP | IP cores, not physical chips |
-| HF model IDs | Anything matching `org/model-name` pattern | Models, not chips |
-
-**Rule of thumb before inserting any chip**: "Would someone use this to train or serve a 7B+ parameter LLM in a datacenter?" If the answer is no, skip it.
-
-## Normalization rules
-
-1. **One canonical `chip_model` per variant.** Include VRAM when known: `"H100 SXM5 80GB"` not `"H100 SXM"`
-2. **`vendor` is the English/romanized slug** (if available), `vendor_display` is the Chinese display name
-3. **Sub-variants are separate rows.** 昇腾910B B1, B2, B4 → three rows, all with `chip_series="昇腾910B"`
-4. **Pre-release chips get `is_released="0"`** and `expected_release_date` set
-5. **Standard vendor names**: `华为(昇腾)` / `寒武纪` / `壁仞科技` / `摩尔线程` / `沐曦股份` / `燧原科技` / `昆仑芯(百度)` / `海光信息` / `景嘉微` / `天数智芯` / `NVIDIA` / `AMD` / `Intel` / `Google` / `AWS` / `Microsoft` / `Meta` / `Groq` / `Cerebras` / `SambaNova` / `Graphcore`
-
-## Workflow
-
-### Step 1 — Read the source CSV
-
-Read `信息来源链接库_final.csv`. Parse the "描述" column for chip name patterns:
-
-- `硬件规格 - CHIP_NAME | ...` → extract CHIP_NAME
-- `CHIP_NAME 硬件规格参考` → extract CHIP_NAME
-- `CHIP_NAME 生态评估` → extract CHIP_NAME
-- Also scan "涉及厂商" for vendor names
-
-Build a raw candidate set. Also check for vendor/product pages in the URL column.
-
-### Step 2 — Supplement with WebSearch
-
-Search for chips that may be missing from the CSV:
-
-```
-国产AI加速芯片 全景图 2025 2026 算力芯片 GPU NPU 列表
-AI accelerator chip catalog 2025 2026 datacenter GPU NPU TPU list
-site:jygpu.com AI芯片 国产 GPU 列表
-```
-
-Add chips found from web results that are real datacenter AI accelerators and not already in the candidate set.
-
-### Step 3 — Deduplicate and normalize
-
-Group raw references by canonical chip identity. Apply naming rules from the normalization section above.
-
-When presenting for user review, group by vendor with counts:
-
-```
-=== CURATED CHIP LIST ===
-NVIDIA (foreign): 14 chips
-  Released: A100 SXM4 80GB, A100 PCIe 80GB, H100 SXM5 80GB, H100 NVL 94GB, ...
-  Pre-release: —
-
-华为(昇腾) (domestic): 6 chips
-  Released: 昇腾910B B1 (64GB), 昇腾910B B2 (64GB), 昇腾910B B4 (64GB), 昇腾910C (OAM 128GB)
-  Pre-release: 昇腾950PR (128GB)
-
-=== STATS ===
-Total: N chips across M vendors
-  Released: R  |  Pre-release: U
-  Domestic: D  |  Foreign: F
-```
-
-Ask the user to confirm with AskUserQuestion.
-
-### Step 4 — Insert into database
-
-Use a Python script that calls `database.add_chip()`. The script pattern:
-
-```python
-import sqlite3
-from datetime import datetime
-from database import add_chip
-
-CHIPS = [
-    # (vendor, vendor_display, vendor_region, chip_series, chip_model,
-    #  chip_type, usage, tier, production_status, is_released, expected_release_date)
-]
-
-SOURCE = {
-    "source_type": "community",
-    "source_url": "信息来源链接库_final.csv + curated from web search",
-    "source_detail": "curated chip catalog v2",
-    "confidence": "medium",
-    "is_official": "0",
-}
-
-def run():
-    conn = sqlite3.connect("data.db")
-    conn.execute("PRAGMA journal_mode=WAL")
-    now = datetime.now().isoformat()
-
-    inserted = 0
-    for chip in CHIPS:
-        (vendor, vendor_display, vendor_region, chip_series, chip_model,
-         chip_type, usage, tier, prod_status, is_released, exp_rel) = chip
-
-        # Skip if chip_model already exists (idempotent)
-        existing = conn.execute(
-            "SELECT id FROM chips WHERE chip_model = ?", (chip_model,)
-        ).fetchone()
-        if existing:
-            print(f"  SKIP (exists): {chip_model}")
-            continue
-
-        fields = {
-            "vendor": vendor,
-            "vendor_display": vendor_display,
-            "vendor_region": vendor_region,
-            "chip_series": chip_series,
-            "chip_model": chip_model,
-            "chip_type": chip_type,
-            "usage": usage,
-            "tier": tier,
-            "production_status": prod_status,
-            "is_released": is_released,
-            "expected_release_date": exp_rel,
-        }
-
-        row_id = add_chip(conn, fields, SOURCE)
-        inserted += 1
-        print(f"  INSERT [{row_id}] {vendor_display} — {chip_model}")
-
-    conn.commit()
-    conn.close()
-    print(f"\nDone: {inserted} chips inserted")
-
-if __name__ == "__main__":
-    run()
-```
-
-Write this script as `_seed_chip_list.py` and execute it:
+从项目根目录运行：
 
 ```bash
-python _seed_chip_list.py
+cd E:/BUPT_PS/P_0/chip-recommend
 ```
 
-### Step 5 — Verify
+| 文件 | 用途 |
+|---|---|
+| `data/信息来源链接库_final.csv` | 已有来源链接与描述 |
+| `schema.sql` | `chips` 与 `field_provenance` 字段定义 |
+| `chip_model/database.py` | 统一数据库写入接口 |
+| `data/data.db` | SQLite 数据库 |
+
+缺少必需文件时停止并明确报告，不得改用猜测数据。
+
+## 负责字段
+
+仅负责：`vendor`、`vendor_display`、`vendor_region`、`chip_series`、`chip_model`、`chip_type`、`usage`、`tier`、`production_status`、`is_released`、`expected_release_date`、`created_at`、`updated_at`。
+
+- `vendor_region`：`domestic` 或 `foreign`。
+- `chip_type`：`GPU`、`NPU`、`DCU`、`TPU`、`LPU`、`ASIC`、`IPU`。
+- `usage`：`训推一体`、`训练`、`推理`。
+- `tier`：`datacenter`、`consumer`、`edge`。
+- `is_released`：字符串 `"1"` 或 `"0"`；未发布时同时填写 `expected_release_date`。
+
+## 排除与规范化规则
+
+1. 排除服务器、集群、机柜、整机与 CPU，例如 Atlas 800、SuperPoD、CloudMatrix、鲲鹏、飞腾、龙芯。
+2. 排除车载 SoC、纯 IP 授权和形如 `org/model-name` 的模型标识。
+3. 只保留可用于 AI 训练或推理的实际加速芯片。
+4. 每个具体变体只有一个规范 `chip_model`；已知显存时写入型号后缀，例如 `H100 SXM5 80GB`。
+5. 子型号分别建行；厂商英文或罗马字写入 `vendor`，中文展示名写入 `vendor_display`。
+
+## 执行流程
+
+1. 读取来源 CSV，从“描述”“涉及厂商”和 URL 中提取候选型号。
+2. 必要时用开放互联网补齐候选，优先厂商官网与官方产品页。
+3. 按厂商、系列、型号、形态和显存变体规范化，合并别名并排除非芯片条目。
+4. 查询 `chips`，以规范型号判断是否已存在，保证重复执行不会重复写入。
+5. 调用 `chip_model.database` 中的统一接口写入芯片；禁止直接拼接原始 SQL 绕过来源记录。
+6. 每个已写字段同步生成 `field_provenance`，记录具体 `source_url`、`source_type`、`confidence` 和 `is_official`。
+7. 用 CLI 验证数量、厂商和发布状态：
 
 ```bash
-python cli.py --db-path data.db db status
+python scripts/run_cli.py db status
+python scripts/run_cli.py chip search --limit 20
 ```
 
-Report the result. Show chip count per vendor_region.
+## 来源与安全要求
 
-## Completion status
+- 官网或官方数据表：`confidence="high"`，并按实际情况设置 `is_official="1"`。
+- 可信媒体或行业资料：通常为 `confidence="medium"`。
+- 单一社区信息或传闻：`confidence="low"`；关键身份有冲突时不写入。
+- 不得把其他芯片的型号或规格复制到当前实体，不得根据常识补造型号。
 
-- **DONE** — chips inserted, provenance records written, verified via `db status`
-- **BLOCKED** — source CSV missing, database not initialized
-- **NEEDS_CONTEXT** — ambiguous chip identity requiring user resolution
+## 输出要求
+
+报告候选数、排除数、去重数、新增数、已存在数和来源记录数，并按厂商列出新增芯片。对身份冲突项给出型号、冲突来源和待确认点。
+
+## 完成标准
+
+- **完成**：芯片身份已规范化写入，逐字段来源记录完整，CLI 验证通过。
+- **带问题完成**：大部分写入成功，但存在明确列出的身份冲突或低可信候选。
+- **阻塞**：来源文件缺失、数据库不可用或网络不可达。
+- **需要确认**：同一型号存在无法自动判断的实体冲突。

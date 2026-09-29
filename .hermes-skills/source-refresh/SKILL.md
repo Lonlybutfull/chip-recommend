@@ -1,6 +1,6 @@
 ---
 name: source-refresh
-description: Monitor explicitly approved AISHPerf source links, report meaningful page changes or repeated failures, and never modify chip/model business data.
+description: 监控明确批准的 AISHPerf 来源链接，报告有意义的页面变化或连续失败，不修改芯片与模型业务数据。
 metadata:
   hermes:
     tags: [chip, data-quality, monitoring, cron]

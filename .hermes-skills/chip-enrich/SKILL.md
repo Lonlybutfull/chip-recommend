@@ -1,6 +1,6 @@
 ---
 name: chip-enrich
-description: Fill detailed hardware specs for chip rows using LLM knowledge + WebSearch + WebFetch, writing every field with field_provenance tracking via database.update_chip_fields().
+description: 对已有芯片执行旧式批量信息扩充，按字段组检索证据并通过统一接口写入字段级来源；队列任务不得调用。
 version: 2.0.0
 metadata:
   hermes:
@@ -8,95 +8,58 @@ metadata:
     related_skills: [chip-catalog]
 ---
 
-## When to invoke
+# 芯片批量扩充
 
-For each chip, searches for specs across all 14 field groups, then writes values with `field_provenance` records using `database.update_chip_fields()`. Chips must already exist in the database (from `chip-catalog`).
+## 何时使用
 
-> 此 Skill 仅保留给人工发起的旧式批量扩充流程。收到 `data_agent` 队列任务时不要使用本 Skill，也不要直接写库；必须改用任务指定的 `chip-basic`、`chip-compute`、`chip-interconnect`、`chip-ecosystem` 或 `chip-price`，并由统一 Publisher 发布候选事实。
+仅供人工发起的旧式批量扩充流程使用。收到 `data_agent` 队列任务时不得使用本 Skill，也不得直接写库；应改用任务指定的 `chip-basic`、`chip-compute`、`chip-interconnect`、`chip-ecosystem` 或 `chip-price`，再由统一发布器处理候选事实。
 
-## Working directory
+## 工作目录与依赖
 
 ```bash
 cd /root/chip-recommend
 ```
 
-## Key Files
+依赖 `data/data.db`、`schema.sql` 和 `chip_model/database.py`。芯片必须已由 `chip-catalog` 建立。
 
-| File | Purpose |
-|------|---------|
-| `data/data.db` | Must have chip rows from chip-catalog |
-| `chip_model/database.py` | `update_chip_fields()`, `get_db()` — **use these, never raw SQL** |
-| `schema.sql` | DDL reference (78 chip columns) |
+## 字段与证据规则
 
-## Field Format Conventions (all TEXT)
+关键字段组包括 `memory`、`precision`、`clock_power_physical`、`architecture`、`interconnect`、`compute_units`、`cache`、`software` 和 `pricing`。这些值必须来自实际网页，不得使用模型记忆补齐。
 
-| Field | Format | Example |
-|-------|--------|---------|
-| `vram_gb` | Bare number | `"80"` |
-| `vram_bw_gb_s` | Bare number | `"3350"` |
-| `tdp_w` | Bare number | `"700"` |
-| `process_node_nm` | Bare number | `"4"` |
-| `die_size_mm2` | Bare number | `"814"` |
-| `transistors_b` | Bare number | `"80"` |
-| `precision_support` | Comma-separated tags | `"FP32,FP16,BF16,FP8,INT8"` |
-| `precision_perf` | `TAG=VALUE` pairs | `"BF16=1980TF,FP8=3960TF"` |
-| `price_cny_wan` | Bare number (万元) | `"18"` |
-| `maturity_level` | Integer 0-5 | `"5"` |
-| `cloud_available` | `"0"` or `"1"` | `"1"` |
+非关键字段组为 `description`、`ecosystem` 和 `lifecycle`。确无公开来源时可使用模型整理，但必须标记：
 
-## Source Quality Rules
+- `source_type="llm_curated"`
+- `source_url="LLM curated"`
+- `confidence="medium"`
+- `is_official="0"`
 
-| Level | Criteria |
-|-------|----------|
-| `high` | Manufacturer datasheet, official product page, MLPerf |
-| `medium` | Reputable tech site (AnandTech, ServeTheHome, SemiAnalysis) |
-| `low` | Single community source, rumor, LLM inference |
+数值字段只保存纯数字字符串；精度性能使用 `BF16=1980TF,FP8=3960TF` 形式；布尔字段使用 `"0"` 或 `"1"`。找不到可靠来源时保留 NULL。
 
-**Critical rule**: LLM-curated (`source_type="llm_curated"`) ONLY allowed for: description, ecosystem, lifecycle groups. Core hardware fields MUST come from WebSearch+WebFetch.
+## 写入要求
 
-## Write Function
+必须调用 `chip_model.database.update_chip_fields()`，由该接口更新旧值并逐字段写入 `field_provenance`。禁止直接执行 `UPDATE chips` 或自行插入来源表。
 
 ```python
-from chip_model.database import update_chip_fields
-import sqlite3
-
-conn = sqlite3.connect("data/data.db")
 source = {
     "source_type": "official_datasheet",
     "source_url": "https://www.nvidia.com/en-us/data-center/h100/",
-    "source_detail": "Specs table > Memory",
+    "source_detail": "规格表 > 显存",
     "confidence": "high",
     "is_official": "1",
-    "field_label": "H100 Datasheet",
-    "notes": "",
 }
-fields = {"vram_gb": "80", "vram_type": "HBM3", "vram_bw_gb_s": "3350", "tdp_w": "700"}
+fields = {"vram_gb": "80", "vram_type": "HBM3", "vram_bw_gb_s": "3350"}
 update_chip_fields(conn, chip_id=3, fields=fields, source=source)
-conn.close()
 ```
 
-## The 14 Field Groups
+## 执行流程
 
-| # | Group | Critical? |
-|---|-------|-----------|
-| 1 | `memory` | YES — no LLM |
-| 2 | `precision` | YES — no LLM |
-| 3 | `clock_power_physical` | YES — no LLM |
-| 4 | `architecture` | YES — no LLM |
-| 5 | `interconnect` | YES — no LLM |
-| 6 | `compute_units` | YES — no LLM |
-| 7 | `cache` | YES — no LLM |
-| 8 | `software` | YES — no LLM |
-| 9 | `pricing` | YES — no LLM |
-| 10 | `description` | Non-critical (LLM OK) |
-| 11 | `ecosystem` | Non-critical (LLM OK) |
-| 12 | `lifecycle` | Non-critical (LLM OK) |
-| 13 | `identity` | Already filled |
-| 14 | `meta` | System-managed |
+1. 用 `python scripts/run_cli.py chip search --limit 50` 找出字段缺失的芯片。
+2. 明确本次芯片范围，逐颗按字段组处理。
+3. 先搜索厂商官网，再搜索可靠第三方来源，并打开具体页面核验原文。
+4. 归一化字段值，按来源分组调用 `update_chip_fields()`。
+5. 矛盾或口径不明的值保持为空并记录原因。
+6. 用 `python scripts/run_cli.py chip profile "<chip_model>"` 验证。
 
-## Workflow
+## 完成标准
 
-1. Find chips needing enrichment: `python scripts/run_cli.py chip search --limit 50`
-2. For each critical group: WebSearch -> WebFetch -> extract specs -> `update_chip_fields()`
-3. For non-critical groups: try WebSearch first, then LLM knowledge as fallback
-4. Verify: `python scripts/run_cli.py chip profile "<chip_model>"`
+报告处理芯片数、新增字段数、网页证据字段数、模型整理字段数、来源记录数以及仍缺失或冲突的关键字段。所有写入必须可追溯。
