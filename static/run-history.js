@@ -85,7 +85,8 @@
       const issueCount=Math.max(0,num(existing.safe_unique_urls)-num(existing.reachable))+Math.max(0,num(fresh.visited_unique_urls)-num(fresh.reachable));
       return `<div class="run-card-head"><div><h3>全部链接检查<span class="run-title-hint">展开结果 ↓</span></h3><div class="run-card-meta">已有链接库 + 6 类信息的开放互联网搜索<br>开始 ${txt(formatUpdateTime(run.started_at))} · 结束 ${txt(formatUpdateTime(run.finished_at))}</div></div>${badge(run.status)}</div><div class="run-card-stats"><span class="run-card-stat strong">已有链接可用 ${num(existing.reachable)} / ${num(existing.safe_unique_urls)}</span><span class="run-card-stat strong">新网址可用 ${num(fresh.reachable)} / ${num(fresh.visited_unique_urls)}</span><span class="run-card-stat warning">需处理 ${issueCount}</span></div>`;
     }
-    return `<div class="run-card-head"><div><h3>开放互联网测试 · ${txt(run.skill_label||'基础参数')}</h3><div class="run-card-meta">${txt((run.chips||[]).join('、')||'自定义搜索')}<br>开始 ${txt(formatUpdateTime(run.started_at))} · 结束 ${txt(formatUpdateTime(run.finished_at))}</div></div>${badge(run.status)}</div><div class="run-card-stats"><span class="run-card-stat">网页访问 ${num(c.visit_succeeded)} / ${num(c.visited||c.coarse_passed)}</span><span class="run-card-stat">有效字段 ${num(c.validated)}</span></div>`;
+    const hermes=run.schema_version==='hermes-open-web-v1';
+    return `<div class="run-card-head"><div><h3>${hermes?'Hermes 开放网络更新':'开放互联网测试'} · ${txt(run.skill_label||'基础参数')}</h3><div class="run-card-meta">${txt((run.chips||[]).join('、')||'自定义搜索')}<br>开始 ${txt(formatUpdateTime(run.started_at))} · 结束 ${txt(formatUpdateTime(run.finished_at))}</div></div>${badge(run.status)}</div><div class="run-card-stats">${hermes?`<span class="run-card-stat">搜索词 ${num(c.queries)}</span><span class="run-card-stat">去重候选 ${num(c.unique_candidates)}</span><span class="run-card-stat">可访问 ${num(c.reachable)} / ${num(c.previewed)}</span>`:`<span class="run-card-stat">网页访问 ${num(c.visit_succeeded)} / ${num(c.visited||c.coarse_passed)}</span>`}<span class="run-card-stat">有效字段 ${num(c.validated)}</span></div>`;
   }
   function openWebCard(run){
     const audit=run.skill==='all-skills'&&run.audit_summary;
@@ -256,11 +257,44 @@
       section('audit-new',`开放网络新增链接 · ${uniqueNew.length} 条（${num(fresh.reachable)} 条可用）`,auditLinkGroup('new','新增链接',uniqueNew),true)+
       `<div class="run-note">抓取结果：可用 ${num(outcomes.new)} · 等待重试 ${num(outcomes.retry_wait)} · 失败 ${num(outcomes.failed)}</div>`;
   }
+  function renderHermesRun(d){
+    const plan=Array.isArray(d.search_plan)?d.search_plan:[],results=Array.isArray(d.search_results)?d.search_results:[];
+    const previews=new Map((d.url_previews||[]).map(row=>[row.candidate_id,row]));
+    const decisions=new Map((d.url_decisions||[]).map(row=>[row.candidate_id,row]));
+    const byQuery=new Map(plan.map(item=>[String(item.query||''),[]]));
+    for(const candidate of results){
+      if(candidate.status!=='candidate')continue;
+      for(const mention of candidate.mentions||[]){
+        const query=String(mention.query||'');if(!byQuery.has(query))byQuery.set(query,[]);
+        byQuery.get(query).push({...candidate,mention});
+      }
+    }
+    const searches=`<div class="audit-search-queries">${plan.map((item,index)=>{
+      const rows=byQuery.get(String(item.query||''))||[];
+      return `<details class="audit-search-query"><summary><span class="audit-search-index">${index+1}</span><span class="audit-search-query-main"><b>${txt(item.query)}</b><small>${txt(item.reason||'未记录构词理由')}</small></span><strong>${rows.length} 条结果</strong></summary><div class="audit-search-results">${rows.map(row=>`<article class="audit-search-result"><span class="audit-search-rank">#${num(row.mention?.rank)||'-'}</span><div><b>${txt(row.title||row.url)}</b><div class="run-links">${link(row.url)}</div>${row.snippet?`<p>${txt(row.snippet)}</p>`:''}<small>${txt(row.mention?.provider||'搜索来源未记录')} · 候选 ${txt(row.candidate_id)}</small></div></article>`).join('')||'<div class="run-note">该搜索词没有可用结果。</div>'}</div></details>`;
+    }).join('')}</div>`;
+    const candidateRows=results.filter(row=>row.status==='candidate').map(row=>{
+      const preview=previews.get(row.candidate_id)||{},decision=decisions.get(row.candidate_id)||{};
+      const categories=(decision.matched_categories||[]).join('、')||'未标记';
+      return `<div class="run-source"><div class="run-source-title"><b>${txt(row.title||row.url)}</b>${badge(preview.access_status==='reachable'?'succeeded':'failed')}</div><div class="run-links">${link(row.url)}</div><div class="run-note">候选 ${txt(row.candidate_id)} · HTTP ${txt(preview.http_status)} · ${decision.selected?'已选择':'未选择'} · 类别 ${txt(categories)}</div>${preview.core_text?`<div class="run-value">核心预览：${txt(preview.core_text)}</div>`:''}<div class="run-note">判断理由：${txt(decision.reason||preview.error||'未记录')}</div>${(decision.suggested_skills||[]).length?`<div class="run-note">建议联动：${auditSkillBadges(decision.suggested_skills)}</div>`:''}</div>`;
+    }).join('')||'<div class="run-note">本轮没有候选网页。</div>';
+    const facts=(d.facts||[]).map(f=>`<div class="run-source"><b>${txt(auditSkillName(f.skill_name||f.skill))} · ${txt(f.chip_model||'未确认芯片')} · ${txt(f.field_name)}</b> = ${txt(f.proposed_value)} ${txt(f.unit||'')}<div class="run-links">${link(f.source_url)}</div><div class="run-note">${txt(f.validation_status==='validated'?'校验通过':'未通过：'+(f.rejection_reason||'原因未记录'))}</div><div class="run-value">原文：${txt(f.evidence_text)}</div></div>`).join('')||'<div class="run-note">本轮没有通过校验的字段。</div>';
+    const linked=(d.linked_tasks||[]).map(row=>`<div class="run-source"><b>${txt(auditSkillName(row.parent_skill))} → ${txt(auditSkillName(row.skill))}</b> · ${badge(row.status)}<div class="run-links">${link(row.url)}</div><div class="run-note">复用候选 ${txt(row.candidate_id)} · 深度 ${num(row.depth)} · 通过字段 ${num(row.validated)}</div></div>`).join('')||'<div class="run-note">本轮没有触发其他 Skill。</div>';
+    const traces=(d.tool_trace||[]).map(row=>`<div><span class="run-note">${txt(formatUpdateTime(row.started_at))} · ${txt(row.tool)}</span><br>${badge(row.status)} ${txt(JSON.stringify(row.output_summary||{}))}${row.error?`<div class="error">${txt(row.error)}</div>`:''}</div>`).join('')||'<div class="run-note">本轮没有工具调用记录。</div>';
+    const target=`<div class="run-parameters"><div><b>目标 Skill</b>${txt(auditSkillName(d.skill))}</div><div><b>目标芯片</b>${txt(d.target_chip||(d.chips||[]).join('、'))}</div><div><b>目标字段</b>${txt((d.target_fields||[]).map(field=>auditFieldLabels[field]||field).join('、'))}</div></div>`;
+    return `<div class="run-detail-block"><h4>本轮目标</h4>${target}</div>`+
+      section('hermes-search',`Hermes 搜索词 · ${plan.length} 条`,searches,true)+
+      section('hermes-candidates',`URL 访问与 Kimi 选择 · ${results.filter(row=>row.status==='candidate').length} 条`,candidateRows,true)+
+      section('hermes-facts',`字段提取与校验 · ${num(d.counts?.validated)} 条`,facts,true)+
+      section('hermes-linked',`关联 Skill 任务 · ${(d.linked_tasks||[]).length} 条`,linked)+
+      section('hermes-tools','Hermes 工具调用记录',`<div class="run-timeline">${traces}</div>`);
+  }
   async function fillOpenWeb(card){
     const body=card.querySelector('.run-card-body');if(body.dataset.loaded)return;
     const d=await fetchJSON(`${API}/data-agent/open-web-runs/${encodeURIComponent(card.dataset.openWebSession)}`);
     if(d._error){body.innerHTML=`<div class="error">${txt(d._error)}</div>`;return}
     if(d.skill==='all-skills'&&d.audit_report){body.innerHTML=renderAuditRun(d);bindAuditLinkFilters(body);body.dataset.loaded='1';return}
+    if(d.schema_version==='hermes-open-web-v1'){body.innerHTML=renderHermesRun(d);body.dataset.loaded='1';return}
     const assetByUrl=new Map((d.url_assets||[]).map(a=>[a.url,a]));
     const urls=(d.urls||[]).map(u=>{const a=assetByUrl.get(u.canonical_url)||{};const categories=(a.information_categories||[]).join('、')||'未确认';const fields=(a.extracted_fields||[]).join('、')||'无';return `<div class="run-source"><b>${txt(u.title||u.canonical_url)}</b> · ${badge(u.fetch_status||'not_run')}<div class="run-links">${link(u.canonical_url)}</div><div class="run-note">${txt(a.asset_status||'尚未形成资产记录')} · 信息类别：${txt(categories)} · 提取字段：${txt(fields)}<br>发现方式：${txt(a.query_strategy||'未记录')} · 粗筛 ${Number(u.coarse_score||0)} 分 · ${txt(u.coarse_reason||'')}${u.precise_reason?'<br>'+txt(u.precise_reason):''}</div></div>`}).join('')||'<div class="run-note">没有通过粗筛的网页。</div>';
     const facts=(d.facts||[]).map(f=>`<div class="run-source"><b>${txt(f.chip_model||'未确认芯片')} · ${txt(f.field_name)}</b> = ${txt(f.proposed_value)} ${txt(f.unit||'')}<div class="run-links">${link(f.source_url)}</div><div class="run-note">${txt(f.validation_status==='validated'?'校验通过':'未通过：'+(f.rejection_reason||'原因未记录'))}</div><div class="run-value">原文：${txt(f.evidence_text)}</div></div>`).join('')||'<div class="run-note">本次没有校验通过的信息。</div>';

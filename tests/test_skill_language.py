@@ -33,7 +33,10 @@ ENGLISH_PROSE_MARKERS = (
 
 
 def skill_files() -> list[Path]:
-    return sorted(path for root in SKILL_ROOTS for path in root.glob("*/SKILL.md"))
+    return sorted(
+        path for root in SKILL_ROOTS for path in root.glob("*/SKILL.md")
+        if path.parent.name != "brainstorming"  # 用户安装的第三方 Skill，非项目产物
+    )
 
 
 @pytest.mark.parametrize("path", skill_files(), ids=lambda path: str(path.relative_to(ROOT)))

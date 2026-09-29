@@ -20,6 +20,12 @@ REQUIRED_SECTIONS = (
     "## 完成标准",
 )
 
+HERMES_TOOL_SEQUENCE = (
+    "open_web_search",
+    "open_web_preview",
+    "open_web_submit_selection",
+)
+
 
 @pytest.mark.parametrize("skill_name", OPEN_WEB_SKILLS)
 def test_open_web_skills_are_self_contained_operational_contracts(
@@ -36,8 +42,7 @@ def test_open_web_skills_are_self_contained_operational_contracts(
         if line.startswith("description:")
     )
     assert re.search(r"[\u4e00-\u9fff]", description)
-    assert "version: 1.2.0" in text
-    assert config["version"] == "1.2.0"
+    assert f"version: {config['version']}" in text
     assert f"`{config['target_table']}`" in text
     assert f"--skill {skill_name}" in text
     for section in REQUIRED_SECTIONS:
@@ -71,3 +76,15 @@ def test_open_web_skills_explain_the_shared_safety_and_evidence_contract(
         "正式数据库",
     ):
         assert term in text
+
+
+@pytest.mark.parametrize("skill_name", OPEN_WEB_SKILLS)
+def test_open_web_skills_define_the_hermes_tool_contract(skill_name: str) -> None:
+    text = (SKILL_ROOT / skill_name / "SKILL.md").read_text(encoding="utf-8")
+
+    assert "10 条" in text
+    assert "不可信" in text
+    assert "candidate_id" in text
+    assert "suggested_skills" in text
+    positions = [text.index(tool) for tool in HERMES_TOOL_SEQUENCE]
+    assert positions == sorted(positions)

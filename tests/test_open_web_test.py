@@ -17,6 +17,36 @@ def test_open_web_default_visit_limit_is_ten():
     assert pipeline.run_open_web_test.__kwdefaults__["visit_limit"] == 10
 
 
+def test_semantic_extractor_defaults_to_kimi_non_thinking_payload(monkeypatch):
+    captured = {}
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "model": "kimi-k2.6",
+                "choices": [{"message": {"content": '{"relevant":false,"facts":[]}'}}],
+            }
+
+    def fake_post(url, **kwargs):
+        captured.update({"url": url, **kwargs})
+        return Response()
+
+    monkeypatch.setattr(pipeline.requests, "post", fake_post)
+    extractor = pipeline.OpenAICompatibleExtractor(api_key="secret")
+    extractor.extract(
+        text="TestChip X1", url="https://example.com", chip_hints=["TestChip X1"],
+        skill=pipeline.TEST_SKILL_REGISTRY["chip-specs"],
+    )
+
+    assert extractor.base_url == "https://api.moonshot.cn"
+    assert extractor.model_name == "kimi-k2.6"
+    assert captured["json"]["thinking"] == {"type": "disabled"}
+    assert captured["json"]["temperature"] == 0.6
+
+
 def make_db(path: Path) -> Path:
     with sqlite3.connect(path) as db:
         db.executescript(SCHEMA)
