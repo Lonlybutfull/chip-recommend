@@ -28,8 +28,6 @@ from chip_model.pipeline.open_web_test import (
     _source_shape,
     _validate_facts,
     database_fingerprints,
-    list_open_web_test_runs,
-    read_open_web_test_run,
 )
 from chip_model.pipeline.source_refresh import SourceRefresher, validate_source_url
 from chip_model.pipeline.test_workspace import create_test_workspace
@@ -174,18 +172,57 @@ def select_global_candidates(
     )[:limit]
 
 
-def _previous_audit(source_db: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    runs = list_open_web_test_runs(source_db, final_only=True)
-    if not runs:
-        return {}, []
-    detail = read_open_web_test_run(source_db, str(runs[0]["session_id"]))
-    report = detail.get("audit_report") or {}
-    assets = [
-        row for row in detail.get("url_assets", [])
-        if row.get("search_provider") == "link_library"
-        or row.get("query_strategy") == "已有资产复查"
-    ]
-    return report, assets
+MODEL_SOURCE_HOSTS = {
+    "huggingface.co",
+    "www.huggingface.co",
+    "modelscope.cn",
+    "www.modelscope.cn",
+}
+
+
+def _is_model_source(row: dict[str, Any]) -> bool:
+    """Keep the chip audit out of model-catalogue sources."""
+    host = (urlparse(str(row.get("url") or "")).hostname or "").casefold()
+    labels = " ".join(
+        str(row.get(key) or "") for key in ("category", "description")
+    ).casefold()
+    return (
+        host in MODEL_SOURCE_HOSTS
+        or "模型信息" in labels
+        or "hf模型" in labels
+        or "model catalogue" in labels
+        or "model catalog" in labels
+    )
+
+
+def _existing_link_plan(
+    db_path: Path,
+) -> tuple[int, int, list[dict[str, Any]], list[dict[str, Any]]]:
+    """Read, filter and canonicalize the current link library in the test clone."""
+    with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as db:
+        db.row_factory = sqlite3.Row
+        rows = [dict(row) for row in db.execute(
+            "SELECT id,url,description,vendor,category FROM link_library ORDER BY id"
+        )]
+    model_links = 0
+    unsafe: list[dict[str, Any]] = []
+    by_url: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if _is_model_source(row):
+            model_links += 1
+            continue
+        try:
+            validate_source_url(str(row.get("url") or ""))
+            canonical = canonicalize_source_url(str(row["url"]))
+        except Exception as exc:
+            unsafe.append({
+                "id": row.get("id"),
+                "url": row.get("url") or "",
+                "reason": str(exc)[:500],
+            })
+            continue
+        by_url.setdefault(canonical, {**row, "canonical_url": canonical})
+    return len(rows), model_links, list(by_url.values()), unsafe
 
 
 def run_all_skill_search(
@@ -205,7 +242,6 @@ def run_all_skill_search(
     if not selected_chips:
         raise ValueError("至少提供一个目标芯片。")
 
-    previous_report, existing_assets = _previous_audit(source)
     formal_before = database_fingerprints(source)
     workspace = create_test_workspace(source)
     run_dir = Path(workspace["db_path"]).parent
@@ -223,8 +259,6 @@ def run_all_skill_search(
     assets_path = run_dir / "url_assets.jsonl"
     facts_path = run_dir / "extracted_facts.jsonl"
     events_path = run_dir / "events.jsonl"
-    for row in existing_assets:
-        _append_jsonl(assets_path, row)
 
     manifest: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
@@ -244,7 +278,7 @@ def run_all_skill_search(
         "queries": [item["query"] for item in plan],
         "counts": {"search_results": 0, "coarse_passed": 0, "visited": 0,
                    "visit_succeeded": 0, "precise_passed": 0,
-                   "url_assets": len(existing_assets), "extracted": 0,
+                   "url_assets": 0, "extracted": 0,
                    "validated": 0, "rejected": 0},
         "artifacts": {"queries": "search_queries.json", "candidates": "url_candidates.jsonl",
                       "url_assets": "url_assets.jsonl", "facts": "extracted_facts.jsonl",
@@ -263,7 +297,127 @@ def run_all_skill_search(
     all_candidates: list[dict[str, Any]] = []
     search_errors: list[dict[str, str]] = []
     try:
-        event("start", "running", "六类芯片信息开放互联网搜索开始。")
+        event("start", "running", "已有链接检查与六类芯片信息开放互联网搜索开始。")
+        database_rows, model_links_skipped, existing_plan, unsafe_existing = (
+            _existing_link_plan(db_path)
+        )
+        event(
+            "existing_links", "running", "开始检查已有链接库。",
+            database_rows=database_rows,
+            model_links_skipped=model_links_skipped,
+            safe_unique_urls=len(existing_plan),
+        )
+        if existing_plan:
+            existing_summary = SourceRefresher(
+                db_path=db_path,
+                snapshot_dir=run_dir / "source_snapshots" / "existing",
+                proxy=proxy,
+                max_bytes=20 * 1024 * 1024,
+                max_attempts=2,
+            ).run(
+                [int(row["id"]) for row in existing_plan],
+                apply_state=True,
+                force=True,
+            )
+            existing_fetched = {
+                int(row["link_id"]): row for row in existing_summary.results
+            }
+        else:
+            existing_fetched = {}
+
+        category_counts: Counter[str] = Counter()
+        selected_by_skill: Counter[str] = Counter()
+        outcome_counts: Counter[str] = Counter()
+        existing_reachable = 0
+        for source_row in existing_plan:
+            fetched = existing_fetched.get(int(source_row["id"]), {})
+            fetch_status = str(fetched.get("outcome") or "failed")
+            outcome_counts[fetch_status] += 1
+            manifest["counts"]["visited"] += 1
+            snapshot_path = str(fetched.get("normalized_snapshot_path") or "")
+            source_text = " ".join(
+                str(source_row.get(key) or "")
+                for key in ("description", "category", "vendor")
+            )
+            if fetch_status in {"new", "changed", "unchanged"}:
+                existing_reachable += 1
+                manifest["counts"]["visit_succeeded"] += 1
+                if snapshot_path and Path(snapshot_path).is_file():
+                    source_text += "\n" + Path(snapshot_path).read_text(
+                        encoding="utf-8", errors="replace"
+                    )
+            categories = keyword_information_categories(source_text)
+            for label in categories:
+                category_counts[label] += 1
+            primary_skill = next(
+                (
+                    skill_name for skill_name, skill in TEST_SKILL_REGISTRY.items()
+                    if skill["label"] in categories
+                ),
+                "",
+            )
+            target_fields = list(
+                dict.fromkeys(
+                    field
+                    for skill in TEST_SKILL_REGISTRY.values()
+                    if skill["label"] in categories
+                    for field in skill["fields"]
+                )
+            )
+            domain, source_format = _source_shape(source_row["canonical_url"])
+            reason = str(fetched.get("error_message") or "")
+            if not reason:
+                reason = (
+                    "已根据链接库描述和网页快照标记信息类别。"
+                    if categories else "网页可访问，但尚未识别出六类目标信息。"
+                )
+            asset = {
+                "schema_version": SCHEMA_VERSION,
+                "url": source_row["canonical_url"],
+                "final_url": fetched.get("final_url") or source_row["canonical_url"],
+                "source_domain": domain,
+                "source_format": source_format,
+                "source_type": source_row.get("category") or source_format,
+                "discovery_type": "link-library",
+                "parent_url": "",
+                "discovery_query": "",
+                "query_strategy": "已有资产复查",
+                "search_provider": "link_library",
+                "search_rank": None,
+                "title": source_row.get("description") or source_row["canonical_url"],
+                "information_category": categories[0] if categories else "",
+                "information_categories": categories,
+                "target_fields": target_fields,
+                "extracted_fields": [],
+                "skill": primary_skill,
+                "skill_version": (
+                    TEST_SKILL_REGISTRY[primary_skill]["version"]
+                    if primary_skill else ""
+                ),
+                "chip_model": "",
+                "vendor": source_row.get("vendor") or "",
+                "asset_status": (
+                    "已检查" if fetch_status in {"new", "changed", "unchanged"}
+                    else "访问失败"
+                ),
+                "coarse_score": 0,
+                "coarse_reasons": ["已有链接库"],
+                "fetch_status": fetch_status,
+                "http_status": fetched.get("http_status"),
+                "content_hash": fetched.get("content_hash"),
+                "snapshot_path": snapshot_path,
+                "precise_relevant": bool(categories),
+                "decision_reason": reason,
+                "recorded_at": _now(),
+            }
+            _append_jsonl(assets_path, asset)
+            manifest["counts"]["url_assets"] += 1
+        event(
+            "existing_links", "success", "已有链接库检查完成。",
+            visited=len(existing_plan), reachable=existing_reachable,
+            unsafe=len(unsafe_existing),
+        )
+
         for item in plan:
             try:
                 results = provider.search(item["query"], search_limit)[:search_limit]
@@ -302,9 +456,8 @@ def run_all_skill_search(
         else:
             fetched_by_url = {}
 
-        category_counts: Counter[str] = Counter()
-        selected_by_skill: Counter[str] = Counter()
-        outcome_counts: Counter[str] = Counter()
+        new_visited = 0
+        new_reachable = 0
         for candidate in selected:
             for skill_name in candidate.get("matched_skills", [candidate["skill"]]):
                 selected_by_skill[skill_name] += 1
@@ -312,6 +465,7 @@ def run_all_skill_search(
             fetch_status = str(fetched.get("outcome") or "failed")
             outcome_counts[fetch_status] += 1
             manifest["counts"]["visited"] += 1
+            new_visited += 1
             snapshot_path = str(fetched.get("normalized_snapshot_path") or "")
             relevant = False
             reason = str(fetched.get("error_message") or "")
@@ -321,6 +475,7 @@ def run_all_skill_search(
             chip_model = candidate.get("chip") or ""
             if fetch_status in {"new", "changed", "unchanged"} and snapshot_path:
                 manifest["counts"]["visit_succeeded"] += 1
+                new_reachable += 1
                 text = Path(snapshot_path).read_text(encoding="utf-8")
                 skill = TEST_SKILL_REGISTRY[candidate["skill"]]
                 try:
@@ -407,25 +562,25 @@ def run_all_skill_search(
                                                   "chip_model": chip_model, **fact})
                 db.commit()
 
-        existing = previous_report.get("existing") or {
-            "database_rows": 0, "model_links_skipped": 0,
-            "safe_unique_urls": len(existing_assets),
-            "visited": len(existing_assets),
-            "reachable": sum(1 for row in existing_assets
-                             if row.get("fetch_status") in {"new", "changed", "unchanged"}),
+        existing = {
+            "database_rows": database_rows,
+            "model_links_skipped": model_links_skipped,
+            "safe_unique_urls": len(existing_plan),
+            "visited": len(existing_plan),
+            "reachable": existing_reachable,
         }
         report = {
             "session_id": workspace["session_id"], "existing": existing,
             "new": {"queries": len(plan), "search_mentions": manifest["counts"]["search_results"],
                     "search_errors": len(search_errors),
                     "selected_unique_skill_urls": sum(selected_by_skill.values()),
-                    "visited_unique_urls": len(selected),
-                    "reachable": manifest["counts"]["visit_succeeded"],
+                    "visited_unique_urls": new_visited,
+                    "reachable": new_reachable,
                     "selected_by_skill": dict(selected_by_skill)},
             "outcomes": dict(outcome_counts),
             "matched_information_categories": dict(category_counts),
             "search_errors": search_errors,
-            "unsafe_existing": previous_report.get("unsafe_existing") or [],
+            "unsafe_existing": unsafe_existing,
             "test_database_quick_check": "ok",
         }
         _atomic_json(run_dir / "full_audit_report.json", report)

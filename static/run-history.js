@@ -233,8 +233,8 @@
     }
     const newAssets=assets.filter(a=>a.search_provider!=='link_library'&&(a.query_strategy||'')!=='已有资产复查').map(asset=>({...asset,discovery_skills:[...new Set([...(asset.discovery_skills||[]),...Array.from(discoverySkillsByUrl.get(auditUrlKey(asset.url))||[]),asset.skill].filter(Boolean))]}));
     const uniqueNew=mergeAuditLinkAssets(newAssets);
-    const failed=urls.filter(u=>!isReachableStatus(u.fetch_status));
-    const issueCount=failed.length;
+    const issueCount=Math.max(0,num(existing.safe_unique_urls)-num(existing.reachable))+
+      Math.max(0,num(fresh.visited_unique_urls)-num(fresh.reachable));
     const summaryTiles=[
       ['链接库记录',num(existing.database_rows),'其中模型链接 '+num(existing.model_links_skipped)+' 条未纳入'],
       ['已有链接可用',`${num(existing.reachable)} / ${num(existing.safe_unique_urls)}`,'完成安全校验后的去重链接'],

@@ -1,10 +1,21 @@
+import sqlite3
+from pathlib import Path
+
+from chip_model.pipeline import open_web_full_search as full_search
 from chip_model.pipeline.open_web_full_search import (
     DEFAULT_CHIPS,
     build_all_skill_query_plan,
     keyword_information_categories,
     select_global_candidates,
 )
-from chip_model.pipeline.open_web_test import FallbackSearch, SearchResult
+from chip_model.pipeline.open_web_test import (
+    FallbackSearch,
+    SearchResult,
+    read_open_web_test_run,
+)
+
+
+SCHEMA = (Path(__file__).parents[1] / "schema.sql").read_text(encoding="utf-8")
 
 
 def test_all_skill_plan_has_six_categories_two_queries_and_three_chips():
@@ -51,3 +62,132 @@ def test_keyword_category_fallback_requires_two_signal_groups():
     )
     assert "实测数据" in categories
     assert "芯片型号" not in categories
+
+
+def test_all_skill_run_checks_existing_links_and_keeps_formal_db_unchanged(
+    tmp_path, monkeypatch
+):
+    formal = tmp_path / "data.db"
+    with sqlite3.connect(formal) as db:
+        db.executescript(SCHEMA)
+        db.execute(
+            "INSERT INTO chips (id,chip_model,vendor) VALUES (1,'TestChip X1','Vendor')"
+        )
+        db.execute(
+            "INSERT INTO link_library (url,description,vendor,category) VALUES (?,?,?,?)",
+            (
+                "https://vendor.example/existing-spec",
+                "TestChip X1 official product specification and benchmark",
+                "Vendor",
+                "芯片硬件信息",
+            ),
+        )
+        db.execute(
+            "INSERT INTO link_library (url,description,vendor,category) VALUES (?,?,?,?)",
+            (
+                "https://huggingface.co/vendor/model",
+                "HF 模型",
+                "Vendor",
+                "模型信息",
+            ),
+        )
+        db.commit()
+
+    class Search:
+        name = "fixture-search"
+
+        def search(self, query, limit):
+            return [SearchResult(
+                url="https://vendor.example/new-audit-page",
+                title="TestChip X1 product series vendor release specification datasheet",
+                snippet=(
+                    "memory HBM bandwidth TDP precision FP16 TFLOPS compute unit "
+                    "compatibility supported framework PyTorch model benchmark throughput "
+                    "tokens/s latency concurrency input tokens deployment vLLM docker topology"
+                ),
+                rank=1,
+                query=query,
+                provider=self.name,
+            )][:limit]
+
+    class Extractor:
+        model_name = "fixture-model"
+
+        def extract(self, *, text, url, chip_hints, skill):
+            return {
+                "relevant": True,
+                "reason": "fixture page contains the requested category",
+                "chip_model": "TestChip X1",
+                "matched_categories": [
+                    value["label"] for value in full_search.TEST_SKILL_REGISTRY.values()
+                ],
+                "facts": [],
+            }
+
+    class Refresh:
+        def __init__(self, *, db_path, snapshot_dir, **kwargs):
+            self.db_path = Path(db_path)
+            self.snapshot_dir = Path(snapshot_dir)
+
+        def run(self, link_ids, *, apply_state, force):
+            self.snapshot_dir.mkdir(parents=True, exist_ok=True)
+            snapshot = self.snapshot_dir / "fixture.txt"
+            snapshot.write_text(
+                "TestChip X1 product series release memory HBM bandwidth TDP "
+                "FP16 TFLOPS compatibility PyTorch benchmark throughput latency "
+                "concurrency deployment vLLM docker topology",
+                encoding="utf-8",
+            )
+            placeholders = ",".join("?" for _ in link_ids)
+            with sqlite3.connect(self.db_path) as db:
+                rows = db.execute(
+                    f"SELECT id,url FROM link_library WHERE id IN ({placeholders})",
+                    list(link_ids),
+                ).fetchall()
+            return type("Summary", (), {"results": [
+                {
+                    "link_id": row[0],
+                    "requested_url": row[1],
+                    "final_url": row[1],
+                    "outcome": "new",
+                    "http_status": 200,
+                    "content_hash": f"fixture-{row[0]}",
+                    "normalized_snapshot_path": str(snapshot),
+                }
+                for row in rows
+            ]})()
+
+    monkeypatch.setattr(full_search, "SourceRefresher", Refresh)
+    before = full_search.database_fingerprints(formal)
+    result = full_search.run_all_skill_search(
+        source_db=formal,
+        chips=["TestChip X1"],
+        search_limit=1,
+        visit_limit=10,
+        search_provider=Search(),
+        extractor=Extractor(),
+    )
+
+    assert result["status"] == "success"
+    assert result["formal_database_modified"] is False
+    assert full_search.database_fingerprints(formal)["db"] == before["db"]
+    detail = read_open_web_test_run(formal, result["session_id"])
+    report = detail["audit_report"]
+    assert report["existing"] == {
+        "database_rows": 2,
+        "model_links_skipped": 1,
+        "safe_unique_urls": 1,
+        "visited": 1,
+        "reachable": 1,
+    }
+    assert report["new"]["queries"] == 12
+    assert report["new"]["visited_unique_urls"] == 1
+    assert report["new"]["reachable"] == 1
+    assert len(report["new"]["selected_by_skill"]) == 6
+    assert len(detail["url_assets"]) == 2
+    assert any(
+        row["search_provider"] == "link_library" for row in detail["url_assets"]
+    )
+    assert any(
+        row["search_provider"] == "fixture-search" for row in detail["url_assets"]
+    )
