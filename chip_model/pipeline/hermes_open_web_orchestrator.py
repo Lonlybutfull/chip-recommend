@@ -31,7 +31,8 @@ def build_hermes_prompt(
         f"目标芯片：{target_chip}\n"
         f"目标字段：{fields}\n\n"
         "这是一次隔离测试。严格按照已加载 Skill 执行：先生成恰好 10 条互不重复的搜索词，"
-        "调用 open_web_search；随后把返回的全部 candidate_id 交给 open_web_preview；"
+        "调用 open_web_search；随后把返回的 candidate_ids 数组原样交给 open_web_preview，"
+        "不要从候选摘要中手工抄写；"
         "阅读每个不超过 500 字的页面预览后，为每个候选给出选择或拒绝理由，最后调用 "
         "open_web_submit_selection。不得使用 Hermes 自带网络搜索，不得编造 URL，不得跳过候选。"
     )

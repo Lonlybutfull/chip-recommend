@@ -77,7 +77,7 @@ CATEGORY_ENUM = ["芯片型号", "基础参数", "算力指标", "兼容信息",
 
 SEARCH_SCHEMA = {
     "name": "open_web_search",
-    "description": "执行已经规划好的 10 条芯片资料搜索词，完成 URL 安全检查、规范化与去重。",
+    "description": "执行已经规划好的 10 条芯片资料搜索词，完成 URL 安全检查、规范化与去重；返回的 candidate_ids 必须原样传给预览工具。",
     "parameters": {
         "type": "object",
         "properties": {

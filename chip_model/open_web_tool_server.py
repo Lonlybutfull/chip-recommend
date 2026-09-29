@@ -330,6 +330,18 @@ def create_open_web_tool_app(
             "search_errors": len(search_errors),
         })
         save_manifest(folder, manifest)
+        candidate_rows = list(candidates.values())
+        candidate_ids = [str(row["candidate_id"]) for row in candidate_rows]
+        compact_candidates = [
+            {
+                "candidate_id": row["candidate_id"],
+                "url": row["url"],
+                "title": str(row.get("title") or "")[:160],
+                "snippet": str(row.get("snippet") or "")[:240],
+                "query_hit_count": len(row.get("mentions") or []),
+            }
+            for row in candidate_rows
+        ]
         output = {
             "ok": True,
             "run_id": request.run_id,
@@ -338,7 +350,10 @@ def create_open_web_tool_app(
             "unique_candidate_count": len(candidates),
             "unsafe_count": unsafe_count,
             "search_errors": search_errors,
-            "candidates": list(candidates.values()),
+            # Keep this explicit list compact and lossless. Hermes must pass it
+            # unchanged to open_web_preview; full mentions stay in the artifact.
+            "candidate_ids": candidate_ids,
+            "candidates": compact_candidates,
         }
         trace_tool(
             folder, tool="open_web_search", status="success", started_at=started,

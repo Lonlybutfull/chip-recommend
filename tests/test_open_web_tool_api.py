@@ -146,9 +146,15 @@ def test_tool_service_search_preview_select_and_extract(tmp_path: Path) -> None:
     search_body = searched.json()
     assert search_body["raw_result_count"] == 20
     assert search_body["unique_candidate_count"] == 2
-    assert all(len(row["mentions"]) == 10 for row in search_body["candidates"])
+    assert search_body["candidate_ids"] == [
+        row["candidate_id"] for row in search_body["candidates"]
+    ]
+    assert len(search_body["candidate_ids"]) == search_body["unique_candidate_count"]
+    assert all("mentions" not in row for row in search_body["candidates"])
+    assert all(len(row["title"]) <= 160 for row in search_body["candidates"])
+    assert all(len(row["snippet"]) <= 240 for row in search_body["candidates"])
 
-    candidate_ids = [row["candidate_id"] for row in search_body["candidates"]]
+    candidate_ids = search_body["candidate_ids"]
     previewed = client.post("/v1/preview", headers=_headers(), json={
         "run_id": run["session_id"], "candidate_ids": candidate_ids,
     })
