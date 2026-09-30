@@ -106,6 +106,10 @@ def test_status_page_loads_run_history_assets():
     assert '建议联动：' not in script.text
     assert '系统关联 Skill' in script.text
     assert '复用候选' not in script.text
+    for stage in ('生成搜索词', '搜索并去重', '网页访问', 'Hermes 选择 URL', '字段提取', '记录 URL'):
+        assert stage in script.text
+    assert '本页只保留本轮全部链接检查的最终汇总' not in script.text
+    assert '/run-history.js?v=20260930-url-flow' in page.text
 
 
 def test_source_updates_list_and_detail(tmp_path, monkeypatch):
