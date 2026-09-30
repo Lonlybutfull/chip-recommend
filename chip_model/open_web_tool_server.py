@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
 import time
 from collections.abc import Callable
@@ -25,12 +26,17 @@ from chip_model.pipeline.hermes_open_web_contracts import (
 )
 from chip_model.pipeline.hermes_open_web_state import (
     HERMES_OPEN_WEB_SCHEMA,
+    aggregate_parent_manifest,
     append_jsonl,
     atomic_json,
     load_manifest,
+    load_unit_manifest,
+    read_artifact,
     read_jsonl,
     resolve_run_dir,
+    resolve_unit_dir,
     save_manifest,
+    save_unit_manifest,
     stable_candidate_id,
     trace_tool,
 )
@@ -110,6 +116,68 @@ def _safe_snapshot(folder: Path, value: str) -> Path:
     return path
 
 
+def _parent_folder(folder: Path) -> Path:
+    return folder.parent.parent if folder.parent.name == "units" else folder
+
+
+def _workspace_db(folder: Path) -> Path:
+    return _parent_folder(folder) / "data.db"
+
+
+def _existing_link_urls(folder: Path) -> set[str]:
+    values: set[str] = set()
+    with sqlite3.connect(_workspace_db(folder)) as db:
+        for row in db.execute("SELECT url FROM link_library WHERE url IS NOT NULL"):
+            try:
+                values.add(canonicalize_source_url(str(row[0])))
+            except Exception:
+                continue
+    return values
+
+
+def _cached_preview(folder: Path, candidate: dict[str, Any]) -> dict[str, Any] | None:
+    cache = _parent_folder(folder) / "snapshot_cache"
+    metadata = read_artifact(cache, f"{candidate['candidate_id']}.json", default={})
+    cached_text = cache / f"{candidate['candidate_id']}.txt"
+    if not metadata or not cached_text.is_file() or cached_text.is_symlink():
+        return None
+    local = folder / "source_snapshots" / f"{candidate['candidate_id']}.txt"
+    shutil.copyfile(cached_text, local)
+    return {
+        "schema_version": HERMES_OPEN_WEB_SCHEMA,
+        "candidate_id": candidate["candidate_id"],
+        "url": candidate["url"],
+        "final_url": metadata.get("final_url") or candidate["url"],
+        "title": candidate.get("title") or "",
+        "access_status": "reachable",
+        "fetch_status": metadata.get("fetch_status") or "unchanged",
+        "http_status": metadata.get("http_status"),
+        "content_hash": metadata.get("content_hash") or "",
+        "snapshot_path": str(local),
+        "core_text": _core_text(local.read_text(encoding="utf-8")),
+        "error": "",
+        "cache_hit": True,
+    }
+
+
+def _cache_preview(folder: Path, row: dict[str, Any]) -> None:
+    if row.get("access_status") != "reachable" or not row.get("snapshot_path"):
+        return
+    cache = _parent_folder(folder) / "snapshot_cache"
+    cache.mkdir(parents=True, exist_ok=True)
+    source_path = _safe_snapshot(folder, str(row["snapshot_path"]))
+    target = cache / f"{row['candidate_id']}.txt"
+    temporary = target.with_suffix(".txt.tmp")
+    shutil.copyfile(source_path, temporary)
+    temporary.replace(target)
+    atomic_json(cache / f"{row['candidate_id']}.json", {
+        "final_url": row.get("final_url") or row.get("url") or "",
+        "fetch_status": row.get("fetch_status") or "",
+        "http_status": row.get("http_status"),
+        "content_hash": row.get("content_hash") or "",
+    })
+
+
 def _first_mention(candidate: dict[str, Any]) -> dict[str, Any]:
     mentions = candidate.get("mentions") or []
     return mentions[0] if mentions else {}
@@ -174,7 +242,7 @@ def _write_extraction(
     extracted = _validated_extraction(extractor.extract(
         text=source_text,
         url=str(candidate["url"]),
-        chip_hints=[str(manifest["target_chip"])],
+        chip_hints=[str(manifest.get("target_chip") or "")] if manifest.get("target_chip") else [],
         skill=active_skill,
     ))
     relevant = extracted["relevant"]
@@ -218,7 +286,7 @@ def _write_extraction(
         "extracted_fields": extracted_fields,
         "skill": skill_name,
         "skill_version": skill["version"],
-        "chip_model": str(extracted.get("chip_model") or manifest["target_chip"]),
+        "chip_model": str(extracted.get("chip_model") or manifest.get("target_chip") or ""),
         "asset_status": "复核通过" if relevant else "复核未通过",
         "fetch_status": preview.get("fetch_status") or "failed",
         "http_status": preview.get("http_status"),
@@ -232,7 +300,7 @@ def _write_extraction(
     }
     append_jsonl(folder / "url_assets.jsonl", asset)
 
-    db_path = folder / "data.db"
+    db_path = _workspace_db(folder)
     with sqlite3.connect(db_path) as db:
         db.execute(
             "INSERT OR REPLACE INTO test_url_classifications "
@@ -254,7 +322,7 @@ def _write_extraction(
             ),
         )
         model_name = str(extracted.get("_model") or getattr(extractor, "model_name", ""))
-        chip_model = str(extracted.get("chip_model") or manifest["target_chip"])
+        chip_model = str(extracted.get("chip_model") or manifest.get("target_chip") or "")
         for fact in accepted:
             db.execute(
                 "INSERT INTO test_extracted_records "
@@ -313,12 +381,33 @@ def create_open_web_tool_app(
         if _bearer(authorization) != expected_token:
             raise HTTPException(status_code=401, detail="工具服务认证失败。")
 
-    def checked_run(run_id: str) -> tuple[Path, dict[str, Any]]:
+    def checked_run(
+        run_id: str, unit_id: str = ""
+    ) -> tuple[Path, dict[str, Any], Path, dict[str, Any]]:
         try:
-            folder = resolve_run_dir(source, run_id)
-            return folder, load_manifest(folder)
+            parent_folder = resolve_run_dir(source, run_id)
+            parent = load_manifest(parent_folder)
+            if parent.get("schema_version") != HERMES_OPEN_WEB_SCHEMA:
+                return parent_folder, parent, parent_folder, parent
+            selected_unit = unit_id
+            if not selected_unit:
+                units = parent.get("units") or []
+                if len(units) != 1:
+                    raise ValueError("全量运行必须提供单元 ID。")
+                selected_unit = str(units[0]["unit_id"])
+            folder = resolve_unit_dir(source, run_id, selected_unit)
+            return folder, load_unit_manifest(folder), parent_folder, parent
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    def save_checked_manifest(
+        folder: Path, manifest: dict[str, Any], parent_folder: Path
+    ) -> None:
+        if folder == parent_folder:
+            save_manifest(folder, manifest)
+            return
+        save_unit_manifest(folder, manifest)
+        aggregate_parent_manifest(parent_folder)
 
     @app.get("/health")
     def health() -> dict[str, Any]:
@@ -328,12 +417,19 @@ def create_open_web_tool_app(
     def search(request: SearchRequest) -> dict[str, Any]:
         started = _now()
         started_clock = time.monotonic()
-        folder, manifest = checked_run(request.run_id)
-        if manifest.get("skill") != request.skill or manifest.get("target_chip") != request.target_chip:
+        folder, manifest, parent_folder, _ = checked_run(request.run_id, request.unit_id)
+        if (
+            manifest.get("skill") != request.skill
+            or str(manifest.get("target_chip") or "") != request.target_chip
+            or str(manifest.get("scope_type") or "chip") != request.scope_type
+        ):
             raise HTTPException(status_code=409, detail="请求目标与运行清单不一致。")
+        if manifest.get("stage") not in {"waiting_for_hermes", "searching"}:
+            raise HTTPException(status_code=409, detail="当前单元状态不允许重复搜索。")
         if read_jsonl(folder, "search_results.jsonl"):
             raise HTTPException(status_code=409, detail="本轮搜索已经执行。")
         provider = search_provider_factory(proxy=os.getenv("DATA_AGENT_PROXY") or None)
+        existing_urls = _existing_link_urls(folder)
         candidates: dict[str, dict[str, Any]] = {}
         raw_count = 0
         unsafe_count = 0
@@ -375,6 +471,8 @@ def create_open_web_tool_app(
                         "candidate_id": candidate_id,
                         "status": "candidate",
                         "url": canonical,
+                        "existing_in_link_library": canonical in existing_urls,
+                        "asset_origin": "existing" if canonical in existing_urls else "new",
                         "title": result.title,
                         "snippet": result.snippet,
                         "mentions": [mention],
@@ -384,6 +482,8 @@ def create_open_web_tool_app(
         atomic_json(folder / "hermes_search_plan.json", {
             "schema_version": HERMES_OPEN_WEB_SCHEMA,
             "run_id": request.run_id,
+            "unit_id": request.unit_id or manifest.get("unit_id") or "",
+            "scope_type": request.scope_type,
             "skill": request.skill,
             "target_chip": request.target_chip,
             "queries": [item.model_dump() for item in request.queries],
@@ -399,7 +499,14 @@ def create_open_web_tool_app(
             "unsafe_candidates": unsafe_count,
             "search_errors": len(search_errors),
         })
-        save_manifest(folder, manifest)
+        if not candidates:
+            manifest.update({
+                "status": "failed" if search_errors else "partial",
+                "stage": "completed",
+                "finished_at": _now(),
+                "error": "搜索工具未返回可用候选 URL。",
+            })
+        save_checked_manifest(folder, manifest, parent_folder)
         candidate_rows = list(candidates.values())
         candidate_ids = [str(row["candidate_id"]) for row in candidate_rows]
         compact_candidates = [
@@ -409,17 +516,20 @@ def create_open_web_tool_app(
                 "title": str(row.get("title") or "")[:160],
                 "snippet": str(row.get("snippet") or "")[:240],
                 "query_hit_count": len(row.get("mentions") or []),
+                "asset_origin": row.get("asset_origin") or "new",
             }
             for row in candidate_rows
         ]
         output = {
             "ok": True,
             "run_id": request.run_id,
+            "unit_id": request.unit_id or manifest.get("unit_id") or "",
             "skill": request.skill,
             "raw_result_count": raw_count,
             "unique_candidate_count": len(candidates),
             "unsafe_count": unsafe_count,
             "search_errors": search_errors,
+            "terminal": not candidates,
             # Keep this explicit list compact and lossless. Hermes must pass it
             # unchanged to open_web_preview; full mentions stay in the artifact.
             "candidate_ids": candidate_ids,
@@ -439,7 +549,11 @@ def create_open_web_tool_app(
     def preview(request: PreviewRequest) -> dict[str, Any]:
         started = _now()
         started_clock = time.monotonic()
-        folder, manifest = checked_run(request.run_id)
+        folder, manifest, parent_folder, _ = checked_run(request.run_id, request.unit_id)
+        if str(manifest.get("scope_type") or "chip") != request.scope_type:
+            raise HTTPException(status_code=409, detail="请求范围与运行单元不一致。")
+        if manifest.get("stage") != "awaiting_preview":
+            raise HTTPException(status_code=409, detail="必须先完成搜索，才能预览候选。")
         candidates = {
             row["candidate_id"]: row
             for row in read_jsonl(folder, "search_results.jsonl")
@@ -453,29 +567,46 @@ def create_open_web_tool_app(
         if existing:
             return {"ok": True, "run_id": request.run_id, "previews": existing, "cached": True}
         ordered = [candidates[candidate_id] for candidate_id in request.candidate_ids]
+        preview_by_id: dict[str, dict[str, Any]] = {}
+        uncached: list[dict[str, Any]] = []
+        for candidate in ordered:
+            cached = _cached_preview(folder, candidate)
+            if cached is None:
+                uncached.append(candidate)
+            else:
+                preview_by_id[str(candidate["candidate_id"])] = cached
         link_ids = _insert_test_links(
-            folder / "data.db",
+            _workspace_db(folder),
             [{
                 "url": row["url"], "title": row.get("title") or "",
                 "snippet": row.get("snippet") or "", "query": _first_mention(row).get("query") or "",
                 "provider": _first_mention(row).get("provider") or "", "rank": _first_mention(row).get("rank") or 0,
-            } for row in ordered],
+            } for row in uncached],
             skill_name=str(manifest["skill"]),
-        )
-        refresher = refresher_factory(
-            db_path=folder / "data.db",
-            snapshot_dir=folder / "source_snapshots",
-            proxy=os.getenv("DATA_AGENT_PROXY") or None,
-            max_bytes=20 * 1024 * 1024,
-            max_attempts=2,
-        )
-        summary = refresher.run(link_ids, apply_state=True, force=True)
+        ) if uncached else []
+        if link_ids:
+            refresher = refresher_factory(
+                db_path=_workspace_db(folder),
+                snapshot_dir=folder / "source_snapshots",
+                proxy=os.getenv("DATA_AGENT_PROXY") or None,
+                max_bytes=20 * 1024 * 1024,
+                max_attempts=2,
+            )
+            summary = refresher.run(link_ids, apply_state=True, force=True)
+            fetched_rows = summary.results
+        else:
+            fetched_rows = []
         fetched = {
             canonicalize_source_url(str(row.get("requested_url") or "")): row
-            for row in summary.results
+            for row in fetched_rows
         }
         previews: list[dict[str, Any]] = []
         for candidate in ordered:
+            cached = preview_by_id.get(str(candidate["candidate_id"]))
+            if cached is not None:
+                append_jsonl(folder / "url_previews.jsonl", cached)
+                previews.append(cached)
+                continue
             item = fetched.get(candidate["url"], {})
             outcome = str(item.get("outcome") or "failed")
             snapshot_value = str(item.get("normalized_snapshot_path") or "")
@@ -499,13 +630,15 @@ def create_open_web_tool_app(
                 "snapshot_path": snapshot_value,
                 "core_text": core,
                 "error": str(item.get("error_message") or "")[:1000],
+                "cache_hit": False,
             }
+            _cache_preview(folder, row)
             append_jsonl(folder / "url_previews.jsonl", row)
             previews.append(row)
         reachable = sum(row["access_status"] == "reachable" for row in previews)
         manifest["stage"] = "awaiting_selection"
         manifest["counts"].update({"previewed": len(previews), "reachable": reachable})
-        save_manifest(folder, manifest)
+        save_checked_manifest(folder, manifest, parent_folder)
         trace_tool(
             folder, tool="open_web_preview", status="success", started_at=started,
             finished_at=_now(), input_summary={"candidates": len(request.candidate_ids)},
@@ -514,19 +647,29 @@ def create_open_web_tool_app(
                 "duration_ms": round((time.monotonic() - started_clock) * 1000),
             },
         )
-        return {"ok": True, "run_id": request.run_id, "previews": previews, "cached": False}
+        return {
+            "ok": True, "run_id": request.run_id,
+            "unit_id": request.unit_id or manifest.get("unit_id") or "",
+            "previews": previews, "cached": False,
+        }
 
     @app.post("/v1/submit-selection", dependencies=[Depends(authorize)])
     def submit_selection(request: SelectionRequest) -> dict[str, Any]:
         started = _now()
         started_clock = time.monotonic()
-        folder, manifest = checked_run(request.run_id)
+        folder, manifest, parent_folder, parent_manifest = checked_run(
+            request.run_id, request.unit_id
+        )
         if manifest.get("skill") != request.skill:
             raise HTTPException(status_code=409, detail="提交 Skill 与运行清单不一致。")
+        if str(manifest.get("scope_type") or "chip") != request.scope_type:
+            raise HTTPException(status_code=409, detail="提交范围与运行单元不一致。")
         request_fingerprint = _selection_fingerprint(request)
         cached = _cached_selection_result(folder, fingerprint=request_fingerprint)
         if cached is not None:
             return cached
+        if manifest.get("stage") != "awaiting_selection":
+            raise HTTPException(status_code=409, detail="必须先完成全部候选预览，才能提交决定。")
         if read_jsonl(folder, "url_decisions.jsonl"):
             raise HTTPException(
                 status_code=409,
@@ -570,6 +713,16 @@ def create_open_web_tool_app(
                 raise HTTPException(status_code=409, detail="不可访问候选不能被选中。")
             selected_count += 1
             categories = list(decision_model.matched_categories)
+            if request.scope_type == "discovery":
+                append_jsonl(folder / "new_chip_candidates.jsonl", {
+                    "schema_version": HERMES_OPEN_WEB_SCHEMA,
+                    "candidate_id": decision_model.candidate_id,
+                    "url": candidate["url"],
+                    "title": candidate.get("title") or "",
+                    "reason": decision_model.reason,
+                    "matched_categories": categories,
+                    "recorded_at": _now(),
+                })
             try:
                 accepted, rejected, categories = _write_extraction(
                     folder=folder, manifest=manifest, skill_name=request.skill,
@@ -636,6 +789,9 @@ def create_open_web_tool_app(
             "rejected": rejected_fact_count,
             "extracted": validated_count + rejected_fact_count,
             "linked_tasks": linked_count,
+            "new_chip_candidates": (
+                selected_count if request.scope_type == "discovery" else 0
+            ),
         })
         manifest["status"] = (
             "success" if validated_count else
@@ -643,17 +799,18 @@ def create_open_web_tool_app(
         )
         manifest["stage"] = "completed"
         manifest["finished_at"] = _now()
-        before = manifest.get("formal_database_before") or {}
+        before = parent_manifest.get("formal_database_before") or manifest.get("formal_database_before") or {}
         after = database_fingerprints(source)
         manifest["formal_database_after"] = after
         manifest["formal_database_modified"] = before.get("db") != after.get("db")
         if manifest["formal_database_modified"]:
             manifest["status"] = "failed"
             manifest["audit_warning"] = "检测到正式数据库主体文件发生变化。"
-        save_manifest(folder, manifest)
+        save_checked_manifest(folder, manifest, parent_folder)
         output = {
             "ok": manifest["status"] in {"success", "partial"},
             "run_id": request.run_id,
+            "unit_id": request.unit_id or manifest.get("unit_id") or "",
             "status": manifest["status"],
             "selected_count": selected_count,
             "rejected_url_count": rejected_url_count,

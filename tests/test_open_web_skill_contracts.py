@@ -41,6 +41,7 @@ def test_open_web_skills_are_self_contained_operational_contracts(
         for line in text.splitlines()
         if line.startswith("description:")
     )
+    assert description.startswith("用于")
     assert re.search(r"[\u4e00-\u9fff]", description)
     assert f"version: {config['version']}" in text
     assert f"`{config['target_table']}`" in text
@@ -91,3 +92,26 @@ def test_open_web_skills_define_the_hermes_tool_contract(skill_name: str) -> Non
     assert "只创建一层关联任务" in text
     positions = [text.index(tool) for tool in HERMES_TOOL_SEQUENCE]
     assert positions == sorted(positions)
+
+
+@pytest.mark.parametrize("skill_name", OPEN_WEB_SKILLS)
+def test_open_web_skills_define_full_scope_and_exact_decision_contract(
+    skill_name: str,
+) -> None:
+    text = (SKILL_ROOT / skill_name / "SKILL.md").read_text(encoding="utf-8")
+
+    for term in (
+        "芯片可选",
+        "开放发现单元",
+        "每个芯片单元",
+        "不得使用全局前 10",
+        '"unit_id"',
+        '"scope_type"',
+        '"candidate_id"',
+        '"matched_categories"',
+        '"suggested_skills"',
+        "不回填本轮芯片队列",
+        "重试",
+        "零候选",
+    ):
+        assert term in text

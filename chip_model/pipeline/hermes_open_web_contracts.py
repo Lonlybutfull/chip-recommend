@@ -46,6 +46,8 @@ CategoryName = Literal[
     "芯片型号", "基础参数", "算力指标", "兼容信息", "实测数据", "部署资料"
 ]
 NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+UnitId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=96)]
+ScopeType = Literal["chip", "discovery"]
 
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{7,80}$")
 CANDIDATE_ID_PATTERN = re.compile(r"^candidate-[a-f0-9]{12,64}$")
@@ -62,8 +64,10 @@ class SearchQuery(StrictModel):
 
 class SearchRequest(StrictModel):
     run_id: NonEmptyText
+    unit_id: str = ""
+    scope_type: ScopeType = "chip"
     skill: SkillName
-    target_chip: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
+    target_chip: Annotated[str, StringConstraints(strip_whitespace=True, max_length=160)] = ""
     queries: Annotated[list[SearchQuery], Field(min_length=10, max_length=10)]
 
     @field_validator("run_id")
@@ -72,6 +76,16 @@ class SearchRequest(StrictModel):
         if not RUN_ID_PATTERN.fullmatch(value):
             raise ValueError("运行 ID 格式无效。")
         return value
+
+    @model_validator(mode="after")
+    def validate_scope(self) -> "SearchRequest":
+        if self.scope_type == "chip" and not self.target_chip:
+            raise ValueError("芯片单元的目标芯片不能为空。")
+        if self.scope_type == "discovery" and self.target_chip:
+            raise ValueError("开放发现单元不得绑定单颗芯片。")
+        if self.scope_type == "discovery" and not self.unit_id:
+            raise ValueError("开放发现请求必须携带单元 ID。")
+        return self
 
     @model_validator(mode="after")
     def validate_unique_queries(self) -> "SearchRequest":
@@ -83,6 +97,8 @@ class SearchRequest(StrictModel):
 
 class PreviewRequest(StrictModel):
     run_id: NonEmptyText
+    unit_id: str = ""
+    scope_type: ScopeType = "chip"
     candidate_ids: Annotated[list[str], Field(min_length=1, max_length=100)]
 
     @field_validator("run_id")
@@ -127,6 +143,8 @@ class UrlDecision(StrictModel):
 
 class SelectionRequest(StrictModel):
     run_id: NonEmptyText
+    unit_id: str = ""
+    scope_type: ScopeType = "chip"
     skill: SkillName
     decisions: Annotated[list[UrlDecision], Field(min_length=1, max_length=100)]
 

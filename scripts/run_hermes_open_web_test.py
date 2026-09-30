@@ -22,13 +22,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Hermes 单 Skill 开放互联网隔离测试")
     parser.add_argument("--db", default=str(get_db_path()), help="正式数据库，只读复制")
     parser.add_argument("--skill", choices=HERMES_OPEN_WEB_SKILLS, required=True)
-    parser.add_argument("--chip", required=True, help="目标芯片")
+    parser.add_argument(
+        "--chip", default=None,
+        help="可选目标芯片；省略时处理数据库快照中的全部芯片并执行开放发现",
+    )
     parser.add_argument("--field", action="append", default=[], help="目标字段，可重复")
     parser.add_argument("--timeout", type=int, default=900)
+    parser.add_argument("--workers", type=int, default=None, help="Hermes 单元并发数")
+    parser.add_argument("--resume", default=None, help="续跑已有父运行 ID")
     args = parser.parse_args(argv)
     result = run_hermes_open_web_test(
         source_db=Path(args.db), skill=args.skill, target_chip=args.chip,
         target_fields=args.field or None, timeout=args.timeout,
+        max_workers=args.workers,
+        resume_run_id=args.resume,
     )
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result.get("status") in {"success", "partial"} else 2

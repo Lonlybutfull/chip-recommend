@@ -82,6 +82,8 @@ SEARCH_SCHEMA = {
         "type": "object",
         "properties": {
             "run_id": {"type": "string"},
+            "unit_id": {"type": "string"},
+            "scope_type": {"type": "string", "enum": ["chip", "discovery"]},
             "skill": {"type": "string", "enum": SKILL_ENUM},
             "target_chip": {"type": "string"},
             "queries": {
@@ -94,7 +96,7 @@ SEARCH_SCHEMA = {
                 },
             },
         },
-        "required": ["run_id", "skill", "target_chip", "queries"],
+        "required": ["run_id", "unit_id", "scope_type", "skill", "queries"],
         "additionalProperties": False,
     },
 }
@@ -106,9 +108,11 @@ PREVIEW_SCHEMA = {
         "type": "object",
         "properties": {
             "run_id": {"type": "string"},
+            "unit_id": {"type": "string"},
+            "scope_type": {"type": "string", "enum": ["chip", "discovery"]},
             "candidate_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
         },
-        "required": ["run_id", "candidate_ids"],
+        "required": ["run_id", "unit_id", "scope_type", "candidate_ids"],
         "additionalProperties": False,
     },
 }
@@ -120,6 +124,8 @@ SUBMIT_SCHEMA = {
         "type": "object",
         "properties": {
             "run_id": {"type": "string"},
+            "unit_id": {"type": "string"},
+            "scope_type": {"type": "string", "enum": ["chip", "discovery"]},
             "skill": {"type": "string", "enum": SKILL_ENUM},
             "decisions": {
                 "type": "array", "minItems": 1,
@@ -137,7 +143,7 @@ SUBMIT_SCHEMA = {
                 },
             },
         },
-        "required": ["run_id", "skill", "decisions"],
+        "required": ["run_id", "unit_id", "scope_type", "skill", "decisions"],
         "additionalProperties": False,
     },
 }

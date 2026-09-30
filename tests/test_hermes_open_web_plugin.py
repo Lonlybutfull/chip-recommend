@@ -53,3 +53,14 @@ def test_plugin_handler_calls_only_configured_loopback_service(monkeypatch) -> N
     }))
     assert result["ok"] is True
     assert calls[0][0] == "/v1/search"
+
+
+def test_plugin_schemas_require_parent_unit_context() -> None:
+    module = _module()
+    for schema in (module.SEARCH_SCHEMA, module.PREVIEW_SCHEMA, module.SUBMIT_SCHEMA):
+        required = set(schema["parameters"]["required"])
+        assert {"run_id", "unit_id", "scope_type"} <= required
+        assert schema["parameters"]["properties"]["scope_type"]["enum"] == [
+            "chip", "discovery"
+        ]
+    assert "target_chip" not in module.SEARCH_SCHEMA["parameters"]["required"]

@@ -1,5 +1,5 @@
 name: aishperf-open-web
-version: 1.0.0
+version: 2.0.0
 description: "AISHPerf 芯片资料开放互联网搜索、网页预览与目标链接提交工具。"
 author: AISHPerf
 kind: standalone

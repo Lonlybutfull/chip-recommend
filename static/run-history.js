@@ -85,8 +85,10 @@
       const a=run.audit_summary,existing=a.existing||{},fresh=a.new||{};
       return `<div class="run-card-head"><div><h3>全部链接检查<span class="run-title-hint">展开流程 ↓</span></h3><div class="run-card-meta">已有链接库 + 6 类信息的开放互联网搜索<br>开始 ${txt(formatUpdateTime(run.started_at))} · 结束 ${txt(formatUpdateTime(run.finished_at))}</div></div>${badge(run.status)}</div><div class="run-card-stats"><span class="run-card-stat strong">搜索 ${num(fresh.queries)} 次 · ${num(fresh.search_mentions)} 条结果</span><span class="run-card-stat strong">已有链接可用 ${num(existing.reachable)} / ${num(existing.safe_unique_urls)}</span><span class="run-card-stat strong">新网址可用 ${num(fresh.reachable)} / ${num(fresh.visited_unique_urls)}</span></div>`;
     }
-    const hermes=run.schema_version==='hermes-open-web-v1';
-    return `<div class="run-card-head"><div><h3>${hermes?'Hermes 开放网络更新':'开放互联网测试'} · ${txt(run.skill_label||'基础参数')}</h3><div class="run-card-meta">${txt((run.chips||[]).join('、')||'自定义搜索')}<br>开始 ${txt(formatUpdateTime(run.started_at))} · 结束 ${txt(formatUpdateTime(run.finished_at))}</div></div>${badge(run.status)}</div><div class="run-card-stats">${hermes?`<span class="run-card-stat">搜索词 ${num(c.queries)}</span><span class="run-card-stat">去重候选 ${num(c.unique_candidates)}</span><span class="run-card-stat">可访问 ${num(c.reachable)} / ${num(c.previewed)}</span>`:`<span class="run-card-stat">网页访问 ${num(c.visit_succeeded)} / ${num(c.visited||c.coarse_passed)}</span>`}<span class="run-card-stat">有效字段 ${num(c.validated)}</span></div>`;
+    const hermes=String(run.schema_version||'').startsWith('hermes-open-web-');
+    const full=hermes&&run.scope==='all';
+    const target=full?`全部芯片 · ${num((run.chips||[]).length)} 颗`:(run.chips||[]).join('、')||'开放发现';
+    return `<div class="run-card-head"><div><h3>${hermes?'Hermes 开放网络更新':'开放互联网测试'} · ${txt(run.skill_label||'基础参数')}</h3><div class="run-card-meta">${txt(target)}<br>开始 ${txt(formatUpdateTime(run.started_at))} · 结束 ${txt(formatUpdateTime(run.finished_at))}</div></div>${badge(run.status)}</div><div class="run-card-stats">${hermes?`<span class="run-card-stat">单元 ${num(c.units_completed)} / ${num(c.units_total)}</span><span class="run-card-stat">搜索词 ${num(c.queries)}</span><span class="run-card-stat">去重候选 ${num(c.unique_candidates)}</span><span class="run-card-stat">可访问 ${num(c.reachable)} / ${num(c.previewed)}</span>`:`<span class="run-card-stat">网页访问 ${num(c.visit_succeeded)} / ${num(c.visited||c.coarse_passed)}</span>`}<span class="run-card-stat">有效字段 ${num(c.validated)}</span></div>`;
   }
   function openWebCard(run){
     const audit=run.skill==='all-skills'&&run.audit_summary;
@@ -283,10 +285,15 @@
       ['字段提取',`提取 ${num(c.extracted)} 个候选字段，校验通过 ${num(c.validated)} 个`,'完成'],
       ['记录 URL 与关联 Skill',`记录选择结果，并生成 ${num(c.linked_tasks)} 个关联任务`,'完成'],
     ];
+    const units=Array.isArray(d.unit_details)?d.unit_details:[];
+    const unitList=units.length?`<div class="run-toolbar"><input type="search" data-hermes-unit-filter placeholder="按芯片名称筛选"></div><div data-hermes-unit-list>${units.map(unit=>`<div class="run-source" data-hermes-unit-row data-hermes-unit-search="${txt(String(unit.target_chip||'开放发现').toLowerCase())}"><div class="run-source-title"><b>${txt(unit.target_chip||'开放发现')}</b>${badge(unit.status)}</div><div class="run-note">${txt(unit.scope_type==='discovery'?'新芯片与新来源':'已有芯片')} · 尝试 ${num(unit.attempts)} 次 · 搜索词 ${num(unit.counts?.queries)} · 候选 ${num(unit.counts?.unique_candidates)} · 可访问 ${num(unit.counts?.reachable)} · 有效字段 ${num(unit.counts?.validated)}</div>${unit.error?`<div class="error">${txt(unit.error)}</div>`:''}</div>`).join('')}</div>`:'';
+    const newChips=(d.new_chip_candidates||[]).map(row=>`<div class="run-source"><b>${txt(row.title||'新芯片候选')}</b><div class="run-links">${link(row.url)}</div><div class="run-note">${txt(row.reason||'')}</div></div>`).join('')||'<div class="run-note">本轮没有发现新芯片候选。</div>';
     return `<div class="run-detail-block"><h4>本轮目标</h4>${target}</div><div class="audit-overview">${renderFlowSteps(flow)}</div>`+
+      (units.length?section('hermes-units',`芯片处理结果 · ${units.length} 个单元`,unitList,true):'')+
       section('hermes-search',`Hermes 搜索词 · ${plan.length} 条`,searches,true)+
       section('hermes-candidates',`URL 访问与 Kimi 选择 · ${results.filter(row=>row.status==='candidate').length} 条`,candidateRows,true)+
       section('hermes-facts',`字段提取与校验 · ${num(d.counts?.validated)} 条`,facts,true)+
+      (units.length?section('hermes-new-chips',`新芯片候选 · ${(d.new_chip_candidates||[]).length} 条`,newChips):'')+
       section('hermes-linked',`系统关联 Skill · ${linkedSkills.length} 类`,linked)+
       section('hermes-tools','Hermes 工具调用记录',`<div class="run-timeline">${traces}</div>`);
   }
@@ -295,7 +302,12 @@
     const d=await fetchJSON(`${API}/data-agent/open-web-runs/${encodeURIComponent(card.dataset.openWebSession)}`);
     if(d._error){body.innerHTML=`<div class="error">${txt(d._error)}</div>`;return}
     if(d.skill==='all-skills'&&d.audit_report){body.innerHTML=renderAuditRun(d);bindAuditLinkFilters(body);body.dataset.loaded='1';return}
-    if(d.schema_version==='hermes-open-web-v1'){body.innerHTML=renderHermesRun(d);body.dataset.loaded='1';return}
+    if(String(d.schema_version||'').startsWith('hermes-open-web-')){
+      body.innerHTML=renderHermesRun(d);body.dataset.loaded='1';
+      const filter=body.querySelector('[data-hermes-unit-filter]');
+      if(filter)filter.addEventListener('input',()=>{const needle=filter.value.trim().toLowerCase();body.querySelectorAll('[data-hermes-unit-row]').forEach(row=>{row.hidden=Boolean(needle)&&!row.dataset.hermesUnitSearch.includes(needle)})});
+      return
+    }
     const assetByUrl=new Map((d.url_assets||[]).map(a=>[a.url,a]));
     const urls=(d.urls||[]).map(u=>{const a=assetByUrl.get(u.canonical_url)||{};const categories=(a.information_categories||[]).join('、')||'未确认';const fields=(a.extracted_fields||[]).join('、')||'无';return `<div class="run-source"><b>${txt(u.title||u.canonical_url)}</b> · ${badge(u.fetch_status||'not_run')}<div class="run-links">${link(u.canonical_url)}</div><div class="run-note">${txt(a.asset_status||'尚未形成资产记录')} · 信息类别：${txt(categories)} · 提取字段：${txt(fields)}<br>发现方式：${txt(a.query_strategy||'未记录')} · 粗筛 ${Number(u.coarse_score||0)} 分 · ${txt(u.coarse_reason||'')}${u.precise_reason?'<br>'+txt(u.precise_reason):''}</div></div>`}).join('')||'<div class="run-note">没有通过粗筛的网页。</div>';
     const facts=(d.facts||[]).map(f=>`<div class="run-source"><b>${txt(f.chip_model||'未确认芯片')} · ${txt(f.field_name)}</b> = ${txt(f.proposed_value)} ${txt(f.unit||'')}<div class="run-links">${link(f.source_url)}</div><div class="run-note">${txt(f.validation_status==='validated'?'校验通过':'未通过：'+(f.rejection_reason||'原因未记录'))}</div><div class="run-value">原文：${txt(f.evidence_text)}</div></div>`).join('')||'<div class="run-note">本次没有校验通过的信息。</div>';
