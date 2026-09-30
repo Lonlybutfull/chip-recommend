@@ -1,6 +1,21 @@
 # 当前线上部署
 
-更新时间：2026-09-28
+更新时间：2026-09-30
+
+## 2026-09-30 Hermes Skill-first 全芯片编排 v2
+
+- 当前发布目录：`/home/lxc/chip-recommend/releases/20260930-hermes-skill-first-73b4c38`
+- 当前镜像：`chip-recommend:hermes-skill-first-73b4c38`
+- 主站回滚容器：`chip-recommend-previous-20260930-1035`（已停止）
+- 工具服务回滚容器：`chip-recommend-open-web-tools-previous-20260930-1035`（已停止）
+- 数据库快照：`/home/lxc/chip-recommend/backups/pre-hermes-skill-first-73b4c38.db`
+- 六类中文 Skill 与 `aishperf-open-web` Hermes 插件升级到 `2.0.0`。Skill 规定完整业务步骤、判定标准和 JSON 合同；插件工具只负责搜索、访问和结果落盘。
+- 后端支持“指定单芯片”和“全部芯片 + 开放发现”两种范围。全量运行先冻结正式库芯片清单，再逐芯片建立独立单元；新发现芯片只进入候选资产，不动态扩大本轮队列。
+- 每个运行单元严格执行：10 组搜索词 → 搜索与去重 → 全候选网页预览 → Hermes 选择 → 字段提取与分类联动；失败只重试当前单元，并支持按父运行 ID 续跑。
+- 前端状态页可查看父运行总体进度、逐芯片单元、搜索/访问/选择计数、新芯片候选和系统规范化后的关联 Skill；网页仍不提供启动入口。
+- 本地完整回归 `317 passed`；写 Skill 时先执行未读新 Skill 的 RED 基线，再用正式 Skill 完成 GREEN 场景，验证了可选芯片、全量范围、精确工具合同、零候选和禁止动态扩容等规则。
+- 线上冒烟会话 `20260930-103344-228dae98` 已实际跑通 Hermes → `chip-specs` → 搜索工具 → 80 个候选预览 → 模型复核 → JSON 提交。Bing 在当前服务器返回无关内容，模型正确拒绝全部候选，因此本次为 `partial`，未提取字段；这是搜索提供器质量问题，不是 Skill/工具调用失败。
+- 部署前后正式数据库主体 SHA-256 均为 `b77e2af7244469dcc38bf08b9effb5d473bd57796fe569521d91a8b9c542534f`，正式业务数据未变化。
 
 ## 2026-09-28 开放互联网分类 Skill v1.2
 
@@ -89,10 +104,10 @@
 
 - SSH：`lxc@81.70.231.92`
 - 项目根目录：`/home/lxc/chip-recommend`
-- 当前发布目录：`/home/lxc/chip-recommend/releases/20260928-222335-skill-v1.2`
+- 当前发布目录：`/home/lxc/chip-recommend/releases/20260930-hermes-skill-first-73b4c38`
 - 持久化数据库：`/home/lxc/chip-recommend/data/data.db`
 - Docker 容器：`chip-recommend`
-- Docker 镜像：`chip-recommend:skill-v1.2-20260928-222335`
+- Docker 镜像：`chip-recommend:hermes-skill-first-73b4c38`
 - 容器端口：`0.0.0.0:5340 -> 8000/tcp`
 - 重启策略：`unless-stopped`
 - Hermes：`hermes-gateway`、`hermes-webui`、`hermes-manual-run-dispatcher` 均在本机运行并开机自启
