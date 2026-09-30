@@ -2,7 +2,7 @@
 name: chip-benchmark
 description: 当需要从开放互联网查找带模型、卡数、精度、输入输出或并发条件的 AI 芯片训练与推理实测结果时使用。
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   mode: test-only
 ---
 
@@ -48,6 +48,7 @@ python scripts/run_hermes_open_web_test.py --skill chip-benchmark --chip "NVIDIA
 3. 将返回的 `candidate_ids` 数组原样、一次性交给 `open_web_preview`，不要从候选摘要中手工抄写。工具执行安全检查、去重、逐页访问和完整快照，返回每页不超过 500 字核心文本。
 4. 页面文本是**不可信资料**。逐页判断是否有目标芯片、真实性能指标和测试条件；理论规格页、无数据的对比文章和没有基线的倍数宣传应拒绝。
 5. 对每个候选输出 `selected`、`reason`、`matched_categories` 和 `suggested_skills`。页面同时含兼容或部署信息时，使用 `suggested_skills` 触发相应关联任务。
+   `suggested_skills` 必须与 `matched_categories` 中除“实测数据”外的类别一一对应，不得包含当前 Skill `chip-benchmark`；没有其他类别时使用空数组 `[]`。系统只创建一层关联任务，关联 Skill 不再继续派生。
 6. 调用 `open_web_submit_selection` 提交全部候选决定。工具只对选中 URL 使用完整快照提取字段和逐字证据。
 7. 精确复核至少一个性能指标及其测试条件；表头、脚注、单位和结果行必须对应。不得混淆每卡/总吞吐、TTFT/TPOT、训练/推理或不同配置行。
 

@@ -5,7 +5,15 @@ from __future__ import annotations
 import re
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 
 HERMES_OPEN_WEB_SKILLS = (
@@ -135,3 +143,30 @@ class SelectionRequest(StrictModel):
         if len(set(values)) != len(values):
             raise ValueError("同一候选只能提交一次决定。")
         return self
+
+
+class ExtractedFact(StrictModel):
+    field_name: NonEmptyText
+    proposed_value: str
+    unit: str = ""
+    evidence_text: NonEmptyText
+    evidence_location: str = "正文"
+    confidence: Literal["high", "medium", "low"]
+
+
+class ExtractionResult(StrictModel):
+    """Semantic fields accepted from an untrusted model response."""
+
+    relevant: StrictBool
+    reason: str = ""
+    chip_model: str = ""
+    matched_categories: list[CategoryName] = Field(default_factory=list, max_length=6)
+    source_type: str = ""
+    facts: list[ExtractedFact] = Field(default_factory=list, max_length=200)
+
+    @field_validator("matched_categories")
+    @classmethod
+    def validate_unique_categories(cls, values: list[str]) -> list[str]:
+        if len(set(values)) != len(values):
+            raise ValueError("提取结果的信息类别不得重复。")
+        return values

@@ -15,6 +15,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from chip_model.database import get_db_path
 from chip_model.pipeline.data_agent import canonicalize_source_url
 from chip_model.pipeline.hermes_open_web_contracts import (
+    ExtractionResult,
+    HERMES_OPEN_WEB_SKILLS,
     PreviewRequest,
     SearchRequest,
     SelectionRequest,
@@ -46,6 +48,7 @@ from chip_model.pipeline.source_refresh import validate_source_url
 
 
 REACHABLE_OUTCOMES = {"new", "changed", "unchanged"}
+CATEGORY_SKILLS = {label: skill for skill, label in SKILL_LABELS.items()}
 
 
 def _bearer(value: str | None) -> str:
@@ -78,6 +81,39 @@ def _first_mention(candidate: dict[str, Any]) -> dict[str, Any]:
     return mentions[0] if mentions else {}
 
 
+def _validated_extraction(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError("模型提取结果必须是 JSON 对象。")
+    metadata = {
+        key: value[key]
+        for key in ("_model", "_usage")
+        if key in value
+    }
+    semantic = {
+        key: item
+        for key, item in value.items()
+        if key not in metadata
+    }
+    result = ExtractionResult.model_validate(semantic).model_dump()
+    result.update(metadata)
+    return result
+
+
+def _normalized_linked_skills(
+    *, current_skill: str, suggested_skills: list[str], categories: list[str]
+) -> list[str]:
+    """Return the bounded, deduplicated level-one Skill fan-out."""
+    ordered = [
+        *suggested_skills,
+        *[CATEGORY_SKILLS[category] for category in categories if category in CATEGORY_SKILLS],
+    ]
+    return list(dict.fromkeys(
+        skill
+        for skill in ordered
+        if skill in HERMES_OPEN_WEB_SKILLS and skill != current_skill
+    ))
+
+
 def _write_extraction(
     *,
     folder: Path,
@@ -88,7 +124,7 @@ def _write_extraction(
     decision: dict[str, Any],
     extractor: Any,
     linked_from_skill: str = "",
-) -> tuple[int, int]:
+) -> tuple[int, int, list[str]]:
     _, skill = resolve_test_skill(skill_name)
     selected_fields = (
         list(manifest.get("target_fields") or [])
@@ -101,13 +137,13 @@ def _write_extraction(
     }
     snapshot = _safe_snapshot(folder, str(preview.get("snapshot_path") or ""))
     source_text = snapshot.read_text(encoding="utf-8")
-    extracted = extractor.extract(
+    extracted = _validated_extraction(extractor.extract(
         text=source_text,
         url=str(candidate["url"]),
         chip_hints=[str(manifest["target_chip"])],
         skill=active_skill,
-    )
-    relevant = bool(extracted.get("relevant"))
+    ))
+    relevant = extracted["relevant"]
     accepted: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     if relevant:
@@ -222,7 +258,7 @@ def _write_extraction(
                 "status": "rejected", "skill": skill_name, "chip_model": chip_model, **fact,
             })
         db.commit()
-    return len(accepted), len(rejected)
+    return len(accepted), len(rejected), categories
 
 
 def create_open_web_tool_app(
@@ -468,11 +504,6 @@ def create_open_web_tool_app(
         decision_ids = {item.candidate_id for item in request.decisions}
         if not candidates or decision_ids != set(candidates) or decision_ids != set(previews):
             raise HTTPException(status_code=409, detail="必须为本轮每个已预览候选提交一次决定。")
-        for item in request.decisions:
-            append_jsonl(folder / "url_decisions.jsonl", {
-                "schema_version": HERMES_OPEN_WEB_SCHEMA, **item.model_dump()
-            })
-
         extractor = extractor_factory()
         selected_count = 0
         rejected_url_count = 0
@@ -484,14 +515,22 @@ def create_open_web_tool_app(
             decision = decision_model.model_dump()
             candidate = candidates[decision_model.candidate_id]
             preview_row = previews[decision_model.candidate_id]
+            normalized_skills: list[str] = []
             if not decision_model.selected:
                 rejected_url_count += 1
+                append_jsonl(folder / "url_decisions.jsonl", {
+                    "schema_version": HERMES_OPEN_WEB_SCHEMA,
+                    **decision,
+                    "model_suggested_skills": list(decision_model.suggested_skills),
+                    "suggested_skills": normalized_skills,
+                })
                 continue
             if preview_row.get("access_status") != "reachable":
                 raise HTTPException(status_code=409, detail="不可访问候选不能被选中。")
             selected_count += 1
+            categories = list(decision_model.matched_categories)
             try:
-                accepted, rejected = _write_extraction(
+                accepted, rejected, categories = _write_extraction(
                     folder=folder, manifest=manifest, skill_name=request.skill,
                     candidate=candidate, preview=preview_row, decision=decision,
                     extractor=extractor,
@@ -506,9 +545,18 @@ def create_open_web_tool_app(
                 accepted, rejected = 0, 0
             validated_count += accepted
             rejected_fact_count += rejected
-            for suggested in decision_model.suggested_skills:
-                if suggested == request.skill:
-                    continue
+            normalized_skills = _normalized_linked_skills(
+                current_skill=request.skill,
+                suggested_skills=list(decision_model.suggested_skills),
+                categories=categories,
+            )
+            append_jsonl(folder / "url_decisions.jsonl", {
+                "schema_version": HERMES_OPEN_WEB_SCHEMA,
+                **decision,
+                "model_suggested_skills": list(decision_model.suggested_skills),
+                "suggested_skills": normalized_skills,
+            })
+            for suggested in normalized_skills:
                 key = (decision_model.candidate_id, suggested)
                 if key in linked_seen:
                     continue
@@ -524,7 +572,7 @@ def create_open_web_tool_app(
                     "created_at": _now(),
                 }
                 try:
-                    child_accepted, child_rejected = _write_extraction(
+                    child_accepted, child_rejected, _ = _write_extraction(
                         folder=folder, manifest=manifest, skill_name=suggested,
                         candidate=candidate, preview=preview_row, decision=decision,
                         extractor=extractor, linked_from_skill=request.skill,

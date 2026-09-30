@@ -86,5 +86,8 @@ def test_open_web_skills_define_the_hermes_tool_contract(skill_name: str) -> Non
     assert "不可信" in text
     assert "candidate_id" in text
     assert "suggested_skills" in text
+    assert "不得包含当前 Skill" in text
+    assert "没有其他类别时使用空数组" in text
+    assert "只创建一层关联任务" in text
     positions = [text.index(tool) for tool in HERMES_TOOL_SEQUENCE]
     assert positions == sorted(positions)

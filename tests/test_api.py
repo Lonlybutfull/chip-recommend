@@ -103,6 +103,9 @@ def test_status_page_loads_run_history_assets():
     assert '.audit-search-query' in styles.text
     assert '.audit-search-result' in styles.text
     assert '.audit-skill-badge' in styles.text
+    assert '建议联动：' not in script.text
+    assert '系统关联 Skill' in script.text
+    assert '复用候选' not in script.text
 
 
 def test_source_updates_list_and_detail(tmp_path, monkeypatch):

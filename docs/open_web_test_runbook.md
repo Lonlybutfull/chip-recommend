@@ -15,6 +15,8 @@
 
 每个 Skill 都要求 Hermes：生成恰好 10 条动态搜索词，依次调用 `open_web_search`、`open_web_preview`、`open_web_submit_selection`，并对每个候选 URL 给出选择或拒绝理由。Hermes 不使用自身搜索功能，网页文本始终作为不可信输入。
 
+当选中页面还包含其他类别时，系统会合并 Hermes 初筛类别与完整快照提取类别，将中文类别规范化为固定 Skill，去除当前 Skill 和重复项，再创建一层关联提取任务。关联任务不会继续派生，避免同一 URL 循环处理或任务数量失控。
+
 ## 三个工具
 
 | 工具 | 系统负责的工作 |
@@ -70,7 +72,7 @@ python scripts/run_hermes_open_web_test.py \
 | `search_results.jsonl` | 全部搜索结果、URL 去重结果和命中搜索词 |
 | `url_previews.jsonl` | 候选页面访问结果与 500 字预览 |
 | `source_snapshots/` | 可访问页面的完整网页快照 |
-| `url_decisions.jsonl` | Hermes 对每个候选的选择、拒绝理由和信息分类 |
+| `url_decisions.jsonl` | Hermes 对每个候选的选择、拒绝理由、原始联动建议和系统规范化后的关联 Skill |
 | `extracted_facts.jsonl` | Kimi 提取后通过或未通过校验的字段及原文证据 |
 | `linked_tasks.jsonl` | 同一页面触发的其他 Skill 联动提取任务 |
 | `hermes_tool_trace.jsonl` | 三个工具的调用顺序、耗时与摘要 |

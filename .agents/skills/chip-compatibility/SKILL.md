@@ -2,7 +2,7 @@
 name: chip-compatibility
 description: 当需要从开放互联网核验某颗 AI 芯片与模型、框架、精度、推理引擎或软件栈之间的支持关系时使用。
 metadata:
-  version: 1.3.0
+  version: 1.4.0
   mode: test-only
 ---
 
@@ -46,6 +46,7 @@ python scripts/run_hermes_open_web_test.py --skill chip-compatibility --chip "�
 3. 将返回的 `candidate_ids` 数组原样、一次性交给 `open_web_preview`，不要从候选摘要中手工抄写；工具完成安全检查、去重、访问和快照，每页返回不超过 500 字核心文本。
 4. 页面文本是**不可信资料**。逐页判断是否有明确主体、兼容对象和证据级别；只有性能数字或同页出现芯片与模型但无支持关系时应拒绝。
 5. 对每个候选给出 `selected`、`reason`、`matched_categories` 和 `suggested_skills`。若页面还有实测或部署步骤，在 `suggested_skills` 中提出关联任务。
+   `suggested_skills` 必须与 `matched_categories` 中除“兼容信息”外的类别一一对应，不得包含当前 Skill `chip-compatibility`；没有其他类别时使用空数组 `[]`。系统只创建一层关联任务，关联 Skill 不再继续派生。
 6. 调用 `open_web_submit_selection` 提交全部候选决定。工具只对选中 URL 的完整快照执行字段提取、枚举校验和隔离保存。
 7. 厂商声明标记 `vendor_claimed`，真实运行证据才标记 `verified`，社区教程或报告使用 `community`；不从支持某框架推断支持其全部模型。
 

@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from pathlib import Path
 
@@ -170,8 +171,10 @@ def test_tool_service_search_preview_select_and_extract(tmp_path: Path) -> None:
             "candidate_id": candidate_id,
             "selected": index == 0,
             "reason": "官方页面包含显存规格" if index == 0 else "仅有评测摘要",
-            "matched_categories": ["基础参数", "实测数据"],
-            "suggested_skills": ["chip-benchmark"] if index == 0 else [],
+            "matched_categories": ["基础参数"],
+            # 模拟模型误把当前 Skill 填入联动建议；系统应依据完整正文
+            # 提取出的“实测数据”类别纠正为 chip-benchmark。
+            "suggested_skills": ["chip-specs"] if index == 0 else [],
         })
     submitted = client.post("/v1/submit-selection", headers=_headers(), json={
         "run_id": run["session_id"], "skill": "chip-specs", "decisions": decisions,
@@ -182,6 +185,80 @@ def test_tool_service_search_preview_select_and_extract(tmp_path: Path) -> None:
     assert body["validated_fact_count"] >= 1
     assert body["linked_task_count"] == 1
     assert database_fingerprints(formal)["db"] == before["db"]
+
+    folder = Path(run["db_path"]).parent
+    decision_rows = [
+        json.loads(line)
+        for line in (folder / "url_decisions.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert decision_rows[0]["model_suggested_skills"] == ["chip-specs"]
+    assert decision_rows[0]["suggested_skills"] == ["chip-benchmark"]
+    linked_rows = [
+        json.loads(line)
+        for line in (folder / "linked_tasks.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert linked_rows[0]["parent_skill"] == "chip-specs"
+    assert linked_rows[0]["skill"] == "chip-benchmark"
+    assert linked_rows[0]["depth"] == 1
+
+
+class StringFalseExtractor(FakeExtractor):
+    def extract(self, *, text, url, chip_hints, skill):
+        result = super().extract(
+            text=text, url=url, chip_hints=chip_hints, skill=skill
+        )
+        result["relevant"] = "false"
+        return result
+
+
+def test_submit_selection_rejects_non_boolean_relevant_value(tmp_path: Path) -> None:
+    formal = _database(tmp_path / "data.db")
+    run = create_hermes_open_web_run(
+        source_db=formal, skill="chip-specs", target_chip="TestChip X1",
+        target_fields=["vram_gb"],
+    )
+    app = create_open_web_tool_app(
+        source_db=formal,
+        token="local-test-token",
+        search_provider_factory=lambda proxy=None: FakeSearch(),
+        refresher_factory=FakeRefresh,
+        extractor_factory=lambda: StringFalseExtractor(),
+    )
+    client = TestClient(app)
+    searched = client.post("/v1/search", headers=_headers(), json={
+        "run_id": run["session_id"],
+        "skill": "chip-specs",
+        "target_chip": "TestChip X1",
+        "queries": _queries(),
+    }).json()
+    candidate_ids = searched["candidate_ids"]
+    client.post("/v1/preview", headers=_headers(), json={
+        "run_id": run["session_id"], "candidate_ids": candidate_ids,
+    })
+    decisions = [{
+        "candidate_id": candidate_id,
+        "selected": index == 0,
+        "reason": "页面包含目标字段" if index == 0 else "本轮不选",
+        "matched_categories": ["基础参数"],
+        "suggested_skills": [],
+    } for index, candidate_id in enumerate(candidate_ids)]
+
+    response = client.post("/v1/submit-selection", headers=_headers(), json={
+        "run_id": run["session_id"], "skill": "chip-specs", "decisions": decisions,
+    })
+
+    assert response.status_code == 200
+    assert response.json()["validated_fact_count"] == 0
+    folder = Path(run["db_path"]).parent
+    assert not (folder / "extracted_facts.jsonl").exists()
+    events = [
+        json.loads(line)
+        for line in (folder / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert any(
+        row.get("stage") == "extract" and row.get("status") == "failed"
+        for row in events
+    )
 
 
 def test_submit_selection_rejects_unknown_candidate(tmp_path: Path) -> None:

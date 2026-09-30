@@ -36,7 +36,7 @@ DEFAULT_TEST_SKILL = "chip-specs"
 TEST_SKILL_ALIASES = {"chip-basic": DEFAULT_TEST_SKILL}
 TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
     "chip-identity": {
-        "version": "1.3.0",
+        "version": "1.4.0",
         "label": "芯片型号",
         "target_table": "chips",
         "purpose": "查找芯片厂商、型号、系列、发布时间和发布状态",
@@ -63,7 +63,7 @@ TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
     },
     "chip-specs": {
-        "version": "1.3.0",
+        "version": "1.4.0",
         "label": "基础参数",
         "target_table": "chips",
         "purpose": "查找显存、带宽、功耗、制程、形态和互联等基础参数",
@@ -98,7 +98,7 @@ TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
     },
     "chip-compute": {
-        "version": "1.3.0",
+        "version": "1.4.0",
         "label": "算力指标",
         "target_table": "chips",
         "purpose": "查找支持精度、各精度理论峰值和计算单元",
@@ -125,7 +125,7 @@ TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
     },
     "chip-compatibility": {
-        "version": "1.3.0",
+        "version": "1.4.0",
         "label": "兼容信息",
         "target_table": "chip_model_compatibility",
         "purpose": "查找芯片对模型、框架、精度和软件栈的兼容声明",
@@ -153,7 +153,7 @@ TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
     },
     "chip-benchmark": {
-        "version": "1.3.0",
+        "version": "1.4.0",
         "label": "实测数据",
         "target_table": "chip_model_benchmarks",
         "purpose": "查找带测试条件的吞吐、时延、并发和显存实测结果",
@@ -198,7 +198,7 @@ TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
     },
     "chip-deployment": {
-        "version": "1.3.0",
+        "version": "1.4.0",
         "label": "部署资料",
         "target_table": "deployment_guides",
         "purpose": "查找推理后端、版本、启动方法、拓扑和部署说明",
