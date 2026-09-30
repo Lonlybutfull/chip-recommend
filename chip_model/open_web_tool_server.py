@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
@@ -49,6 +50,39 @@ from chip_model.pipeline.source_refresh import validate_source_url
 
 REACHABLE_OUTCOMES = {"new", "changed", "unchanged"}
 CATEGORY_SKILLS = {label: skill for skill, label in SKILL_LABELS.items()}
+
+
+def _selection_fingerprint(request: SelectionRequest) -> str:
+    """Return an order-independent identity for an exact selection submission."""
+    payload = {
+        "skill": request.skill,
+        "decisions": sorted(
+            (decision.model_dump(mode="json") for decision in request.decisions),
+            key=lambda decision: decision["candidate_id"],
+        ),
+    }
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _cached_selection_result(
+    folder: Path, *, fingerprint: str
+) -> dict[str, Any] | None:
+    path = folder / "selection_result.json"
+    if not path.is_file() or path.is_symlink():
+        return None
+    try:
+        saved = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if saved.get("request_fingerprint") != fingerprint:
+        raise HTTPException(status_code=409, detail="本轮选择已由不同内容提交。")
+    output = saved.get("output")
+    if not isinstance(output, dict):
+        return None
+    return {**output, "cached": True}
 
 
 def _bearer(value: str | None) -> str:
@@ -489,8 +523,15 @@ def create_open_web_tool_app(
         folder, manifest = checked_run(request.run_id)
         if manifest.get("skill") != request.skill:
             raise HTTPException(status_code=409, detail="提交 Skill 与运行清单不一致。")
+        request_fingerprint = _selection_fingerprint(request)
+        cached = _cached_selection_result(folder, fingerprint=request_fingerprint)
+        if cached is not None:
+            return cached
         if read_jsonl(folder, "url_decisions.jsonl"):
-            raise HTTPException(status_code=409, detail="本轮选择已经提交。")
+            raise HTTPException(
+                status_code=409,
+                detail="本轮选择正在处理，或旧版本未保存可重放的提交结果。",
+            )
         candidates = {
             row["candidate_id"]: row
             for row in read_jsonl(folder, "search_results.jsonl")
@@ -620,7 +661,13 @@ def create_open_web_tool_app(
             "rejected_fact_count": rejected_fact_count,
             "linked_task_count": linked_count,
             "formal_database_modified": manifest["formal_database_modified"],
+            "cached": False,
         }
+        atomic_json(folder / "selection_result.json", {
+            "schema_version": HERMES_OPEN_WEB_SCHEMA,
+            "request_fingerprint": request_fingerprint,
+            "output": output,
+        })
         trace_tool(
             folder, tool="open_web_submit_selection", status=manifest["status"],
             started_at=started, finished_at=_now(),

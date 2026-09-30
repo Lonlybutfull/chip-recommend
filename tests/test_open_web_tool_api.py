@@ -184,6 +184,7 @@ def test_tool_service_search_preview_select_and_extract(tmp_path: Path) -> None:
     assert body["selected_count"] == 1
     assert body["validated_fact_count"] >= 1
     assert body["linked_task_count"] == 1
+    assert body["cached"] is False
     assert database_fingerprints(formal)["db"] == before["db"]
 
     folder = Path(run["db_path"]).parent
@@ -200,6 +201,25 @@ def test_tool_service_search_preview_select_and_extract(tmp_path: Path) -> None:
     assert linked_rows[0]["parent_skill"] == "chip-specs"
     assert linked_rows[0]["skill"] == "chip-benchmark"
     assert linked_rows[0]["depth"] == 1
+
+    facts_before_retry = (folder / "extracted_facts.jsonl").read_text(encoding="utf-8")
+    links_before_retry = (folder / "linked_tasks.jsonl").read_text(encoding="utf-8")
+    retried = client.post("/v1/submit-selection", headers=_headers(), json={
+        "run_id": run["session_id"], "skill": "chip-specs", "decisions": decisions,
+    })
+    assert retried.status_code == 200, retried.text
+    assert retried.json() == {**body, "cached": True}
+    assert (folder / "extracted_facts.jsonl").read_text(encoding="utf-8") == facts_before_retry
+    assert (folder / "linked_tasks.jsonl").read_text(encoding="utf-8") == links_before_retry
+
+    changed_decisions = [dict(decision) for decision in decisions]
+    changed_decisions[0]["reason"] = "不同的重复提交"
+    conflict = client.post("/v1/submit-selection", headers=_headers(), json={
+        "run_id": run["session_id"],
+        "skill": "chip-specs",
+        "decisions": changed_decisions,
+    })
+    assert conflict.status_code == 409
 
 
 class StringFalseExtractor(FakeExtractor):
