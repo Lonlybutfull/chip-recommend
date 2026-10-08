@@ -31,11 +31,13 @@ from chip_model.pipeline.test_workspace import create_test_workspace, runs_root
 
 
 SCHEMA_VERSION = "open-web-test-v2"
+HERMES_SCHEMA_VERSION = "hermes-open-web-v2"
+LEGACY_HERMES_SCHEMA_VERSION = "hermes-open-web-v1"
 DEFAULT_TEST_SKILL = "chip-specs"
 TEST_SKILL_ALIASES = {"chip-basic": DEFAULT_TEST_SKILL}
 TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
     "chip-identity": {
-        "version": "1.2.0",
+        "version": "2.0.0",
         "label": "芯片型号",
         "target_table": "chips",
         "purpose": "查找芯片厂商、型号、系列、发布时间和发布状态",
@@ -62,7 +64,7 @@ TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
     },
     "chip-specs": {
-        "version": "1.2.0",
+        "version": "2.0.0",
         "label": "基础参数",
         "target_table": "chips",
         "purpose": "查找显存、带宽、功耗、制程、形态和互联等基础参数",
@@ -97,7 +99,7 @@ TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
     },
     "chip-compute": {
-        "version": "1.2.0",
+        "version": "2.0.0",
         "label": "算力指标",
         "target_table": "chips",
         "purpose": "查找支持精度、各精度理论峰值和计算单元",
@@ -124,7 +126,7 @@ TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
     },
     "chip-compatibility": {
-        "version": "1.2.0",
+        "version": "2.0.0",
         "label": "兼容信息",
         "target_table": "chip_model_compatibility",
         "purpose": "查找芯片对模型、框架、精度和软件栈的兼容声明",
@@ -152,7 +154,7 @@ TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
     },
     "chip-benchmark": {
-        "version": "1.2.0",
+        "version": "2.0.0",
         "label": "实测数据",
         "target_table": "chip_model_benchmarks",
         "purpose": "查找带测试条件的吞吐、时延、并发和显存实测结果",
@@ -197,7 +199,7 @@ TEST_SKILL_REGISTRY: dict[str, dict[str, Any]] = {
         ),
     },
     "chip-deployment": {
-        "version": "1.2.0",
+        "version": "2.0.0",
         "label": "部署资料",
         "target_table": "deployment_guides",
         "purpose": "查找推理后端、版本、启动方法、拓扑和部署说明",
@@ -577,9 +579,11 @@ class OpenAICompatibleExtractor:
         model: str | None = None,
         timeout: float = 60.0,
     ) -> None:
-        self.base_url = (base_url or os.getenv("DATA_AGENT_LLM_BASE_URL") or "").rstrip("/")
+        self.base_url = (
+            base_url or os.getenv("DATA_AGENT_LLM_BASE_URL") or "https://api.moonshot.cn"
+        ).rstrip("/")
         self.api_key = api_key or os.getenv("DATA_AGENT_LLM_API_KEY") or ""
-        self.model_name = model or os.getenv("DATA_AGENT_LLM_MODEL") or "glm-5.3"
+        self.model_name = model or os.getenv("DATA_AGENT_LLM_MODEL") or "kimi-k2.6"
         self.timeout = timeout
         if not self.base_url or not self.api_key:
             raise ValueError(
@@ -642,7 +646,8 @@ class OpenAICompatibleExtractor:
                     {"role": "user", "content": json.dumps(user, ensure_ascii=False)},
                 ],
                 "stream": False,
-                "temperature": 0,
+                "temperature": 0.6,
+                "thinking": {"type": "disabled"},
             },
             timeout=self.timeout,
         )
@@ -1340,12 +1345,15 @@ def list_open_web_test_runs(
             value = json.loads(manifest.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        if value.get("schema_version") != SCHEMA_VERSION:
+        if value.get("schema_version") not in {
+            SCHEMA_VERSION, HERMES_SCHEMA_VERSION, LEGACY_HERMES_SCHEMA_VERSION,
+        }:
             continue
         item = {
             key: value.get(key) for key in (
-                "session_id", "status", "started_at", "finished_at", "skill",
-                "skill_label", "chips", "queries", "counts", "formal_database_modified",
+                "schema_version", "session_id", "status", "started_at", "finished_at", "skill",
+                "skill_label", "scope", "unit_count", "units", "chips", "queries", "counts",
+                "formal_database_modified",
             )
         }
         audit_summary = _compact_audit_summary(_read_full_audit_report(folder))
@@ -1359,8 +1367,12 @@ def list_open_web_test_runs(
         return [
             item
             for item in ordered
-            if item.get("skill") == "all-skills"
-            and item.get("audit_summary")
+            if (
+                (item.get("skill") == "all-skills" and item.get("audit_summary"))
+                or item.get("schema_version") in {
+                    HERMES_SCHEMA_VERSION, LEGACY_HERMES_SCHEMA_VERSION,
+                }
+            )
             and item.get("finished_at")
             and item.get("status") in {"success", "partial"}
         ][:1]
@@ -1381,7 +1393,9 @@ def read_open_web_test_run(source_db: str | Path, session_id: str) -> dict[str, 
     if folder.is_symlink() or not marker_path.is_file() or not manifest_path.is_file():
         raise ValueError("测试会话不存在。")
     marker = json.loads(marker_path.read_text(encoding="utf-8"))
-    if marker.get("mode") != "test" or marker.get("pipeline") != "open-web-test":
+    if marker.get("mode") != "test" or marker.get("pipeline") not in {
+        "open-web-test", "hermes-open-web",
+    }:
         raise ValueError("不是开放互联网测试会话。")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     db_path = folder / "data.db"
@@ -1414,17 +1428,29 @@ def read_open_web_test_run(source_db: str | Path, session_id: str) -> dict[str, 
             except ValueError:
                 continue
     search_plan: list[dict[str, Any]] = []
-    queries_path = folder / "search_queries.json"
+    queries_path = (
+        folder / "hermes_search_plan.json"
+        if manifest.get("schema_version") in {
+            HERMES_SCHEMA_VERSION, LEGACY_HERMES_SCHEMA_VERSION,
+        }
+        else folder / "search_queries.json"
+    )
     if queries_path.is_file() and not queries_path.is_symlink():
         try:
             query_document = json.loads(queries_path.read_text(encoding="utf-8"))
-            raw_plan = query_document.get("query_plan", [])
+            raw_plan = query_document.get("query_plan", query_document.get("queries", []))
             if isinstance(raw_plan, list):
                 search_plan = [item for item in raw_plan if isinstance(item, dict)]
         except (OSError, ValueError):
             pass
     search_results: list[dict[str, Any]] = []
-    candidates_path = folder / "url_candidates.jsonl"
+    candidates_path = (
+        folder / "search_results.jsonl"
+        if manifest.get("schema_version") in {
+            HERMES_SCHEMA_VERSION, LEGACY_HERMES_SCHEMA_VERSION,
+        }
+        else folder / "url_candidates.jsonl"
+    )
     if candidates_path.is_file() and not candidates_path.is_symlink():
         for line in candidates_path.read_text(encoding="utf-8").splitlines():
             try:
@@ -1433,6 +1459,103 @@ def read_open_web_test_run(source_db: str | Path, session_id: str) -> dict[str, 
                     search_results.append(item)
             except ValueError:
                 continue
+    extra_artifacts: dict[str, list[dict[str, Any]]] = {}
+    for key, name in (
+        ("url_previews", "url_previews.jsonl"),
+        ("url_decisions", "url_decisions.jsonl"),
+        ("linked_tasks", "linked_tasks.jsonl"),
+        ("tool_trace", "hermes_tool_trace.jsonl"),
+    ):
+        values: list[dict[str, Any]] = []
+        path = folder / name
+        if path.is_file() and not path.is_symlink():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                try:
+                    item = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(item, dict):
+                    values.append(item)
+        extra_artifacts[key] = values
+    unit_details: list[dict[str, Any]] = []
+    new_chip_candidates: list[dict[str, Any]] = []
+    if manifest.get("schema_version") == HERMES_SCHEMA_VERSION:
+        search_plan = []
+        search_results = []
+        url_assets = []
+        events = []
+        extra_artifacts = {
+            "url_previews": [], "url_decisions": [],
+            "linked_tasks": [], "tool_trace": [],
+        }
+
+        def read_unit_jsonl(unit_folder: Path, name: str) -> list[dict[str, Any]]:
+            rows: list[dict[str, Any]] = []
+            path = unit_folder / name
+            if not path.is_file() or path.is_symlink():
+                return rows
+            for line in path.read_text(encoding="utf-8").splitlines():
+                try:
+                    value = json.loads(line)
+                except ValueError:
+                    continue
+                if isinstance(value, dict):
+                    rows.append(value)
+            return rows
+
+        for summary in manifest.get("units") or []:
+            unit_id = str(summary.get("unit_id") or "")
+            unit_folder = folder / "units" / unit_id
+            unit_manifest_path = unit_folder / "manifest.json"
+            if not unit_id or not unit_manifest_path.is_file() or unit_folder.is_symlink():
+                continue
+            try:
+                unit = json.loads(unit_manifest_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            context = {
+                "unit_id": unit_id,
+                "scope_type": unit.get("scope_type") or "chip",
+                "target_chip": unit.get("target_chip") or "",
+            }
+            plan_doc = {}
+            plan_path = unit_folder / "hermes_search_plan.json"
+            if plan_path.is_file() and not plan_path.is_symlink():
+                try:
+                    plan_doc = json.loads(plan_path.read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    plan_doc = {}
+            unit_plan = [
+                {**item, **context, "skill": unit.get("skill")}
+                for item in plan_doc.get("queries", [])
+                if isinstance(item, dict)
+            ]
+            search_plan.extend(unit_plan)
+            artifacts = {
+                "search_results": read_unit_jsonl(unit_folder, "search_results.jsonl"),
+                "url_previews": read_unit_jsonl(unit_folder, "url_previews.jsonl"),
+                "url_decisions": read_unit_jsonl(unit_folder, "url_decisions.jsonl"),
+                "linked_tasks": read_unit_jsonl(unit_folder, "linked_tasks.jsonl"),
+                "tool_trace": read_unit_jsonl(unit_folder, "hermes_tool_trace.jsonl"),
+                "url_assets": read_unit_jsonl(unit_folder, "url_assets.jsonl"),
+                "events": read_unit_jsonl(unit_folder, "events.jsonl"),
+                "new_chip_candidates": read_unit_jsonl(unit_folder, "new_chip_candidates.jsonl"),
+            }
+            search_results.extend({**row, **context} for row in artifacts["search_results"])
+            url_assets.extend({**row, **context} for row in artifacts["url_assets"])
+            events.extend({**row, **context} for row in artifacts["events"])
+            new_chip_candidates.extend(
+                {**row, **context} for row in artifacts["new_chip_candidates"]
+            )
+            for key in ("url_previews", "url_decisions", "linked_tasks", "tool_trace"):
+                extra_artifacts[key].extend({**row, **context} for row in artifacts[key])
+            unit_details.append({
+                **context,
+                "status": unit.get("status"), "stage": unit.get("stage"),
+                "attempts": unit.get("attempts", 0), "counts": unit.get("counts") or {},
+                "started_at": unit.get("started_at"), "finished_at": unit.get("finished_at"),
+                "error": unit.get("error") or "", "queries": len(unit_plan),
+            })
     return {
         **manifest,
         "urls": urls,
@@ -1441,5 +1564,8 @@ def read_open_web_test_run(source_db: str | Path, session_id: str) -> dict[str, 
         "search_results": search_results,
         "facts": facts,
         "events": events,
+        "unit_details": unit_details,
+        "new_chip_candidates": new_chip_candidates,
         "audit_report": _read_full_audit_report(folder),
+        **extra_artifacts,
     }
